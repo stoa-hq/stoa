@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stoa
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: stoa
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stoa"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  stoa:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      STOA_DATABASE_URL: "postgres://stoa:secret@postgres:5432/stoa?sslmode=disable"
+      STOA_AUTH_JWT_SECRET: "change-me-in-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  pgdata:
+  uploads:

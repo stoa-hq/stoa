@@ -1,0 +1,15 @@
+/stoa
+coverage.out
+coverage.html
+uploads/
+config.yaml
+*.env
+.env
+node_modules/
+admin/build/
+admin/.svelte-kit/
+storefront/build/
+storefront/.svelte-kit/
+project
+internal/admin/build
+internal/storefront/build

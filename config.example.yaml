@@ -1,0 +1,40 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 30s
+  cors:
+    allowed_origins: ["http://localhost:5173"]
+    allowed_methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+database:
+  url: "postgres://stoa:secret@localhost:5432/stoa?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+auth:
+  jwt_secret: "change-me-in-production"
+  access_token_ttl: 15m
+  refresh_token_ttl: 168h  # 7 days
+
+media:
+  storage: "local"         # "local" or "s3"
+  local_path: "./uploads"
+  s3:
+    bucket: ""
+    region: ""
+    endpoint: ""           # For MinIO
+
+search:
+  engine: "postgres"       # "postgres", or via plugin
+
+i18n:
+  default_locale: "de-DE"
+  available_locales: ["de-DE", "en-US"]
+
+security:
+  rate_limit:
+    requests_per_minute: 60
+    burst: 10
+  bcrypt_cost: 12
