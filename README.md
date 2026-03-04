@@ -1,329 +1,331 @@
 # Stoa
 
-Eine leichtgewichtige, Open-Source Headless-E-Commerce-Plattform, gebaut mit Go. Das System wird als einzelnes Binary ausgeliefert, in dem sowohl das Admin-Panel als auch der Storefront eingebettet sind.
+A lightweight, open-source headless e-commerce platform built with Go. The system ships as a single binary with both the admin panel and the storefront embedded.
 
 ## Features
 
-- **Headless Architecture** – REST API (JSON)
-- **Single Binary** – Go-Backend mit eingebetteten SvelteKit-Frontends (Admin + Storefront)
-- **Plugin-System** – Erweiterbar über Hooks und eigene API-Endpunkte
-- **Mehrsprachig** – Übersetzungstabellen mit Locale-basierter API
-- **Eigenschaftsgruppen & Varianten** – Farbe, Größe etc. mit automatischer Kombinationsgenerierung
-- **Volltextsuche** – PostgreSQL-basiert
-- **RBAC** – Rollenbasierte Zugriffskontrolle
+- **Headless Architecture** -- REST API (JSON)
+- **Single Binary** -- Go backend with embedded SvelteKit frontends (Admin + Storefront)
+- **Plugin System** -- Extensible via hooks and custom API endpoints
+- **Multi-language** -- Translation tables with locale-based API
+- **Property Groups & Variants** -- Color, size, etc. with automatic combination generation
+- **Full-text Search** -- PostgreSQL-based
+- **RBAC** -- Role-based access control
 
-## Voraussetzungen
+## Prerequisites
 
-| Tool | Version | Wofür |
-|------|---------|-------|
-| Docker + Docker Compose | aktuell | Datenbank (und optionaler App-Container) |
-| Go | 1.23+ | Backend bauen (nur bei lokaler Entwicklung) |
-| Node.js | 20+ | Frontends bauen (nur bei lokaler Entwicklung) |
-| PostgreSQL | 16+ | Datenbank (wird per Docker bereitgestellt) |
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Docker + Docker Compose | latest | Database (and optional app container) |
+| Go | 1.23+ | Build backend (local development only) |
+| Node.js | 20+ | Build frontends (local development only) |
+| PostgreSQL | 16+ | Database (provided via Docker) |
 
 ---
 
-## Schnellstart mit Docker (empfohlen)
+## Quick Start with Docker (recommended)
 
-Dies ist der einfachste Weg, um die gesamte Plattform lokal zu starten. Du brauchst nur Docker.
+This is the easiest way to run the entire platform locally. All you need is Docker.
 
-### 1. Repository klonen
+### 1. Clone the repository
 
 ```bash
 git clone <repository-url>
 cd stoa
 ```
 
-### 2. Konfiguration anlegen
+### 2. Create configuration
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-Die Standardwerte funktionieren sofort mit Docker Compose — du musst nichts ändern.
+The default values work out of the box with Docker Compose -- no changes required.
 
-### 3. Alles starten
+### 3. Start everything
 
 ```bash
 docker compose up -d
 ```
 
-Das startet PostgreSQL und die Stoa-Anwendung. Beim ersten Mal wird das Docker-Image gebaut (inkl. Admin- und Storefront-Frontend). Das dauert beim ersten Mal einige Minuten.
+This starts PostgreSQL and the Stoa application. On the first run the Docker image is built (including admin and storefront frontends), which takes a few minutes.
 
-### 4. Datenbank einrichten
+### 4. Set up the database
 
 ```bash
-# Migrationen ausführen (Tabellen anlegen)
+# Run migrations (create tables)
 docker compose exec stoa ./stoa migrate up
 
-# Admin-Benutzer anlegen
-docker compose exec stoa ./stoa admin create --email admin@example.com --password dein-passwort
+# Create an admin user
+docker compose exec stoa ./stoa admin create --email admin@example.com --password your-password
 
-# Optional: Demo-Daten laden (Produkte, Kategorien, etc.)
+# Optional: load demo data (products, categories, etc.)
 docker compose exec stoa ./stoa seed --demo
 ```
 
-### 5. Fertig!
+### 5. Done!
 
-| Was | URL |
-|-----|-----|
+| What | URL |
+|------|-----|
 | Storefront | http://localhost:8080 |
-| Admin-Panel | http://localhost:8080/admin |
-| API Health-Check | http://localhost:8080/api/v1/health |
+| Admin Panel | http://localhost:8080/admin |
+| API Health Check | http://localhost:8080/api/v1/health |
 
-Melde dich im Admin-Panel mit den Zugangsdaten aus Schritt 4 an.
+Log into the admin panel with the credentials from step 4.
 
-### Stoppen und Neustarten
+### Stopping and Restarting
 
 ```bash
-# Stoppen (Daten bleiben erhalten)
+# Stop (data is preserved)
 docker compose down
 
-# Stoppen und alle Daten löschen
+# Stop and delete all data
 docker compose down -v
 
-# Neustarten
+# Restart
 docker compose up -d
 ```
 
 ---
 
-## Lokale Entwicklung (ohne Docker für die App)
+## Local Development (without Docker for the app)
 
-Für die Entwicklung am Code ist es praktischer, nur PostgreSQL per Docker laufen zu lassen und die App direkt auszuführen.
+For working on the codebase it is more convenient to run only PostgreSQL via Docker and execute the app directly.
 
-### 1. PostgreSQL starten
+### 1. Start PostgreSQL
 
 ```bash
 docker compose up -d postgres
 ```
 
-### 2. Konfiguration anlegen
+### 2. Create configuration
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-### 3. Datenbank einrichten
+### 3. Set up the database
 
 ```bash
 go run ./cmd/stoa migrate up
-go run ./cmd/stoa admin create --email admin@example.com --password dein-passwort
+go run ./cmd/stoa admin create --email admin@example.com --password your-password
 go run ./cmd/stoa seed --demo   # optional
 ```
 
-### 4. Frontends bauen
+### 4. Build frontends
 
-Sowohl Admin als auch Storefront sind SvelteKit-Anwendungen, die per `//go:embed` in das Go-Binary eingebettet werden. Vor dem ersten Start müssen sie gebaut werden:
+Both admin and storefront are SvelteKit applications embedded into the Go binary via `//go:embed`. They must be built before the first run:
 
 ```bash
-# Admin-Panel
+# Admin panel
 cd admin && npm install && npm run build && cd ..
 
 # Storefront
 cd storefront && npm install && npm run build && cd ..
 ```
 
-> **Wichtig:** Nach jeder Änderung an den Frontends muss `npm run build` UND danach das Go-Binary neu gebaut werden, weil die Frontends statisch in das Binary eingebettet sind.
+> **Important:** After every change to the frontends you must run `npm run build` AND rebuild the Go binary, because the frontends are statically embedded into the binary.
 
-### 5. Backend starten
+### 5. Start the backend
 
 ```bash
 go run ./cmd/stoa serve
 ```
 
-Oder als kompiliertes Binary:
+Or as a compiled binary:
 
 ```bash
 go build -o stoa ./cmd/stoa
 ./stoa serve
 ```
 
-### Frontend-Entwicklung mit Hot-Reload
+### Frontend Development with Hot-Reload
 
-Für die Entwicklung an den Frontends kannst du die Vite-Dev-Server starten, die Hot-Reload bieten:
+For frontend development you can start the Vite dev servers, which provide hot-reload:
 
 ```bash
-# Admin-Panel (Port 5174)
+# Admin panel (port 5174)
 cd admin && npm run dev
 
-# Storefront (Port 5173)
+# Storefront (port 5173)
 cd storefront && npm run dev
 ```
 
-Die Dev-Server kommunizieren über die API mit dem Go-Backend auf Port 8080. Stelle sicher, dass das Backend läuft.
+The dev servers communicate with the Go backend on port 8080 via the API. Make sure the backend is running.
 
 ---
 
-## Makefile-Befehle
+## Makefile Commands
 
 ```bash
-make build              # Frontends bauen + Go-Binary kompilieren
-make run                # build + starten
-make test               # Go-Tests ausführen
-make test-race          # Tests mit Race-Detector
-make lint               # Linter ausführen (golangci-lint + go vet)
+make build              # Build frontends + compile Go binary
+make run                # build + start
+make test               # Run Go tests
+make test-race          # Tests with race detector
+make lint               # Run linters (golangci-lint + go vet)
 make docker-up          # docker compose up -d
 make docker-down        # docker compose down
-make admin-dev          # Admin-Frontend Dev-Server
-make storefront-dev     # Storefront Dev-Server
-make seed               # Demo-Daten laden
+make admin-dev          # Admin frontend dev server
+make storefront-dev     # Storefront dev server
+make seed               # Load demo data
 ```
 
 ---
 
-## Konfiguration
+## Configuration
 
-Alle Einstellungen stehen in `config.yaml`. Alternativ können sie per Umgebungsvariable mit dem Prefix `STOA_` überschrieben werden:
+All settings are in `config.yaml`. Alternatively they can be overridden via environment variables with the `STOA_` prefix:
 
 ```bash
 STOA_DATABASE_URL="postgres://user:pass@host:5432/db?sslmode=disable"
-STOA_AUTH_JWT_SECRET="ein-sicherer-schlüssel"
+STOA_AUTH_JWT_SECRET="a-secure-secret"
 STOA_SERVER_PORT=8080
 ```
 
-### Wichtige Einstellungen
+### Key Settings
 
-| Einstellung | Standard | Beschreibung |
-|-------------|----------|--------------|
-| `server.port` | `8080` | HTTP-Port |
-| `database.url` | `postgres://stoa:secret@localhost:5432/stoa` | PostgreSQL-Connection-String |
-| `auth.jwt_secret` | `change-me-in-production` | JWT-Signierungsschlüssel |
-| `media.storage` | `local` | Medien-Speicher (`local` oder `s3`) |
-| `media.local_path` | `./uploads` | Lokaler Upload-Pfad |
-| `i18n.default_locale` | `de-DE` | Standard-Sprache |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `server.port` | `8080` | HTTP port |
+| `database.url` | `postgres://stoa:secret@localhost:5432/stoa` | PostgreSQL connection string |
+| `auth.jwt_secret` | `change-me-in-production` | JWT signing key |
+| `media.storage` | `local` | Media storage (`local` or `s3`) |
+| `media.local_path` | `./uploads` | Local upload path |
+| `i18n.default_locale` | `de-DE` | Default language |
+| `payment.encryption_key` | *(required)* | AES-256 key for payment config encryption (32 bytes or 64 hex chars, env: `STOA_PAYMENT_ENCRYPTION_KEY`) |
 
 ---
 
-## API-Übersicht
+## API Overview
 
-| Bereich | Pfad | Authentifizierung |
-|---------|------|-------------------|
-| Admin-API | `/api/v1/admin/*` | JWT (Admin-Rolle) |
-| Store-API | `/api/v1/store/*` | Öffentlich / Kunden-JWT |
-| Auth | `/api/v1/auth/*` | Keine |
-| Health | `/api/v1/health` | Keine |
+| Area | Path | Authentication |
+|------|------|----------------|
+| Admin API | `/api/v1/admin/*` | JWT (admin role) |
+| Store API | `/api/v1/store/*` | Public / customer JWT |
+| Auth | `/api/v1/auth/*` | None |
+| Health | `/api/v1/health` | None |
 
-### Authentifizierung
+### Authentication
 
 ```bash
-# Admin-Login
+# Admin login
 curl -X POST http://localhost:8080/api/v1/auth/admin/login \
   -H 'Content-Type: application/json' \
-  -d '{"email": "admin@example.com", "password": "dein-passwort"}'
+  -d '{"email": "admin@example.com", "password": "your-password"}'
 
-# Antwort enthält access_token und refresh_token
-# access_token in Authorization-Header verwenden:
+# The response contains access_token and refresh_token
+# Use access_token in the Authorization header:
 curl http://localhost:8080/api/v1/admin/products \
   -H 'Authorization: Bearer <access_token>'
 ```
 
 ---
 
-## CLI-Befehle
+## CLI Commands
 
 ```bash
-stoa serve                  # HTTP-Server starten
-stoa migrate up             # Migrationen ausführen
-stoa migrate down           # Letzte Migration zurückrollen
-stoa admin create           # Admin-Benutzer anlegen
+stoa serve                  # Start HTTP server
+stoa migrate up             # Run migrations
+stoa migrate down           # Roll back last migration
+stoa admin create           # Create admin user
   --email admin@example.com
-  --password dein-passwort
-stoa seed --demo            # Demo-Daten laden
-stoa plugin list            # Installierte Plugins anzeigen
-stoa version                # Version ausgeben
+  --password your-password
+stoa seed --demo            # Load demo data
+stoa plugin list            # List installed plugins
+stoa version                # Print version
 ```
 
 ---
 
-## Projektstruktur
+## Project Structure
 
 ```
 stoa/
-├── cmd/stoa/           # CLI-Einstiegspunkt (main.go)
+├── cmd/stoa/           # CLI entry point (main.go)
 ├── internal/
-│   ├── app/                # Application-Bootstrapping
-│   ├── config/             # Konfiguration laden
-│   ├── server/             # HTTP-Server, Router, Middleware
-│   ├── auth/               # JWT, RBAC, Berechtigungen
-│   ├── database/           # DB-Verbindung, Migrations-Runner
-│   ├── domain/             # Business-Logik (DDD-artig)
-│   │   ├── product/        # Produkte, Varianten, Eigenschaftsgruppen
-│   │   ├── category/       # Kategorien (Baumstruktur)
-│   │   ├── order/          # Bestellungen
-│   │   ├── cart/           # Warenkorb
-│   │   ├── customer/       # Kundenverwaltung
-│   │   ├── media/          # Medien-Upload
-│   │   ├── discount/       # Rabatte
-│   │   ├── shipping/       # Versandmethoden
-│   │   ├── payment/        # Zahlungsmethoden
-│   │   ├── tax/            # Steuerregeln
+│   ├── app/                # Application bootstrapping
+│   ├── config/             # Configuration loading
+│   ├── crypto/             # AES-256-GCM encryption helpers
+│   ├── server/             # HTTP server, router, middleware
+│   ├── auth/               # JWT, RBAC, permissions
+│   ├── database/           # DB connection, migration runner
+│   ├── domain/             # Business logic (DDD-style)
+│   │   ├── product/        # Products, variants, property groups
+│   │   ├── category/       # Categories (tree structure)
+│   │   ├── order/          # Orders
+│   │   ├── cart/           # Shopping cart
+│   │   ├── customer/       # Customer management
+│   │   ├── media/          # Media uploads
+│   │   ├── discount/       # Discounts
+│   │   ├── shipping/       # Shipping methods
+│   │   ├── payment/        # Payment methods
+│   │   ├── tax/            # Tax rules
 │   │   ├── tag/            # Tags
-│   │   └── audit/          # Audit-Log
-│   ├── admin/              # Eingebettetes Admin-Frontend (//go:embed)
-│   ├── storefront/         # Eingebettetes Storefront (//go:embed)
-│   ├── plugin/             # Plugin-Registry
-│   └── search/             # Suchindex
-├── admin/                  # Admin-Frontend (SvelteKit)
+│   │   └── audit/          # Audit log
+│   ├── admin/              # Embedded admin frontend (//go:embed)
+│   ├── storefront/         # Embedded storefront (//go:embed)
+│   ├── plugin/             # Plugin registry
+│   └── search/             # Search index
+├── admin/                  # Admin frontend (SvelteKit)
 ├── storefront/             # Storefront (SvelteKit)
-├── migrations/             # SQL-Migrationen
-├── pkg/sdk/                # Plugin-SDK
+├── migrations/             # SQL migrations
+├── pkg/sdk/                # Plugin SDK
 ├── Dockerfile
 ├── docker-compose.yaml
 ├── Makefile
 └── config.example.yaml
 ```
 
-Jede Domain folgt dem gleichen Muster:
-- `entity.go` – Datenstrukturen
-- `repository.go` – Interface
-- `postgres.go` – Implementierung
-- `service.go` – Business-Logik
-- `handler.go` – HTTP-Handler
-- `dto.go` – Request/Response-Typen
+Every domain follows the same pattern:
+- `entity.go` -- Data structures
+- `repository.go` -- Interface
+- `postgres.go` -- Implementation
+- `service.go` -- Business logic
+- `handler.go` -- HTTP handlers
+- `dto.go` -- Request/response types
 
 ---
 
-## Plugins entwickeln
+## Developing Plugins
 
-Stoa hat ein eingebautes Plugin-System, mit dem du die Plattform erweitern kannst, ohne den Kerncode zu ändern. Plugins können:
+Stoa has a built-in plugin system that lets you extend the platform without modifying core code. Plugins can:
 
-- **Auf Ereignisse reagieren** (z. B. E-Mail versenden nach Bestellung)
-- **Operationen verhindern** (z. B. Validierung vor Warenkorb-Änderung)
-- **Eigene API-Endpunkte** bereitstellen
-- **Direkt auf die Datenbank** zugreifen
+- **React to events** (e.g. send an email after an order)
+- **Prevent operations** (e.g. validate before a cart change)
+- **Provide custom API endpoints**
+- **Access the database directly**
 
-### Plugin-Interface
+### Plugin Interface
 
-Jedes Plugin implementiert das `sdk.Plugin`-Interface aus `pkg/sdk`:
+Every plugin implements the `sdk.Plugin` interface from `pkg/sdk`:
 
 ```go
 package sdk
 
 type Plugin interface {
-    Name() string        // Eindeutiger Name, z. B. "order-email"
-    Version() string     // Semver, z. B. "1.0.0"
-    Description() string // Kurzbeschreibung
-    Init(app *AppContext) error   // Wird beim Start aufgerufen
-    Shutdown() error              // Wird beim Herunterfahren aufgerufen
+    Name() string        // Unique name, e.g. "order-email"
+    Version() string     // Semver, e.g. "1.0.0"
+    Description() string // Short description
+    Init(app *AppContext) error   // Called on startup
+    Shutdown() error              // Called on shutdown
 }
 ```
 
-In der `Init`-Methode bekommt das Plugin einen `AppContext` mit allem, was es braucht:
+In the `Init` method the plugin receives an `AppContext` with everything it needs:
 
 ```go
 type AppContext struct {
-    DB     *pgxpool.Pool       // PostgreSQL-Verbindung
-    Router chi.Router           // HTTP-Router für eigene Endpunkte
-    Hooks  *HookRegistry        // Event-System
-    Config map[string]interface{} // Plugin-spezifische Konfiguration
-    Logger zerolog.Logger        // Strukturiertes Logging
+    DB     *pgxpool.Pool       // PostgreSQL connection
+    Router chi.Router           // HTTP router for custom endpoints
+    Hooks  *HookRegistry        // Event system
+    Config map[string]interface{} // Plugin-specific configuration
+    Logger zerolog.Logger        // Structured logging
 }
 ```
 
-### Beispiel: E-Mail bei neuer Bestellung
+### Example: Email on New Order
 
-Erstelle eine neue Datei, z. B. `plugins/orderemail/plugin.go`:
+Create a new file, e.g. `plugins/orderemail/plugin.go`:
 
 ```go
 package orderemail
@@ -346,19 +348,19 @@ func New() *Plugin {
 
 func (p *Plugin) Name() string        { return "order-email" }
 func (p *Plugin) Version() string     { return "1.0.0" }
-func (p *Plugin) Description() string { return "Sendet Bestätigungs-E-Mails nach Bestellungen" }
+func (p *Plugin) Description() string { return "Sends confirmation emails after orders" }
 
 func (p *Plugin) Init(app *sdk.AppContext) error {
     p.logger = app.Logger
 
-    // Nach jeder neuen Bestellung eine E-Mail versenden
+    // Send an email after every new order
     app.Hooks.On(sdk.HookAfterOrderCreate, func(ctx context.Context, event *sdk.HookEvent) error {
         o := event.Entity.(*order.Order)
         p.logger.Info().
             Str("order", o.OrderNumber).
-            Msg("Bestätigungsmail versenden")
+            Msg("sending confirmation email")
 
-        // Hier: SMTP-Versand, externer Service, etc.
+        // Here: SMTP send, external service, etc.
         return nil
     })
 
@@ -370,16 +372,16 @@ func (p *Plugin) Shutdown() error {
 }
 ```
 
-### Beispiel: Mindestbestellwert prüfen
+### Example: Minimum Order Value
 
-Before-Hooks können Operationen **verhindern**, indem sie einen Fehler zurückgeben:
+Before-hooks can **prevent operations** by returning an error:
 
 ```go
 func (p *Plugin) Init(app *sdk.AppContext) error {
     app.Hooks.On(sdk.HookBeforeCheckout, func(ctx context.Context, event *sdk.HookEvent) error {
         o := event.Entity.(*order.Order)
-        if o.Total < 1000 { // Preise in Cent
-            return fmt.Errorf("Mindestbestellwert: 10,00 €")
+        if o.Total < 1000 { // prices in cents
+            return fmt.Errorf("minimum order value: 10.00 EUR")
         }
         return nil
     })
@@ -387,9 +389,9 @@ func (p *Plugin) Init(app *sdk.AppContext) error {
 }
 ```
 
-### Beispiel: Eigene API-Endpunkte
+### Example: Custom API Endpoints
 
-Plugins können über den Chi-Router eigene Endpunkte registrieren:
+Plugins can register their own endpoints via the Chi router:
 
 ```go
 func (p *Plugin) Init(app *sdk.AppContext) error {
@@ -403,25 +405,25 @@ func (p *Plugin) Init(app *sdk.AppContext) error {
 }
 
 func (p *Plugin) handleList(w http.ResponseWriter, r *http.Request) {
-    // Direkter DB-Zugriff über p.db (im Init gespeichert)
+    // Direct DB access via p.db (stored during Init)
     rows, err := p.db.Query(r.Context(), "SELECT * FROM wishlists WHERE customer_id = $1", customerID)
     // ...
 }
 ```
 
-### Plugin registrieren
+### Registering a Plugin
 
-Um ein Plugin zu aktivieren, registriere es in `internal/app/app.go` nach dem Erstellen der `App`:
+To activate a plugin, register it in `internal/app/app.go` after creating the `App`:
 
 ```go
 import "github.com/epoxx-arch/stoa/plugins/orderemail"
 
-// In New() oder einer eigenen Methode:
+// In New() or a dedicated method:
 func (a *App) RegisterPlugins() error {
     appCtx := &plugin.AppContext{
         DB:     a.DB.Pool,
         Router: a.Server.Router(),
-        Config: nil, // oder aus config.yaml laden
+        Config: nil, // or load from config.yaml
         Logger: a.Logger,
     }
 
@@ -429,45 +431,324 @@ func (a *App) RegisterPlugins() error {
 }
 ```
 
-### Verfügbare Hooks
+### Available Hooks
 
-| Hook | Zeitpunkt | Kann abbrechen? |
-|------|-----------|-----------------|
-| `product.before_create` | Vor Produkt-Erstellung | Ja |
-| `product.after_create` | Nach Produkt-Erstellung | Nein |
-| `product.before_update` | Vor Produkt-Update | Ja |
-| `product.after_update` | Nach Produkt-Update | Nein |
-| `product.before_delete` | Vor Produkt-Löschung | Ja |
-| `product.after_delete` | Nach Produkt-Löschung | Nein |
-| `order.before_create` | Vor Bestellerstellung | Ja |
-| `order.after_create` | Nach Bestellerstellung | Nein |
-| `order.before_update` | Vor Status-Änderung | Ja |
-| `order.after_update` | Nach Status-Änderung | Nein |
-| `cart.before_add_item` | Vor Warenkorb-Hinzufügen | Ja |
-| `cart.after_add_item` | Nach Warenkorb-Hinzufügen | Nein |
-| `cart.before_update_item` | Vor Mengen-Änderung | Ja |
-| `cart.after_update_item` | Nach Mengen-Änderung | Nein |
-| `cart.before_remove_item` | Vor Artikel-Entfernung | Ja |
-| `cart.after_remove_item` | Nach Artikel-Entfernung | Nein |
-| `customer.before_create` | Vor Kundenregistrierung | Ja |
-| `customer.after_create` | Nach Kundenregistrierung | Nein |
-| `customer.before_update` | Vor Kunden-Update | Ja |
-| `customer.after_update` | Nach Kunden-Update | Nein |
-| `category.before_create` | Vor Kategorie-Erstellung | Ja |
-| `category.after_create` | Nach Kategorie-Erstellung | Nein |
-| `category.before_update` | Vor Kategorie-Update | Ja |
-| `category.after_update` | Nach Kategorie-Update | Nein |
-| `category.before_delete` | Vor Kategorie-Löschung | Ja |
-| `category.after_delete` | Nach Kategorie-Löschung | Nein |
-| `checkout.before` | Vor Checkout-Abschluss | Ja |
-| `checkout.after` | Nach Checkout-Abschluss | Nein |
-| `payment.after_complete` | Nach erfolgreicher Zahlung | Nein |
-| `payment.after_failed` | Nach fehlgeschlagener Zahlung | Nein |
+| Hook | Timing | Can cancel? |
+|------|--------|-------------|
+| `product.before_create` | Before product creation | Yes |
+| `product.after_create` | After product creation | No |
+| `product.before_update` | Before product update | Yes |
+| `product.after_update` | After product update | No |
+| `product.before_delete` | Before product deletion | Yes |
+| `product.after_delete` | After product deletion | No |
+| `order.before_create` | Before order creation | Yes |
+| `order.after_create` | After order creation | No |
+| `order.before_update` | Before status change | Yes |
+| `order.after_update` | After status change | No |
+| `cart.before_add_item` | Before adding to cart | Yes |
+| `cart.after_add_item` | After adding to cart | No |
+| `cart.before_update_item` | Before quantity change | Yes |
+| `cart.after_update_item` | After quantity change | No |
+| `cart.before_remove_item` | Before item removal | Yes |
+| `cart.after_remove_item` | After item removal | No |
+| `customer.before_create` | Before customer registration | Yes |
+| `customer.after_create` | After customer registration | No |
+| `customer.before_update` | Before customer update | Yes |
+| `customer.after_update` | After customer update | No |
+| `category.before_create` | Before category creation | Yes |
+| `category.after_create` | After category creation | No |
+| `category.before_update` | Before category update | Yes |
+| `category.after_update` | After category update | No |
+| `category.before_delete` | Before category deletion | Yes |
+| `category.after_delete` | After category deletion | No |
+| `checkout.before` | Before checkout completion | Yes |
+| `checkout.after` | After checkout completion | No |
+| `payment.after_complete` | After successful payment | No |
+| `payment.after_failed` | After failed payment | No |
 
-**Before-Hooks** werden vor der Datenbankoperation ausgeführt und können die Operation durch Rückgabe eines Fehlers abbrechen. **After-Hooks** werden danach ausgeführt — Fehler werden nur geloggt, brechen die Operation aber nicht ab.
+**Before-hooks** execute before the database operation and can cancel it by returning an error. **After-hooks** execute afterwards -- errors are only logged and do not abort the operation.
 
 ---
 
-## Lizenz
+## Integrating a Payment Service Provider (PSP)
 
-Apache 2.0 – siehe [LICENSE](LICENSE).
+Stoa provides a flexible payment architecture that separates *payment methods* (stored in the database) from *payment processing* (implemented as plugins). This section explains step by step how to integrate a PSP such as Stripe, PayPal, Mollie, or any other provider.
+
+### Architecture Overview
+
+```
+┌──────────────┐       ┌──────────────┐       ┌────────────────────┐
+│  Storefront  │──────▶│  Stoa API    │──────▶│  PSP Plugin        │
+│  (Checkout)  │       │  /checkout   │       │  (e.g. Stripe)     │
+└──────────────┘       └──────┬───────┘       └────────┬───────────┘
+                              │                        │
+                     ┌────────▼────────┐      ┌────────▼───────────┐
+                     │ PaymentMethod   │      │ Stripe API         │
+                     │ (DB: config,    │      │ (external)         │
+                     │  provider name) │      └────────────────────┘
+                     └─────────────────┘
+```
+
+1. A **PaymentMethod** record in the database stores the provider name (e.g. `"stripe"`) and encrypted provider credentials in the `config` field (e.g. API keys, webhook secrets).
+2. A **PSP plugin** listens to checkout/payment hooks, reads the config from the payment method, and communicates with the external provider API.
+3. The plugin creates **PaymentTransaction** records to track the outcome.
+
+### Step 1: Create the Plugin Skeleton
+
+Create a new directory for your plugin, e.g. `plugins/stripe/plugin.go`:
+
+```go
+package stripe
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+
+    "github.com/go-chi/chi/v5"
+    "github.com/jackc/pgx/v5/pgxpool"
+    "github.com/rs/zerolog"
+
+    "github.com/epoxx-arch/stoa/internal/domain/order"
+    "github.com/epoxx-arch/stoa/internal/domain/payment"
+    "github.com/epoxx-arch/stoa/pkg/sdk"
+)
+
+// ProviderName is the identifier stored in payment_methods.provider.
+const ProviderName = "stripe"
+
+// Config holds the provider-specific credentials stored (encrypted) in
+// PaymentMethod.Config.
+type Config struct {
+    SecretKey     string `json:"secret_key"`
+    WebhookSecret string `json:"webhook_secret"`
+    PublishableKey string `json:"publishable_key"`
+}
+
+type Plugin struct {
+    db     *pgxpool.Pool
+    logger zerolog.Logger
+    hooks  *sdk.HookRegistry
+}
+
+func New() *Plugin { return &Plugin{} }
+
+func (p *Plugin) Name() string        { return "stripe-payment" }
+func (p *Plugin) Version() string     { return "1.0.0" }
+func (p *Plugin) Description() string { return "Stripe payment integration" }
+func (p *Plugin) Shutdown() error     { return nil }
+```
+
+### Step 2: Implement Init -- Hook into the Checkout Flow
+
+In the `Init` method you register hooks and optional webhook endpoints:
+
+```go
+func (p *Plugin) Init(app *sdk.AppContext) error {
+    p.db = app.DB
+    p.logger = app.Logger
+    p.hooks = app.Hooks
+
+    // 1. Before checkout: create a payment intent with the provider
+    app.Hooks.On(sdk.HookBeforeCheckout, p.handleBeforeCheckout)
+
+    // 2. Register a webhook endpoint for async payment confirmations
+    app.Router.Route("/api/v1/payments/stripe", func(r chi.Router) {
+        r.Post("/webhook", p.handleWebhook)
+    })
+
+    p.logger.Info().Msg("stripe payment plugin initialized")
+    return nil
+}
+```
+
+### Step 3: Load Provider Credentials from the PaymentMethod
+
+When the checkout hook fires, you need to look up the `PaymentMethod` to retrieve the (decrypted) config. The config is automatically decrypted by the repository layer -- your plugin receives plain JSON:
+
+```go
+func (p *Plugin) loadConfig(ctx context.Context, methodID uuid.UUID) (*Config, error) {
+    // Query the payment method directly from the DB.
+    var configBytes []byte
+    err := p.db.QueryRow(ctx,
+        `SELECT config FROM payment_methods WHERE id = $1`, methodID,
+    ).Scan(&configBytes)
+    if err != nil {
+        return nil, fmt.Errorf("stripe: load config: %w", err)
+    }
+
+    var cfg Config
+    if err := json.Unmarshal(configBytes, &cfg); err != nil {
+        return nil, fmt.Errorf("stripe: unmarshal config: %w", err)
+    }
+    return &cfg, nil
+}
+```
+
+> **Note:** If you query the database directly (as above), the config column contains the *encrypted* bytes. To get decrypted config, use the `PaymentMethodService.GetByID()` method instead, which goes through the repository layer where decryption happens automatically. You can access the service by storing a reference during `Init`, or by calling the service from the hook event context.
+
+A cleaner approach is to receive the payment method through the hook event:
+
+```go
+func (p *Plugin) handleBeforeCheckout(ctx context.Context, event *sdk.HookEvent) error {
+    o := event.Entity.(*order.Order)
+
+    // Use the payment method service (injected or looked up) to get decrypted config
+    method, err := p.paymentMethodSvc.GetByID(ctx, o.PaymentMethodID)
+    if err != nil {
+        return fmt.Errorf("stripe: %w", err)
+    }
+    if method.Provider != ProviderName {
+        return nil // not our provider, skip
+    }
+
+    var cfg Config
+    if err := json.Unmarshal(method.Config, &cfg); err != nil {
+        return fmt.Errorf("stripe: invalid config: %w", err)
+    }
+
+    // Now use cfg.SecretKey to call the Stripe API...
+    return p.createPaymentIntent(ctx, o, &cfg)
+}
+```
+
+### Step 4: Communicate with the Provider API
+
+Implement the actual API calls to your PSP. This example uses Stripe's PaymentIntents:
+
+```go
+func (p *Plugin) createPaymentIntent(ctx context.Context, o *order.Order, cfg *Config) error {
+    // Build the request to the Stripe API
+    // POST https://api.stripe.com/v1/payment_intents
+    //   amount=<o.Total>
+    //   currency=<o.Currency>
+    //   metadata[order_id]=<o.ID>
+
+    // Use cfg.SecretKey as the Bearer token
+    // Parse the response to get the client_secret
+
+    // Store the provider reference (e.g. pi_xxx) for later reconciliation:
+    _, err := p.db.Exec(ctx, `
+        INSERT INTO payment_transactions
+            (id, order_id, payment_method_id, status, currency, amount, provider_reference, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        uuid.New(), o.ID, o.PaymentMethodID, "pending", o.Currency, o.Total, stripePaymentIntentID,
+    )
+    return err
+}
+```
+
+### Step 5: Handle Webhooks for Asynchronous Confirmation
+
+Most PSPs confirm payments asynchronously via webhooks. Register an endpoint and verify the signature:
+
+```go
+func (p *Plugin) handleWebhook(w http.ResponseWriter, r *http.Request) {
+    // 1. Read and verify the webhook signature
+    //    (use cfg.WebhookSecret from the payment method)
+    body, _ := io.ReadAll(r.Body)
+
+    // 2. Parse the event type
+    //    e.g. "payment_intent.succeeded" or "payment_intent.payment_failed"
+
+    // 3. Update the transaction status
+    _, err := p.db.Exec(r.Context(), `
+        UPDATE payment_transactions
+        SET status = $1
+        WHERE provider_reference = $2`,
+        "completed", providerReference,
+    )
+    if err != nil {
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+
+    // 4. Fire the appropriate hook so other plugins can react
+    if eventType == "payment_intent.succeeded" {
+        _ = p.hooks.Dispatch(r.Context(), &sdk.HookEvent{
+            Name:   sdk.HookAfterPaymentComplete,
+            Entity: transaction,
+        })
+    } else {
+        _ = p.hooks.Dispatch(r.Context(), &sdk.HookEvent{
+            Name:   sdk.HookAfterPaymentFailed,
+            Entity: transaction,
+        })
+    }
+
+    w.WriteHeader(http.StatusOK)
+}
+```
+
+### Step 6: Configure the Payment Method via Admin API
+
+Create a payment method through the admin API. The `config` field holds your provider credentials -- they will be encrypted at rest automatically:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/payment-methods \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "provider": "stripe",
+    "active": true,
+    "config": {
+      "secret_key": "sk_live_...",
+      "publishable_key": "pk_live_...",
+      "webhook_secret": "whsec_..."
+    },
+    "translations": [
+      {"locale": "en-US", "name": "Credit Card", "description": "Pay with Visa, Mastercard, or Amex"},
+      {"locale": "de-DE", "name": "Kreditkarte", "description": "Zahlen Sie mit Visa, Mastercard oder Amex"}
+    ]
+  }'
+```
+
+The `config` object is stored as AES-256-GCM encrypted bytes in the database. It is never exposed through the public store API (the field is tagged `json:"-"`). Only the repository layer decrypts it when a service or plugin requests it internally.
+
+### Step 7: Register the Plugin
+
+Add your plugin to `internal/app/app.go`:
+
+```go
+import "github.com/epoxx-arch/stoa/plugins/stripe"
+
+func (a *App) RegisterPlugins() error {
+    appCtx := &plugin.AppContext{
+        DB:     a.DB.Pool,
+        Router: a.Server.Router(),
+        Hooks:  a.PluginRegistry.Hooks(),
+        Logger: a.Logger,
+    }
+    return a.PluginRegistry.Register(stripe.New(), appCtx)
+}
+```
+
+### Summary: PSP Integration Checklist
+
+| Step | What | Where |
+|------|------|-------|
+| 1 | Create plugin struct implementing `sdk.Plugin` | `plugins/<provider>/plugin.go` |
+| 2 | Define a `Config` struct matching your provider's credentials | Same file |
+| 3 | Hook into `checkout.before` to initiate payment | `Init()` method |
+| 4 | Parse `PaymentMethod.Config` (auto-decrypted JSON) for API keys | Hook handler |
+| 5 | Call the provider API to create a payment intent/session | Hook handler |
+| 6 | Create a `payment_transactions` record with status `pending` | Hook handler |
+| 7 | Register a `/api/v1/payments/<provider>/webhook` endpoint | `Init()` method |
+| 8 | Verify webhook signature and update transaction status | Webhook handler |
+| 9 | Dispatch `payment.after_complete` or `payment.after_failed` hook | Webhook handler |
+| 10 | Register the plugin in `app.go` | `RegisterPlugins()` |
+| 11 | Create the payment method via admin API with provider credentials | Admin API / UI |
+
+### Security Notes
+
+- **Config encryption**: All provider credentials in `PaymentMethod.Config` are encrypted with AES-256-GCM at rest. Set `STOA_PAYMENT_ENCRYPTION_KEY` (32-byte key or 64-char hex) before starting the application. Existing plaintext configs are automatically migrated on startup.
+- **Never expose secrets**: The `Config` field is tagged `json:"-"` and never included in API responses. Only internal services and plugins can access it.
+- **Webhook verification**: Always verify webhook signatures using your provider's SDK or signing secret. Never trust unverified webhook payloads.
+- **Scope provider access**: Each payment method has its own isolated config. You can run multiple providers (Stripe + PayPal) or multiple accounts of the same provider simultaneously.
+
+---
+
+## License
+
+Apache 2.0 -- see [LICENSE](LICENSE).
