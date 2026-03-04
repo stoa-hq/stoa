@@ -60,7 +60,8 @@ func (m *mockShippingRepo) Delete(ctx context.Context, id uuid.UUID) error {
 // ---------------------------------------------------------------------------
 
 func newTestShippingService(repo ShippingMethodRepository) ShippingService {
-	return NewService(repo, sdk.NewHookRegistry(), zerolog.Nop())
+	noopTaxRate := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	return NewService(repo, sdk.NewHookRegistry(), zerolog.Nop(), noopTaxRate)
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +122,8 @@ func TestShippingService_Create_BeforeHookCancels(t *testing.T) {
 	hooks.On(HookBeforeShippingCreate, func(_ context.Context, _ *sdk.HookEvent) error {
 		return hookErr
 	})
-	svc := NewService(&mockShippingRepo{}, hooks, zerolog.Nop())
+	noopTaxRate := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	svc := NewService(&mockShippingRepo{}, hooks, zerolog.Nop(), noopTaxRate)
 	err := svc.Create(context.Background(), &ShippingMethod{})
 	if !errors.Is(err, hookErr) {
 		t.Errorf("expected hookErr, got %v", err)

@@ -18,7 +18,9 @@ import (
 
 // newTestHandler wires a Handler with the given mock repository.
 func newTestHandler(repo ProductRepository) *Handler {
-	svc := NewService(repo, sdk.NewHookRegistry(), zerolog.Nop())
+	noopURL := func(s string) string { return "/uploads/" + s }
+	noopTax := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	svc := NewService(repo, sdk.NewHookRegistry(), zerolog.Nop(), noopURL, noopTax)
 	return NewHandler(svc, validator.New(), zerolog.Nop())
 }
 

@@ -68,9 +68,36 @@ func (m *mockRepo) StockAvailable(ctx context.Context, productID uuid.UUID, vari
 	return true, nil
 }
 
+// Variant stubs
+func (m *mockRepo) CreateVariant(_ context.Context, _ *ProductVariant) error           { return nil }
+func (m *mockRepo) FindVariantByID(_ context.Context, _ uuid.UUID) (*ProductVariant, error) {
+	return nil, ErrNotFound
+}
+func (m *mockRepo) UpdateVariant(_ context.Context, _ *ProductVariant) error { return nil }
+func (m *mockRepo) DeleteVariant(_ context.Context, _ uuid.UUID) error       { return nil }
+
+// PropertyGroup stubs
+func (m *mockRepo) FindAllPropertyGroups(_ context.Context) ([]PropertyGroup, error)        { return nil, nil }
+func (m *mockRepo) FindPropertyGroupByID(_ context.Context, _ uuid.UUID) (*PropertyGroup, error) {
+	return nil, ErrNotFound
+}
+func (m *mockRepo) CreatePropertyGroup(_ context.Context, _ *PropertyGroup) error { return nil }
+func (m *mockRepo) UpdatePropertyGroup(_ context.Context, _ *PropertyGroup) error { return nil }
+func (m *mockRepo) DeletePropertyGroup(_ context.Context, _ uuid.UUID) error      { return nil }
+
+// PropertyOption stubs
+func (m *mockRepo) FindOptionsByGroupID(_ context.Context, _ uuid.UUID) ([]PropertyOption, error) {
+	return nil, nil
+}
+func (m *mockRepo) CreatePropertyOption(_ context.Context, _ *PropertyOption) error { return nil }
+func (m *mockRepo) UpdatePropertyOption(_ context.Context, _ *PropertyOption) error { return nil }
+func (m *mockRepo) DeletePropertyOption(_ context.Context, _ uuid.UUID) error       { return nil }
+
 // newTestService builds a Service with a no-op HookRegistry and silent logger.
 func newTestService(repo ProductRepository) *Service {
-	return NewService(repo, sdk.NewHookRegistry(), zerolog.Nop())
+	noopURL := func(s string) string { return "/uploads/" + s }
+	noopTax := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	return NewService(repo, sdk.NewHookRegistry(), zerolog.Nop(), noopURL, noopTax)
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +161,9 @@ func TestService_Create_BeforeHookCancels(t *testing.T) {
 		return hookErr
 	})
 
-	svc := NewService(&mockRepo{}, hooks, zerolog.Nop())
+	noopURL := func(s string) string { return "/uploads/" + s }
+	noopTax := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	svc := NewService(&mockRepo{}, hooks, zerolog.Nop(), noopURL, noopTax)
 	err := svc.Create(context.Background(), &Product{SKU: "BLOCKED"})
 	if !errors.Is(err, hookErr) {
 		t.Errorf("expected hookErr to be wrapped in error, got %v", err)
@@ -148,7 +177,9 @@ func TestService_Create_AfterHookErrorIgnored(t *testing.T) {
 	})
 
 	// After-hook errors must not propagate.
-	err := NewService(&mockRepo{}, hooks, zerolog.Nop()).
+	noopURL := func(s string) string { return "/uploads/" + s }
+	noopTax := TaxRateFn(func(_ context.Context, _ uuid.UUID) (int, error) { return 0, nil })
+	err := NewService(&mockRepo{}, hooks, zerolog.Nop(), noopURL, noopTax).
 		Create(context.Background(), &Product{SKU: "OK"})
 	if err != nil {
 		t.Fatalf("after-hook error should be swallowed, got %v", err)

@@ -70,6 +70,9 @@ func (m *mockStorage) Delete(ctx context.Context, storagePath string) error {
 	}
 	return nil
 }
+func (m *mockStorage) URL(storagePath string) string {
+	return "/uploads/" + storagePath
+}
 
 // ---------------------------------------------------------------------------
 // Helper
