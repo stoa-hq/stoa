@@ -10,18 +10,21 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
+
+	"github.com/epoxx-arch/stoa/internal/crypto"
 )
 
 // --- PaymentMethod repository ---
 
 type postgresMethodRepository struct {
-	db     *pgxpool.Pool
-	logger zerolog.Logger
+	db            *pgxpool.Pool
+	logger        zerolog.Logger
+	encryptionKey []byte
 }
 
 // NewPostgresMethodRepository creates a new PostgreSQL-backed PaymentMethodRepository.
-func NewPostgresMethodRepository(db *pgxpool.Pool, logger zerolog.Logger) PaymentMethodRepository {
-	return &postgresMethodRepository{db: db, logger: logger}
+func NewPostgresMethodRepository(db *pgxpool.Pool, logger zerolog.Logger, encryptionKey []byte) PaymentMethodRepository {
+	return &postgresMethodRepository{db: db, logger: logger, encryptionKey: encryptionKey}
 }
 
 func (r *postgresMethodRepository) FindByID(ctx context.Context, id uuid.UUID) (*PaymentMethod, error) {
@@ -40,6 +43,9 @@ func (r *postgresMethodRepository) FindByID(ctx context.Context, id uuid.UUID) (
 			return nil, ErrMethodNotFound
 		}
 		return nil, fmt.Errorf("payment: FindByID: %w", err)
+	}
+	if err := r.decryptConfig(m); err != nil {
+		return nil, fmt.Errorf("payment: FindByID decrypt config: %w", err)
 	}
 	if len(cfRaw) > 0 {
 		if err := json.Unmarshal(cfRaw, &m.CustomFields); err != nil {
@@ -102,6 +108,9 @@ func (r *postgresMethodRepository) FindAll(ctx context.Context, filter PaymentMe
 		); err != nil {
 			return nil, 0, fmt.Errorf("payment: FindAll scan: %w", err)
 		}
+		if err := r.decryptConfig(&m); err != nil {
+			return nil, 0, fmt.Errorf("payment: FindAll decrypt config: %w", err)
+		}
 		if len(cfRaw) > 0 {
 			if err := json.Unmarshal(cfRaw, &m.CustomFields); err != nil {
 				return nil, 0, fmt.Errorf("payment: FindAll unmarshal custom_fields: %w", err)
@@ -130,12 +139,17 @@ func (r *postgresMethodRepository) Create(ctx context.Context, m *PaymentMethod)
 		return fmt.Errorf("payment: Create marshal custom_fields: %w", err)
 	}
 
+	encConfig, err := r.encryptConfig(m.Config)
+	if err != nil {
+		return fmt.Errorf("payment: Create encrypt config: %w", err)
+	}
+
 	const q = `
 		INSERT INTO payment_methods (id, provider, active, config, custom_fields, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	_, err = r.db.Exec(ctx, q,
-		m.ID, m.Provider, m.Active, m.Config, cfJSON, m.CreatedAt, m.UpdatedAt,
+		m.ID, m.Provider, m.Active, encConfig, cfJSON, m.CreatedAt, m.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("payment: Create: %w", err)
@@ -150,13 +164,18 @@ func (r *postgresMethodRepository) Update(ctx context.Context, m *PaymentMethod)
 		return fmt.Errorf("payment: Update marshal custom_fields: %w", err)
 	}
 
+	encConfig, err := r.encryptConfig(m.Config)
+	if err != nil {
+		return fmt.Errorf("payment: Update encrypt config: %w", err)
+	}
+
 	const q = `
 		UPDATE payment_methods
 		SET provider = $2, active = $3, config = $4, custom_fields = $5, updated_at = $6
 		WHERE id = $1`
 
 	ct, err := r.db.Exec(ctx, q,
-		m.ID, m.Provider, m.Active, m.Config, cfJSON, m.UpdatedAt,
+		m.ID, m.Provider, m.Active, encConfig, cfJSON, m.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("payment: Update: %w", err)
@@ -218,6 +237,72 @@ func (r *postgresMethodRepository) upsertTranslations(ctx context.Context, id uu
 		if _, err := r.db.Exec(ctx, q, id, t.Locale, t.Name, t.Description); err != nil {
 			return fmt.Errorf("payment: upsertTranslations: %w", err)
 		}
+	}
+	return nil
+}
+
+// encryptConfig encrypts raw config bytes. Returns nil for nil/empty input.
+func (r *postgresMethodRepository) encryptConfig(config []byte) ([]byte, error) {
+	if len(config) == 0 {
+		return config, nil
+	}
+	return crypto.Encrypt(config, r.encryptionKey)
+}
+
+// decryptConfig decrypts the Config field of a PaymentMethod in place.
+func (r *postgresMethodRepository) decryptConfig(m *PaymentMethod) error {
+	if len(m.Config) == 0 {
+		return nil
+	}
+	plaintext, err := crypto.Decrypt(m.Config, r.encryptionKey)
+	if err != nil {
+		return err
+	}
+	m.Config = plaintext
+	return nil
+}
+
+// MigrateEncryption reads all payment methods and encrypts any config that is
+// still stored as plaintext. Safe to call multiple times.
+func (r *postgresMethodRepository) MigrateEncryption(ctx context.Context) error {
+	const q = `SELECT id, config FROM payment_methods WHERE config IS NOT NULL AND length(config) > 0`
+	rows, err := r.db.Query(ctx, q)
+	if err != nil {
+		return fmt.Errorf("payment: MigrateEncryption query: %w", err)
+	}
+	defer rows.Close()
+
+	type row struct {
+		id     uuid.UUID
+		config []byte
+	}
+	var toMigrate []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.config); err != nil {
+			return fmt.Errorf("payment: MigrateEncryption scan: %w", err)
+		}
+		if !crypto.IsEncrypted(r.config) {
+			toMigrate = append(toMigrate, r)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("payment: MigrateEncryption rows: %w", err)
+	}
+
+	for _, row := range toMigrate {
+		enc, err := crypto.Encrypt(row.config, r.encryptionKey)
+		if err != nil {
+			return fmt.Errorf("payment: MigrateEncryption encrypt id=%s: %w", row.id, err)
+		}
+		if _, err := r.db.Exec(ctx, `UPDATE payment_methods SET config = $1 WHERE id = $2`, enc, row.id); err != nil {
+			return fmt.Errorf("payment: MigrateEncryption update id=%s: %w", row.id, err)
+		}
+		r.logger.Info().Str("id", row.id.String()).Msg("migrated payment method config to encrypted")
+	}
+
+	if len(toMigrate) > 0 {
+		r.logger.Info().Int("count", len(toMigrate)).Msg("payment config encryption migration complete")
 	}
 	return nil
 }

@@ -38,3 +38,6 @@ security:
     requests_per_minute: 60
     burst: 10
   bcrypt_cost: 12
+
+payment:
+  encryption_key: ""   # 32-byte key or 64-char hex (Env: STOA_PAYMENT_ENCRYPTION_KEY)

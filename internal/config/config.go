@@ -16,6 +16,11 @@ type Config struct {
 	Search   SearchConfig   `mapstructure:"search"`
 	I18n     I18nConfig     `mapstructure:"i18n"`
 	Security SecurityConfig `mapstructure:"security"`
+	Payment  PaymentConfig  `mapstructure:"payment"`
+}
+
+type PaymentConfig struct {
+	EncryptionKey string `mapstructure:"encryption_key"`
 }
 
 type ServerConfig struct {

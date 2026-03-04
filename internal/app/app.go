@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/epoxx-arch/stoa/internal/crypto"
 	"github.com/epoxx-arch/stoa/internal/admin"
 	"github.com/epoxx-arch/stoa/internal/storefront"
 	"github.com/epoxx-arch/stoa/internal/auth"
@@ -86,6 +87,10 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("setting up domains: %w", err)
 	}
 
+	if err := a.migratePaymentEncryption(cfg); err != nil {
+		return nil, fmt.Errorf("migrating payment encryption: %w", err)
+	}
+
 	return a, nil
 }
 
@@ -105,7 +110,11 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	cartRepo     := cart.NewPostgresRepository(pool, log)
 	taxRepo      := tax.NewPostgresRepository(pool, log)
 	shippingRepo := shipping.NewPostgresRepository(pool, log)
-	pmethodRepo  := payment.NewPostgresMethodRepository(pool, log)
+	paymentKey, err := crypto.ParseKey(cfg.Payment.EncryptionKey)
+	if err != nil {
+		return fmt.Errorf("payment encryption key: %w", err)
+	}
+	pmethodRepo  := payment.NewPostgresMethodRepository(pool, log, paymentKey)
 	ptxRepo      := payment.NewPostgresTransactionRepository(pool, log)
 	discountRepo := discount.NewPostgresRepository(pool, log)
 	tagRepo      := tag.NewPostgresRepository(pool, log)
@@ -346,4 +355,17 @@ func (a *storageAdapter) Delete(ctx context.Context, storagePath string) error {
 
 func (a *storageAdapter) URL(storagePath string) string {
 	return a.s.URL(storagePath)
+}
+
+func (a *App) migratePaymentEncryption(cfg *config.Config) error {
+	paymentKey, err := crypto.ParseKey(cfg.Payment.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	repo := payment.NewPostgresMethodRepository(a.DB.Pool, a.Logger, paymentKey)
+	migrator, ok := repo.(interface{ MigrateEncryption(context.Context) error })
+	if !ok {
+		return nil
+	}
+	return migrator.MigrateEncryption(context.Background())
 }
