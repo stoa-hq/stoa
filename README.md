@@ -429,6 +429,8 @@ Every domain follows the same pattern:
 
 ## Developing Plugins
 
+Stoa includes a Claude Code skill for plugin development. Run `/plugin` in Claude Code to activate it -- it provides the full SDK reference, all hook constants, entity types, and ready-to-use templates for rapid plugin development.
+
 Stoa has a built-in plugin system that lets you extend the platform without modifying core code. Plugins can:
 
 - **React to events** (e.g. send an email after an order)
