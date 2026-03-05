@@ -1,4 +1,4 @@
-.PHONY: build run test lint migrate-up migrate-down docker-up docker-down clean admin-build admin-dev storefront-build storefront-dev
+.PHONY: build run test lint migrate-up migrate-down docker-up docker-down clean admin-build admin-dev storefront-build storefront-dev mcp-store-build mcp-admin-build mcp-store-run mcp-admin-run
 
 BINARY=stoa
 VERSION?=dev
@@ -39,7 +39,19 @@ docker-build:
 	docker compose build
 
 clean:
-	rm -f $(BINARY) coverage.out coverage.html
+	rm -f $(BINARY) stoa-store-mcp stoa-admin-mcp coverage.out coverage.html
+
+mcp-store-build:
+	go build -ldflags="-s -w" -o stoa-store-mcp ./cmd/stoa-store-mcp
+
+mcp-admin-build:
+	go build -ldflags="-s -w" -o stoa-admin-mcp ./cmd/stoa-admin-mcp
+
+mcp-store-run: mcp-store-build
+	./stoa-store-mcp
+
+mcp-admin-run: mcp-admin-build
+	./stoa-admin-mcp
 
 admin-build:
 	cd admin && npm install && npm run build

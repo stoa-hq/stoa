@@ -6,11 +6,12 @@ A lightweight, open-source headless e-commerce platform built with Go. The syste
 
 - **Headless Architecture** -- REST API (JSON)
 - **Single Binary** -- Go backend with embedded SvelteKit frontends (Admin + Storefront)
+- **MCP Servers** -- AI agents can shop in and manage the store via the Model Context Protocol
 - **Plugin System** -- Extensible via hooks and custom API endpoints
 - **Multi-language** -- Translation tables with locale-based API
 - **Property Groups & Variants** -- Color, size, etc. with automatic combination generation
 - **Full-text Search** -- PostgreSQL-based
-- **RBAC** -- Role-based access control
+- **RBAC** -- Role-based access control with granular API key permissions
 
 ## Prerequisites
 
@@ -168,6 +169,10 @@ make docker-down        # docker compose down
 make admin-dev          # Admin frontend dev server
 make storefront-dev     # Storefront dev server
 make seed               # Load demo data
+make mcp-store-build    # Build Store MCP Server binary
+make mcp-admin-build    # Build Admin MCP Server binary
+make mcp-store-run      # Build + run Store MCP Server (stdio)
+make mcp-admin-run      # Build + run Admin MCP Server (stdio)
 ```
 
 ---
@@ -200,16 +205,16 @@ STOA_SERVER_PORT=8080
 
 | Area | Path | Authentication |
 |------|------|----------------|
-| Admin API | `/api/v1/admin/*` | JWT (admin role) |
-| Store API | `/api/v1/store/*` | Public / customer JWT |
+| Admin API | `/api/v1/admin/*` | JWT (admin role) or API key with permissions |
+| Store API | `/api/v1/store/*` | Public / customer JWT / API key |
 | Auth | `/api/v1/auth/*` | None |
 | Health | `/api/v1/health` | None |
 
 ### Authentication
 
 ```bash
-# Admin login
-curl -X POST http://localhost:8080/api/v1/auth/admin/login \
+# Admin login (JWT)
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email": "admin@example.com", "password": "your-password"}'
 
@@ -217,6 +222,10 @@ curl -X POST http://localhost:8080/api/v1/auth/admin/login \
 # Use access_token in the Authorization header:
 curl http://localhost:8080/api/v1/admin/products \
   -H 'Authorization: Bearer <access_token>'
+
+# API key authentication (for MCP servers and integrations):
+curl http://localhost:8080/api/v1/admin/products \
+  -H 'Authorization: ApiKey ck_your_api_key_here'
 ```
 
 ---
@@ -237,17 +246,141 @@ stoa version                # Print version
 
 ---
 
+## MCP Servers (AI Agent Integration)
+
+Stoa ships with two MCP (Model Context Protocol) servers that allow AI agents -- such as Claude -- to interact with the shop programmatically.
+
+| Server | Binary | Tools | Purpose |
+|--------|--------|-------|---------|
+| **Store MCP** | `stoa-store-mcp` | 16 | Shopping: browse products, manage cart, checkout |
+| **Admin MCP** | `stoa-admin-mcp` | 33 | Management: products, orders, discounts, customers, ... |
+
+### Prerequisites
+
+1. A running Stoa instance
+2. An API key with the required permissions
+
+### Create an API Key
+
+API keys are managed through the admin API. Only `super_admin` and `admin` roles can create keys.
+
+```bash
+# Login as admin
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"your-password"}' | jq -r '.data.access_token')
+
+# Create an API key with full admin permissions
+curl -X POST http://localhost:8080/api/v1/admin/api-keys \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "MCP Admin Key",
+    "permissions": [
+      "products.read", "products.create", "products.update", "products.delete",
+      "orders.read", "orders.update",
+      "discounts.read", "discounts.create", "discounts.update", "discounts.delete",
+      "customers.read", "customers.update", "customers.delete",
+      "categories.read", "categories.create", "categories.update",
+      "media.read", "media.delete",
+      "shipping.read", "payment.read", "tax.read",
+      "audit.read"
+    ]
+  }'
+
+# Save the "key" field from the response -- it is shown only once!
+```
+
+For the Store MCP server, no API key is needed for public endpoints (browsing, cart). An API key or customer JWT is only required for account-related operations.
+
+### Build
+
+```bash
+make mcp-store-build    # → ./stoa-store-mcp
+make mcp-admin-build    # → ./stoa-admin-mcp
+```
+
+### Configuration
+
+Both servers are configured via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STOA_MCP_API_URL` | `http://localhost:8080` | Stoa backend URL |
+| `STOA_MCP_API_KEY` | *(empty)* | API key for authentication |
+| `STOA_MCP_TRANSPORT` | `stdio` | Transport: `stdio` or `http` |
+| `STOA_MCP_HTTP_PORT` | `8090` | HTTP port (when transport=http) |
+
+### Use with Claude Code
+
+Add the MCP servers to your Claude Code configuration (`.claude/settings.json` or project settings):
+
+```json
+{
+  "mcpServers": {
+    "stoa-store": {
+      "command": "/path/to/stoa-store-mcp",
+      "env": {
+        "STOA_MCP_API_URL": "http://localhost:8080"
+      }
+    },
+    "stoa-admin": {
+      "command": "/path/to/stoa-admin-mcp",
+      "env": {
+        "STOA_MCP_API_URL": "http://localhost:8080",
+        "STOA_MCP_API_KEY": "ck_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+Once configured, you can interact with the shop in natural language:
+
+- *"Show me all shoes under 50 EUR"*
+- *"Add the leather boots to the cart"*
+- *"Create a 20% discount code SUMMER for all orders over 50 EUR"*
+- *"What are the last 10 orders?"*
+
+### Store MCP Tools (16)
+
+| Category | Tools |
+|----------|-------|
+| **Products** | `store_list_products`, `store_get_product`, `store_search`, `store_get_categories` |
+| **Cart** | `store_create_cart`, `store_get_cart`, `store_add_to_cart`, `store_update_cart_item`, `store_remove_from_cart` |
+| **Checkout** | `store_get_shipping_methods`, `store_get_payment_methods`, `store_checkout` |
+| **Account** | `store_register`, `store_login`, `store_get_account`, `store_list_orders` |
+
+### Admin MCP Tools (33)
+
+| Category | Tools |
+|----------|-------|
+| **Products** (8) | `admin_list_products`, `admin_get_product`, `admin_create_product`, `admin_update_product`, `admin_delete_product`, `admin_create_variant`, `admin_update_variant`, `admin_delete_variant` |
+| **Orders** (3) | `admin_list_orders`, `admin_get_order`, `admin_update_order_status` |
+| **Discounts** (5) | `admin_list_discounts`, `admin_get_discount`, `admin_create_discount`, `admin_update_discount`, `admin_delete_discount` |
+| **Customers** (4) | `admin_list_customers`, `admin_get_customer`, `admin_update_customer`, `admin_delete_customer` |
+| **Categories** (4) | `admin_list_categories`, `admin_get_category`, `admin_create_category`, `admin_update_category` |
+| **Tags** (3) | `admin_list_tags`, `admin_create_tag`, `admin_delete_tag` |
+| **Media** (2) | `admin_list_media`, `admin_delete_media` |
+| **Config** (3) | `admin_list_shipping_methods`, `admin_list_tax_rules`, `admin_list_payment_methods` |
+| **Audit** (1) | `admin_list_audit_log` |
+
+---
+
 ## Project Structure
 
 ```
 stoa/
-├── cmd/stoa/           # CLI entry point (main.go)
+├── cmd/
+│   ├── stoa/               # CLI entry point (main.go)
+│   ├── stoa-store-mcp/     # Store MCP Server (shopping)
+│   └── stoa-admin-mcp/     # Admin MCP Server (management)
 ├── internal/
 │   ├── app/                # Application bootstrapping
 │   ├── config/             # Configuration loading
 │   ├── crypto/             # AES-256-GCM encryption helpers
 │   ├── server/             # HTTP server, router, middleware
-│   ├── auth/               # JWT, RBAC, permissions
+│   ├── auth/               # JWT, RBAC, API keys, permissions
 │   ├── database/           # DB connection, migration runner
 │   ├── domain/             # Business logic (DDD-style)
 │   │   ├── product/        # Products, variants, property groups
@@ -262,6 +395,9 @@ stoa/
 │   │   ├── tax/            # Tax rules
 │   │   ├── tag/            # Tags
 │   │   └── audit/          # Audit log
+│   ├── mcp/                # Shared MCP infrastructure
+│   │   ├── store/          # Store MCP tools (16)
+│   │   └── admin/          # Admin MCP tools (33)
 │   ├── admin/              # Embedded admin frontend (//go:embed)
 │   ├── storefront/         # Embedded storefront (//go:embed)
 │   ├── plugin/             # Plugin registry
