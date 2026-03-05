@@ -1,0 +1,8 @@
+{
+  "skills": {
+    "plugin": {
+      "description": "Stoa Plugin Developer — helps build plugins with hooks, custom routes, and database access. Use when creating or modifying Stoa plugins.",
+      "path": ".claude/skills/plugin-developer.md"
+    }
+  }
+}
