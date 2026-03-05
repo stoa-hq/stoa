@@ -35,8 +35,8 @@ i18n:
 
 security:
   rate_limit:
-    requests_per_minute: 60
-    burst: 10
+    requests_per_minute: 300
+    burst: 50
   bcrypt_cost: 12
 
 payment:

@@ -115,8 +115,8 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("i18n.default_locale", "de-DE")
 	v.SetDefault("i18n.available_locales", []string{"de-DE", "en-US"})
 
-	v.SetDefault("security.rate_limit.requests_per_minute", 60)
-	v.SetDefault("security.rate_limit.burst", 10)
+	v.SetDefault("security.rate_limit.requests_per_minute", 300)
+	v.SetDefault("security.rate_limit.burst", 50)
 	v.SetDefault("security.bcrypt_cost", 12)
 
 	// Config file
