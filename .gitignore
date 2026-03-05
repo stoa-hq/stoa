@@ -11,5 +11,6 @@ admin/.svelte-kit/
 storefront/build/
 storefront/.svelte-kit/
 project
+commerce
 internal/admin/build
 internal/storefront/build
