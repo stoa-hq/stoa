@@ -104,6 +104,31 @@ func (m *APIKeyManager) Validate(ctx context.Context, key string) (*APIKey, erro
 	return &apiKey, nil
 }
 
+func (m *APIKeyManager) List(ctx context.Context) ([]APIKey, error) {
+	rows, err := m.pool.Query(ctx,
+		`SELECT id, name, permissions, active, last_used_at, created_at
+		 FROM api_keys ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("listing API keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []APIKey
+	for rows.Next() {
+		var k APIKey
+		var permStrs []string
+		if err := rows.Scan(&k.ID, &k.Name, &permStrs, &k.Active, &k.LastUsedAt, &k.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning API key: %w", err)
+		}
+		k.Permissions = make([]Permission, len(permStrs))
+		for i, s := range permStrs {
+			k.Permissions[i] = Permission(s)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
 func (m *APIKeyManager) Revoke(ctx context.Context, id uuid.UUID) error {
 	_, err := m.pool.Exec(ctx, `UPDATE api_keys SET active = false WHERE id = $1`, id)
 	return err

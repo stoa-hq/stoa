@@ -182,7 +182,8 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
 
-	authH     := auth.NewHandler(pool, a.JWTManager, log)
+	apiKeyManager := auth.NewAPIKeyManager(pool)
+	authH     := auth.NewHandler(pool, a.JWTManager, apiKeyManager, log)
 	productH  := product.NewHandler(productSvc, validate, log)
 	categoryH := category.NewHandler(categorySvc, log)
 	customerH := customer.NewHandler(customerSvc, validate, log)
@@ -231,6 +232,10 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		r.Use(audit.Middleware(auditSvc, log))
 
 		productH.RegisterAdminRoutes(r)
+		r.Group(func(r chi.Router) {
+			r.Use(a.AuthMiddleware.RequireRole(auth.RoleSuperAdmin, auth.RoleAdmin))
+			authH.RegisterAdminRoutes(r)
+		})
 		r.Route("/categories", categoryH.RegisterAdminRoutes)
 		customerH.RegisterAdminRoutes(r)
 		orderH.RegisterAdminRoutes(r)
