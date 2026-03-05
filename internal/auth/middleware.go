@@ -12,9 +12,10 @@ import (
 type contextKeyType string
 
 const (
-	ctxKeyUserID   contextKeyType = "user_id"
-	ctxKeyUserType contextKeyType = "user_type"
-	ctxKeyRole     contextKeyType = "role"
+	ctxKeyUserID      contextKeyType = "user_id"
+	ctxKeyUserType    contextKeyType = "user_type"
+	ctxKeyRole        contextKeyType = "role"
+	ctxKeyPermissions contextKeyType = "permissions"
 )
 
 type Middleware struct {
@@ -75,6 +76,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			ctx = context.WithValue(r.Context(), ctxKeyUserID, apiKey.ID)
 			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
 			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
+			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
 
 		default:
 			writeAuthError(w, http.StatusUnauthorized, "unsupported authorization scheme")
@@ -86,6 +88,8 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 }
 
 // RequireRole checks that the user has a specific role.
+// API clients (RoleAPIClient) are allowed through if they have any permissions
+// at all — fine-grained access control is enforced by RequirePermission.
 func (m *Middleware) RequireRole(roles ...Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,17 +100,25 @@ func (m *Middleware) RequireRole(roles ...Role) func(http.Handler) http.Handler 
 					return
 				}
 			}
+			// Allow API clients with permissions to access admin routes.
+			if role == RoleAPIClient {
+				if perms := UserPermissions(r.Context()); len(perms) > 0 {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
 			writeAuthError(w, http.StatusForbidden, "insufficient permissions")
 		})
 	}
 }
 
 // RequirePermission checks that the user has a specific permission.
+// For API clients, it checks context-stored per-key permissions.
 func (m *Middleware) RequirePermission(perm Permission) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role := UserRole(r.Context())
-			if !HasPermission(role, perm) {
+			if !HasPermissionCtx(r.Context(), role, perm) {
 				writeAuthError(w, http.StatusForbidden, "insufficient permissions")
 				return
 			}
@@ -158,6 +170,7 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), ctxKeyUserID, apiKey.ID)
 			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
 			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
+			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
 			next.ServeHTTP(w, r.WithContext(ctx))
 
 		default:
@@ -186,6 +199,13 @@ func UserRole(ctx context.Context) Role {
 		return role
 	}
 	return ""
+}
+
+func UserPermissions(ctx context.Context) []Permission {
+	if perms, ok := ctx.Value(ctxKeyPermissions).([]Permission); ok {
+		return perms
+	}
+	return nil
 }
 
 func writeAuthError(w http.ResponseWriter, status int, detail string) {

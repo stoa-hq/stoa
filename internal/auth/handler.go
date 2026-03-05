@@ -13,9 +13,10 @@ import (
 )
 
 type Handler struct {
-	pool       *pgxpool.Pool
-	jwtManager *JWTManager
-	logger     zerolog.Logger
+	pool          *pgxpool.Pool
+	jwtManager    *JWTManager
+	apiKeyManager *APIKeyManager
+	logger        zerolog.Logger
 }
 
 type AdminUser struct {
@@ -45,8 +46,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, logger zerolog.Logger) *Handler {
-	return &Handler{pool: pool, jwtManager: jwtManager, logger: logger}
+func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, logger zerolog.Logger) *Handler {
+	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
@@ -190,6 +191,99 @@ func (h *Handler) handleRefresh(w http.ResponseWriter, r *http.Request) {
 			ExpiresIn:    900,
 			TokenType:    "Bearer",
 		},
+	})
+}
+
+// RegisterAdminRoutes mounts API key management routes under the admin router.
+func (h *Handler) RegisterAdminRoutes(r chi.Router) {
+	r.Route("/api-keys", func(r chi.Router) {
+		r.Post("/", h.handleCreateAPIKey)
+		r.Get("/", h.handleListAPIKeys)
+		r.Delete("/{id}", h.handleRevokeAPIKey)
+	})
+}
+
+type CreateAPIKeyRequest struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+}
+
+func (h *Handler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
+	var req CreateAPIKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid request body"}},
+		})
+		return
+	}
+
+	if req.Name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "validation_error", "detail": "name is required"}},
+		})
+		return
+	}
+
+	perms := make([]Permission, len(req.Permissions))
+	for i, p := range req.Permissions {
+		perms[i] = Permission(p)
+	}
+
+	rawKey, apiKey, err := h.apiKeyManager.Create(r.Context(), req.Name, perms)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("creating API key")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to create API key"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"data": map[string]interface{}{
+			"id":          apiKey.ID,
+			"name":        apiKey.Name,
+			"key":         rawKey,
+			"permissions": apiKey.Permissions,
+			"created_at":  apiKey.CreatedAt,
+		},
+	})
+}
+
+func (h *Handler) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.apiKeyManager.List(r.Context())
+	if err != nil {
+		h.logger.Error().Err(err).Msg("listing API keys")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to list API keys"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": keys,
+	})
+}
+
+func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid API key ID"}},
+		})
+		return
+	}
+
+	if err := h.apiKeyManager.Revoke(r.Context(), id); err != nil {
+		h.logger.Error().Err(err).Msg("revoking API key")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to revoke API key"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": map[string]string{"message": "API key revoked"},
 	})
 }
 

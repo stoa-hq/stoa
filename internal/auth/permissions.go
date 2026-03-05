@@ -1,5 +1,7 @@
 package auth
 
+import "context"
+
 type Role string
 
 const (
@@ -106,6 +108,20 @@ func HasPermission(role Role, perm Permission) bool {
 		}
 	}
 	return false
+}
+
+// HasPermissionCtx checks permissions for API clients using context-stored
+// permissions, falling back to role-based permissions for other roles.
+func HasPermissionCtx(ctx context.Context, role Role, perm Permission) bool {
+	if role == RoleAPIClient {
+		for _, p := range UserPermissions(ctx) {
+			if p == perm {
+				return true
+			}
+		}
+		return false
+	}
+	return HasPermission(role, perm)
 }
 
 func allPermissions() []Permission {
