@@ -1,7 +1,12 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/mark3labs/mcp-go/server"
 
@@ -37,7 +42,27 @@ Requires an API key with appropriate admin permissions.`),
 
 	admin.RegisterTools(s, client)
 
-	if err := server.ServeStdio(s); err != nil {
-		log.Fatalf("Server error: %v", err)
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	sseServer := server.NewSSEServer(s,
+		server.WithBaseURL(cfg.BaseURL),
+		server.WithSSEEndpoint("/sse"),
+		server.WithMessageEndpoint("/message"),
+		server.WithKeepAlive(true),
+	)
+
+	go func() {
+		log.Printf("stoa-admin-mcp listening on %s (SSE)", addr)
+		if err := sseServer.Start(addr); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down...")
+	if err := sseServer.Shutdown(context.Background()); err != nil {
+		log.Printf("shutdown error: %v", err)
 	}
 }

@@ -171,8 +171,8 @@ make storefront-dev     # Storefront dev server
 make seed               # Load demo data
 make mcp-store-build    # Build Store MCP Server binary
 make mcp-admin-build    # Build Admin MCP Server binary
-make mcp-store-run      # Build + run Store MCP Server (stdio)
-make mcp-admin-run      # Build + run Admin MCP Server (stdio)
+make mcp-store-run      # Build + run Store MCP Server (SSE on :8090)
+make mcp-admin-run      # Build + run Admin MCP Server (SSE on :8090)
 ```
 
 ---
@@ -296,8 +296,8 @@ For the Store MCP server, no API key is needed for public endpoints (browsing, c
 ### Build
 
 ```bash
-make mcp-store-build    # → ./stoa-store-mcp
-make mcp-admin-build    # → ./stoa-admin-mcp
+make mcp-store-build    # → bin/stoa-store-mcp
+make mcp-admin-build    # → bin/stoa-admin-mcp
 ```
 
 ### Configuration
@@ -308,8 +308,20 @@ Both servers are configured via environment variables:
 |----------|---------|-------------|
 | `STOA_MCP_API_URL` | `http://localhost:8080` | Stoa backend URL |
 | `STOA_MCP_API_KEY` | *(empty)* | API key for authentication |
-| `STOA_MCP_TRANSPORT` | `stdio` | Transport: `stdio` or `http` |
-| `STOA_MCP_HTTP_PORT` | `8090` | HTTP port (when transport=http) |
+| `STOA_MCP_PORT` | `8090` | HTTP port for SSE server |
+| `STOA_MCP_BASE_URL` | `http://localhost:<port>` | Public base URL (for proxied setups) |
+
+### Run
+
+```bash
+# Store MCP on port 8091, Admin MCP on port 8092
+STOA_MCP_PORT=8091 make mcp-store-run                         # bin/stoa-store-mcp
+STOA_MCP_PORT=8092 STOA_MCP_API_KEY=ck_... make mcp-admin-run # bin/stoa-admin-mcp
+```
+
+Both servers expose SSE endpoints:
+- **SSE stream:** `http://localhost:<port>/sse`
+- **Message endpoint:** `http://localhost:<port>/message`
 
 ### Use with Claude Code
 
@@ -319,17 +331,10 @@ Add the MCP servers to your Claude Code configuration (`.claude/settings.json` o
 {
   "mcpServers": {
     "stoa-store": {
-      "command": "/path/to/stoa-store-mcp",
-      "env": {
-        "STOA_MCP_API_URL": "http://localhost:8080"
-      }
+      "url": "http://localhost:8091/sse"
     },
     "stoa-admin": {
-      "command": "/path/to/stoa-admin-mcp",
-      "env": {
-        "STOA_MCP_API_URL": "http://localhost:8080",
-        "STOA_MCP_API_KEY": "ck_your_api_key_here"
-      }
+      "url": "http://localhost:8092/sse"
     }
   }
 }
