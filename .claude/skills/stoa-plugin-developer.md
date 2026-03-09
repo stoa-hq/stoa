@@ -6,8 +6,8 @@ You are an expert Stoa plugin developer. You help users build plugins for the St
 
 Stoa plugins are Go packages that implement the `sdk.Plugin` interface. They receive full access to the database, HTTP router, hook system, configuration, and logger.
 
-**Module:** `github.com/epoxx-arch/stoa`
-**SDK package:** `github.com/epoxx-arch/stoa/pkg/sdk`
+**Module:** `github.com/stoa-hq/stoa`
+**SDK package:** `github.com/stoa-hq/stoa/pkg/sdk`
 
 ## Plugin Interface
 
@@ -46,7 +46,7 @@ import (
     "github.com/jackc/pgx/v5/pgxpool"
     "github.com/rs/zerolog"
 
-    "github.com/epoxx-arch/stoa/pkg/sdk"
+    "github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 type MyPlugin struct {
@@ -178,13 +178,13 @@ When handling hook events, type-assert `event.Entity` to the correct domain type
 
 | Hook prefix | Entity type | Import |
 |-------------|-------------|--------|
-| `product.*` | `*product.Product` | `github.com/epoxx-arch/stoa/internal/domain/product` |
-| `order.*` | `*order.Order` | `github.com/epoxx-arch/stoa/internal/domain/order` |
-| `cart.*` | `*cart.CartItem` | `github.com/epoxx-arch/stoa/internal/domain/cart` |
-| `customer.*` | `*customer.Customer` | `github.com/epoxx-arch/stoa/internal/domain/customer` |
-| `category.*` | `*category.Category` | `github.com/epoxx-arch/stoa/internal/domain/category` |
-| `checkout.*` | `*order.Order` | `github.com/epoxx-arch/stoa/internal/domain/order` |
-| `payment.*` | `*order.Order` | `github.com/epoxx-arch/stoa/internal/domain/order` |
+| `product.*` | `*product.Product` | `github.com/stoa-hq/stoa/internal/domain/product` |
+| `order.*` | `*order.Order` | `github.com/stoa-hq/stoa/internal/domain/order` |
+| `cart.*` | `*cart.CartItem` | `github.com/stoa-hq/stoa/internal/domain/cart` |
+| `customer.*` | `*customer.Customer` | `github.com/stoa-hq/stoa/internal/domain/customer` |
+| `category.*` | `*category.Category` | `github.com/stoa-hq/stoa/internal/domain/category` |
+| `checkout.*` | `*order.Order` | `github.com/stoa-hq/stoa/internal/domain/order` |
+| `payment.*` | `*order.Order` | `github.com/stoa-hq/stoa/internal/domain/order` |
 
 ### Key Entity Structs
 
@@ -320,7 +320,7 @@ func (p *MyPlugin) Init(app *sdk.AppContext) error {
 Use these to access the authenticated user in custom route handlers:
 
 ```go
-import "github.com/epoxx-arch/stoa/internal/auth"
+import "github.com/stoa-hq/stoa/internal/auth"
 
 auth.UserID(r.Context())    // uuid.UUID — authenticated user ID (uuid.Nil if anonymous)
 auth.UserType(r.Context())  // string — "admin", "customer", or "api_key"

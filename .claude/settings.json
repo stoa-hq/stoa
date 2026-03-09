@@ -1,8 +1,20 @@
 {
   "skills": {
-    "plugin": {
+    "stoa-new-domain": {
+      "description": "Create a new domain package in Stoa (6-file pattern: entity, repository, postgres, service, handler, dto). Use when adding a new domain entity.",
+      "path": ".claude/skills/stoa-new-domain.md"
+    },
+    "stoa-plugin-developer": {
       "description": "Stoa Plugin Developer — helps build plugins with hooks, custom routes, and database access. Use when creating or modifying Stoa plugins.",
-      "path": ".claude/skills/plugin-developer.md"
+      "path": ".claude/skills/stoa-plugin-developer.md"
+    },
+    "stoa-routes": {
+      "description": "Reference for all Stoa API routes and MCP server tools. Use when working with REST endpoints or MCP configuration.",
+      "path": ".claude/skills/stoa-routes.md"
+    },
+    "stoa-test": {
+      "description": "Stoa test conventions: mock patterns, handler tests, Chi URL params. Use when writing or reviewing tests.",
+      "path": ".claude/skills/stoa-test.md"
     }
   }
 }

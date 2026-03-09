@@ -2,6 +2,7 @@
 
 [![Website](https://img.shields.io/badge/website-stoahq.eu-blue)](https://stoahq.eu)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/stoahq)
+[![Matrix](https://img.shields.io/matrix/stoa-dev?server_fqdn=matrix.pineconeops.com&fetchMode=guest)](https://matrix.to/#/#stoa-dev:matrix.pineconeops.com)
 
 A lightweight, open-source headless e-commerce platform built with Go. Ships as a single binary with the admin panel and storefront embedded.
 
