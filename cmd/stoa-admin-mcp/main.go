@@ -10,8 +10,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/server"
 
-	stoamcp "github.com/epoxx-arch/stoa/internal/mcp"
-	"github.com/epoxx-arch/stoa/internal/mcp/admin"
+	stoamcp "github.com/stoa-hq/stoa/internal/mcp"
+	"github.com/stoa-hq/stoa/internal/mcp/admin"
 )
 
 func main() {

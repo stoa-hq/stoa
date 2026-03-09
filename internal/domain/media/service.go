@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/pkg/sdk"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 // Sentinel errors for the media domain.

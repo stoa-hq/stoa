@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/internal/auth"
+	"github.com/stoa-hq/stoa/internal/auth"
 )
 
 // Middleware returns a chi-compatible middleware that records every successful

@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/internal/crypto"
+	"github.com/stoa-hq/stoa/internal/crypto"
 )
 
 // --- PaymentMethod repository ---

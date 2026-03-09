@@ -1,4 +1,4 @@
-module github.com/epoxx-arch/stoa
+module github.com/stoa-hq/stoa
 
 go 1.25.5
 

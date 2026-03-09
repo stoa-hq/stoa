@@ -3,7 +3,7 @@ package store
 import (
 	"github.com/mark3labs/mcp-go/server"
 
-	stoamcp "github.com/epoxx-arch/stoa/internal/mcp"
+	stoamcp "github.com/stoa-hq/stoa/internal/mcp"
 )
 
 // RegisterTools adds all store tools to the MCP server.

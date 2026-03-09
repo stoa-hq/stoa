@@ -15,8 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/internal/config"
-	"github.com/epoxx-arch/stoa/internal/database"
+	"github.com/stoa-hq/stoa/internal/config"
+	"github.com/stoa-hq/stoa/internal/database"
 )
 
 type Server struct {

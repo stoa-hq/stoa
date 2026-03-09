@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/internal/auth"
-	"github.com/epoxx-arch/stoa/pkg/sdk"
+	"github.com/stoa-hq/stoa/internal/auth"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 // Sentinel errors used throughout the customer domain.
