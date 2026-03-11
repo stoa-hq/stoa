@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
   import { auditApi } from '$lib/api/audit';
   import { notifications } from '$lib/stores/notifications';
-  import { formatDateTime } from '$lib/utils';
+  import { fmt } from '$lib/i18n/formatters';
   import Pagination from '$lib/components/Pagination.svelte';
 
   let items = $state<any[]>([]);
@@ -18,7 +19,7 @@
       items = res.data ?? [];
       meta = res.meta ?? null;
     } catch (e) {
-      notifications.error('Audit-Log konnte nicht geladen werden.');
+      notifications.error($t('audit.loadFailed'));
     } finally {
       loading = false;
     }
@@ -39,7 +40,7 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Audit-Log</h1>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('audit.title')}</h1>
 </div>
 
 <div class="card p-6">
@@ -52,30 +53,30 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zeitpunkt</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Benutzer</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktion</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity-ID</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.timestamp')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.user')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.action')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.entity')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.entityId')}</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           {#each items as entry}
             <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDateTime(entry.created_at)}</td>
+              <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{$fmt.dateTime(entry.created_at)}</td>
               <td class="px-4 py-3 text-sm font-mono text-gray-700">{formatUser(entry)}</td>
               <td class="px-4 py-3 text-sm">
                 <span class="badge badge-blue">{entry.action}</span>
               </td>
               <td class="px-4 py-3 text-sm text-gray-700">{entry.entity_type ?? '—'}</td>
               <td class="px-4 py-3 text-sm font-mono text-gray-500">
-                {entry.entity_id ? String(entry.entity_id).substring(0, 12) + '…' : '—'}
+                {entry.entity_id ? String(entry.entity_id).substring(0, 12) + '...' : '—'}
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Einträge gefunden.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('audit.noEntries')}</td>
             </tr>
           {/if}
         </tbody>

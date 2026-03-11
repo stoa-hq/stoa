@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
+	import { t } from 'svelte-i18n';
 
 	interface Props {
 		open: boolean;
@@ -12,22 +13,22 @@
 	}
 	let {
 		open,
-		title = 'Bestätigen',
+		title,
 		message,
-		confirmLabel = 'Bestätigen',
+		confirmLabel,
 		danger = false,
 		onConfirm,
 		onCancel
 	}: Props = $props();
 </script>
 
-<Modal {open} {title} onClose={onCancel}>
+<Modal open={open} title={title ?? $t('common.confirm')} onClose={onCancel}>
 	<p class="text-gray-700">{message}</p>
 	{#snippet footer()}
-		<button class="btn btn-secondary" onclick={onCancel}>Abbrechen</button>
+		<button class="btn btn-secondary" onclick={onCancel}>{$t('common.cancel')}</button>
 		<button
 			class={danger ? 'btn btn-danger' : 'btn btn-primary'}
 			onclick={onConfirm}
-		>{confirmLabel}</button>
+		>{confirmLabel ?? $t('common.confirm')}</button>
 	{/snippet}
 </Modal>

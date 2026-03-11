@@ -1,5 +1,7 @@
+import { get } from 'svelte/store';
 import { api } from './client';
-import type { ApiResponse, Product, ProductListResponse, CreateProductRequest, ProductVariant, PaginationParams } from '$lib/types';
+import { authStore } from '$lib/stores/auth';
+import type { ApiResponse, Product, ProductListResponse, CreateProductRequest, ProductVariant, PaginationParams, BulkRequest, BulkResponse } from '$lib/types';
 
 const BASE = '/admin/products';
 
@@ -29,4 +31,15 @@ export const productsApi = {
 		api.put<ApiResponse<ProductVariant>>(`${BASE}/${productId}/variants/${variantId}`, data),
 	deleteVariant: (productId: string, variantId: string) =>
 		api.delete<void>(`${BASE}/${productId}/variants/${variantId}`),
+	bulk: (data: BulkRequest) =>
+		api.post<ApiResponse<BulkResponse>>(`${BASE}/bulk`, data),
+	importCSV: (file: File) => {
+		const formData = new FormData();
+		formData.append('file', file);
+		return api.upload<ApiResponse<BulkResponse>>('/admin/products/import', formData);
+	},
+	downloadTemplate: () =>
+		fetch('/api/v1/admin/products/import/template', {
+			headers: { Authorization: `Bearer ${get(authStore).accessToken ?? ''}` }
+		}),
 };

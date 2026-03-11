@@ -2,9 +2,11 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { t } from 'svelte-i18n';
   import { ordersApi } from '$lib/api/orders';
   import { notifications } from '$lib/stores/notifications';
-  import { formatPrice, formatDateTime, orderStatusBadge } from '$lib/utils';
+  import { fmt } from '$lib/i18n/formatters';
+  import { orderStatusBadge } from '$lib/utils';
   import Pagination from '$lib/components/Pagination.svelte';
 
   let items = $state<any[]>([]);
@@ -14,14 +16,14 @@
   let loading = $state(true);
   let statusFilter = $state('');
 
-  const statusOptions = [
-    { value: '', label: 'Alle Status' },
-    { value: 'pending', label: 'Ausstehend' },
-    { value: 'processing', label: 'In Bearbeitung' },
-    { value: 'shipped', label: 'Versendet' },
-    { value: 'delivered', label: 'Geliefert' },
-    { value: 'cancelled', label: 'Storniert' },
-    { value: 'refunded', label: 'Erstattet' },
+  const statusKeys: { value: string; key: string }[] = [
+    { value: '', key: 'orders.allStatuses' },
+    { value: 'pending', key: 'orders.pending' },
+    { value: 'processing', key: 'orders.processing' },
+    { value: 'shipped', key: 'orders.shipped' },
+    { value: 'delivered', key: 'orders.delivered' },
+    { value: 'cancelled', key: 'orders.cancelled' },
+    { value: 'refunded', key: 'orders.refunded' },
   ];
 
   async function load() {
@@ -33,7 +35,7 @@
       items = res.data ?? [];
       meta = res.meta ?? null;
     } catch (e) {
-      notifications.error('Bestellungen konnten nicht geladen werden.');
+      notifications.error($t('orders.loadFailed'));
     } finally {
       loading = false;
     }
@@ -53,14 +55,14 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Bestellungen</h1>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('orders.title')}</h1>
 </div>
 
 <div class="card p-6">
   <div class="mb-4">
     <select class="input max-w-xs" bind:value={statusFilter} onchange={handleStatusFilter}>
-      {#each statusOptions as opt}
-        <option value={opt.value}>{opt.label}</option>
+      {#each statusKeys as opt}
+        <option value={opt.value}>{$t(opt.key)}</option>
       {/each}
     </select>
   </div>
@@ -74,10 +76,10 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestellnr.</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gesamt</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erstellt</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('orders.orderNumber')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.status')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('orders.total')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.createdAt')}</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
@@ -88,13 +90,13 @@
               <td class="px-4 py-3 text-sm">
                 <span class="badge {badgeClass}">{item.status}</span>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-700">{formatPrice(item.total)}</td>
-              <td class="px-4 py-3 text-sm text-gray-500">{formatDateTime(item.created_at)}</td>
+              <td class="px-4 py-3 text-sm text-gray-700">{$fmt.price(item.total)}</td>
+              <td class="px-4 py-3 text-sm text-gray-500">{$fmt.dateTime(item.created_at)}</td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Bestellungen gefunden.</td>
+              <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('orders.noOrders')}</td>
             </tr>
           {/if}
         </tbody>

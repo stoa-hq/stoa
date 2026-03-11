@@ -3,6 +3,7 @@
 	import { customersApi } from '$lib/api/customers';
 	import { authApi } from '$lib/api/auth';
 	import { authStore } from '$lib/stores/auth';
+	import { t } from 'svelte-i18n';
 
 	let form = $state({ email: '', password: '', first_name: '', last_name: '' });
 	let error = $state('');
@@ -21,7 +22,7 @@
 			}
 			goto('/account/orders');
 		} catch (err: unknown) {
-			error = (err as Error).message ?? 'Registrierung fehlgeschlagen.';
+			error = (err as Error).message ?? $t('auth.registerError');
 		} finally {
 			loading = false;
 		}
@@ -29,35 +30,35 @@
 </script>
 
 <svelte:head>
-	<title>Registrieren – stoa</title>
+	<title>{$t('auth.registerPageTitle')}</title>
 </svelte:head>
 
 <div class="min-h-[60vh] flex items-center justify-center px-4 py-12">
 	<div class="w-full max-w-sm">
 		<div class="text-center mb-8">
-			<h1 class="text-2xl font-bold text-gray-900">Konto erstellen</h1>
-			<p class="text-gray-500 mt-1 text-sm">Bereits registriert?
-				<a href="/account/login" class="text-primary-700 font-medium hover:underline">Anmelden</a>
+			<h1 class="text-2xl font-bold text-gray-900">{$t('auth.registerTitle')}</h1>
+			<p class="text-gray-500 mt-1 text-sm">{$t('auth.alreadyRegistered')}
+				<a href="/account/login" class="text-primary-700 font-medium hover:underline">{$t('auth.loginLink')}</a>
 			</p>
 		</div>
 
 		<form onsubmit={submit} class="card p-6 space-y-4">
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<label class="label" for="first_name">Vorname</label>
+					<label class="label" for="first_name">{$t('auth.firstNameLabel')}</label>
 					<input class="input" id="first_name" bind:value={form.first_name} required />
 				</div>
 				<div>
-					<label class="label" for="last_name">Nachname</label>
+					<label class="label" for="last_name">{$t('auth.lastNameLabel')}</label>
 					<input class="input" id="last_name" bind:value={form.last_name} required />
 				</div>
 			</div>
 			<div>
-				<label class="label" for="email">E-Mail</label>
+				<label class="label" for="email">{$t('auth.emailLabel')}</label>
 				<input class="input" id="email" type="email" bind:value={form.email} required autocomplete="email" />
 			</div>
 			<div>
-				<label class="label" for="password">Passwort</label>
+				<label class="label" for="password">{$t('auth.passwordLabel')}</label>
 				<input class="input" id="password" type="password" bind:value={form.password} required minlength="8" autocomplete="new-password" />
 			</div>
 
@@ -72,7 +73,7 @@
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
 					</svg>
 				{:else}
-					Registrieren
+					{$t('auth.registerButton')}
 				{/if}
 			</button>
 		</form>

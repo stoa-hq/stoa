@@ -10,7 +10,6 @@
   import { taxApi } from '$lib/api/tax';
   import { propertyGroupsApi, type PropertyGroup } from '$lib/api/property-groups';
   import { notifications } from '$lib/stores/notifications';
-  import { formatPrice } from '$lib/utils';
   import type { Media } from '$lib/types';
   import Modal from '$lib/components/Modal.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -23,6 +22,9 @@
     translationsFromArray,
     translationsToArray,
   } from '$lib/config';
+  import { t, locale } from 'svelte-i18n';
+  import { fmt } from '$lib/i18n/formatters';
+  import { tr } from '$lib/i18n/entity';
 
   const FIELDS = ['name', 'slug', 'description', 'meta_title', 'meta_description'];
 
@@ -125,7 +127,7 @@
         enteredPrice = product.price_gross ?? 0;
       }
     } catch {
-      notifications.error('Produkt konnte nicht geladen werden.');
+      notifications.error($t('products.loadOneFailed'));
     } finally {
       loading = false;
     }
@@ -150,7 +152,7 @@
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     if (!translations[DEFAULT_LOCALE].name.trim()) {
-      notifications.error(`Bitte Name auf ${LOCALE_LABELS[DEFAULT_LOCALE]} ausfüllen.`);
+      notifications.error($t('common.pleaseNameInLocale', { values: { locale: LOCALE_LABELS[DEFAULT_LOCALE] } }));
       return;
     }
     submitting = true;
@@ -167,9 +169,9 @@
         translations: translationsToArray(translations),
         media_ids: productMediaIds,
       } as any);
-      notifications.success('Produkt gespeichert.');
+      notifications.success($t('products.saved'));
     } catch {
-      notifications.error('Speichern fehlgeschlagen.');
+      notifications.error($t('common.saveFailed'));
     } finally {
       submitting = false;
     }
@@ -178,10 +180,10 @@
   async function handleDelete() {
     try {
       await productsApi.delete(id);
-      notifications.success('Produkt gelöscht.');
+      notifications.success($t('products.deleted'));
       goto(`${base}/products`);
     } catch {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 
@@ -202,9 +204,7 @@
     const group = allPropertyGroups.find((g) => g.id === groupId);
     const opt = group?.options?.find((o) => o.id === optionId);
     if (!opt) return optionId;
-    return opt.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name
-      ?? opt.translations?.[0]?.name
-      ?? opt.id;
+    return tr(opt.translations, 'name', $locale) || opt.id;
   }
 
   // Variant-Optionen als lesbaren String
@@ -214,9 +214,7 @@
       .map((o: any) => {
         const group = allPropertyGroups.find((g) => g.id === o.group_id);
         const opt = group?.options?.find((op) => op.id === o.id);
-        const name = opt?.translations?.find((t: any) => t.locale === DEFAULT_LOCALE)?.name
-          ?? opt?.translations?.[0]?.name
-          ?? o.id;
+        const name = tr(opt?.translations, 'name', $locale) || o.id;
         return name;
       })
       .join(', ');
@@ -232,14 +230,14 @@
         stock: Number(variantForm.stock),
         option_ids: Object.values(addVariantOptions).filter(Boolean),
       } as any);
-      notifications.success('Variante hinzugefügt.');
+      notifications.success($t('products.variantAdded'));
       showVariantModal = false;
       variantForm = { sku: '', price_gross: 0, stock: 0, active: true };
       addVariantOptions = {};
       const product = await productsApi.get(id);
       variants = product.data.variants ?? [];
     } catch {
-      notifications.error('Variante konnte nicht erstellt werden.');
+      notifications.error($t('products.variantCreateFailed'));
     } finally {
       variantSubmitting = false;
     }
@@ -271,12 +269,12 @@
         stock: Number(editVariantForm.stock),
         option_ids: Object.values(editVariantOptions).filter(Boolean),
       } as any);
-      notifications.success('Variante gespeichert.');
+      notifications.success($t('products.variantSaved'));
       editVariant = null;
       const product = await productsApi.get(id);
       variants = product.data.variants ?? [];
     } catch {
-      notifications.error('Speichern fehlgeschlagen.');
+      notifications.error($t('common.saveFailed'));
     } finally {
       editVariantSubmitting = false;
     }
@@ -288,9 +286,9 @@
       await productsApi.deleteVariant(id, deleteVariantId);
       variants = variants.filter((v) => v.id !== deleteVariantId);
       deleteVariantId = null;
-      notifications.success('Variante gelöscht.');
+      notifications.success($t('products.variantDeleted'));
     } catch {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 
@@ -301,19 +299,19 @@
       .filter((arr) => arr.length > 0);
 
     if (optionGroups.length === 0) {
-      notifications.error('Bitte mindestens eine Ausprägung auswählen.');
+      notifications.error($t('products.selectAtLeastOneOption'));
       return;
     }
     generateSubmitting = true;
     try {
       await productsApi.createVariant(id, { option_groups: optionGroups } as any);
-      notifications.success('Varianten generiert.');
+      notifications.success($t('products.variantsGenerated'));
       showGenerateModal = false;
       generateSelections = {};
       const product = await productsApi.get(id);
       variants = product.data.variants ?? [];
     } catch {
-      notifications.error('Generierung fehlgeschlagen.');
+      notifications.error($t('products.variantsGenerateFailed'));
     } finally {
       generateSubmitting = false;
     }
@@ -330,7 +328,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/products" class="text-sm text-primary-600 hover:underline">← Zurück</a>
+  <a href="{base}/products" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -340,28 +338,28 @@
 {:else}
   <div class="card p-6 max-w-2xl mb-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">Produkt bearbeiten</h1>
-      <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>Löschen</button>
+      <h1 class="text-xl font-bold text-gray-900">{$t('products.editProduct')}</h1>
+      <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>{$t('common.delete')}</button>
     </div>
 
     <form onsubmit={handleSubmit} class="space-y-4">
       <div>
-        <label class="label" for="sku">SKU *</label>
+        <label class="label" for="sku">{$t('products.sku')} *</label>
         <input id="sku" class="input" type="text" bind:value={form.sku} required />
       </div>
 
       <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">Übersetzungen</h3>
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('common.translations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}
           primaryLocale={DEFAULT_LOCALE}
           fields={[
-            { key: 'name', label: 'Name', type: 'input', required: true },
-            { key: 'slug', label: 'Slug', type: 'input', required: true },
-            { key: 'description', label: 'Beschreibung', type: 'textarea', rows: 4 },
-            { key: 'meta_title', label: 'Meta-Titel', type: 'input' },
-            { key: 'meta_description', label: 'Meta-Beschreibung', type: 'textarea', rows: 2 },
+            { key: 'name', label: $t('common.name'), type: 'input', required: true },
+            { key: 'slug', label: $t('common.slug'), type: 'input', required: true },
+            { key: 'description', label: $t('common.description'), type: 'textarea', rows: 4 },
+            { key: 'meta_title', label: $t('products.metaTitle'), type: 'input' },
+            { key: 'meta_description', label: $t('products.metaDescription'), type: 'textarea', rows: 2 },
           ]}
           bind:value={translations}
         />
@@ -369,9 +367,9 @@
 
       <!-- Steuerregel -->
       <div>
-        <label class="label" for="tax_rule">Steuerregel</label>
+        <label class="label" for="tax_rule">{$t('products.taxRule')}</label>
         <select id="tax_rule" class="input" bind:value={selectedTaxRuleId}>
-          <option value="">Keine Steuerregel</option>
+          <option value="">{$t('products.noTaxRule')}</option>
           {#each allTaxRules as t}
             <option value={t.id}>{t.name} ({t.rate / 100}%)</option>
           {/each}
@@ -382,39 +380,39 @@
         <div class="flex gap-4">
           <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
             <input type="radio" bind:group={priceMode} value="gross" />
-            Brutto eingeben
+            {$t('products.grossInput')}
           </label>
           <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
             <input type="radio" bind:group={priceMode} value="net" />
-            Netto eingeben
+            {$t('products.netInput')}
           </label>
         </div>
       {/if}
 
       <div>
         <label class="label" for="entered_price">
-          {selectedTaxRule ? (priceMode === 'gross' ? 'Brutto' : 'Netto') : 'Preis brutto'} (Cent)
+          {selectedTaxRule ? (priceMode === 'gross' ? $t('products.grossLabel') : $t('products.netLabel')) : $t('products.priceGrossLabel')} {$t('products.priceCents')}
         </label>
         <input id="entered_price" class="input" type="number" min="0" bind:value={enteredPrice}
-          placeholder="{selectedTaxRule ? (priceMode === 'gross' ? 'Brutto' : 'Netto') : 'Brutto'} in Cent (1999 = 19,99 €)" />
+          placeholder={$t('products.grossPlaceholder')} />
       </div>
 
       {#if calculatedPrice !== null}
         <p class="text-sm text-gray-500">
-          {priceMode === 'gross' ? 'Netto (berechnet)' : 'Brutto (berechnet)'}:
-          {formatPrice(calculatedPrice)}
+          {priceMode === 'gross' ? $t('products.netCalculated') : $t('products.grossCalculated')}:
+          {$fmt.price(calculatedPrice)}
         </p>
       {/if}
 
       <div>
-        <label class="label" for="stock">Lagerbestand</label>
+        <label class="label" for="stock">{$t('products.lagerbestand')}</label>
         <input id="stock" class="input" type="number" min="0" bind:value={form.stock} />
       </div>
 
       <div>
-        <p class="label">Kategorien</p>
+        <p class="label">{$t('products.categories')}</p>
         {#if allCategories.length === 0}
-          <p class="text-sm text-gray-400">Keine Kategorien vorhanden.</p>
+          <p class="text-sm text-gray-400">{$t('products.noCategories')}</p>
         {:else}
           <div class="border border-gray-200 rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
             {#each allCategories as cat}
@@ -425,7 +423,7 @@
                   checked={selectedCategoryIds.includes(cat.id)}
                   onchange={() => toggleCategory(cat.id)}
                 />
-                <span class="text-sm text-gray-700">{cat.translations?.[0]?.name ?? cat.id}</span>
+                <span class="text-sm text-gray-700">{tr(cat.translations, 'name', $locale) || cat.id}</span>
               </label>
             {/each}
           </div>
@@ -433,9 +431,9 @@
       </div>
 
       <div>
-        <p class="label">Tags</p>
+        <p class="label">{$t('products.tags')}</p>
         {#if allTags.length === 0}
-          <p class="text-sm text-gray-400">Keine Tags vorhanden.</p>
+          <p class="text-sm text-gray-400">{$t('products.noTags')}</p>
         {:else}
           <div class="border border-gray-200 rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
             {#each allTags as tag}
@@ -455,14 +453,14 @@
 
       <div class="flex items-center gap-2">
         <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="active" class="text-sm text-gray-700">Aktiv</label>
+        <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
       </div>
 
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Speichern...' : 'Speichern'}
+          {submitting ? $t('common.saving') : $t('common.save')}
         </button>
-        <a href="{base}/products" class="btn btn-secondary">Abbrechen</a>
+        <a href="{base}/products" class="btn btn-secondary">{$t('common.cancel')}</a>
       </div>
     </form>
   </div>
@@ -470,14 +468,14 @@
   <!-- Media -->
   <div class="card p-6 max-w-2xl mb-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Bilder</h2>
+      <h2 class="text-lg font-semibold text-gray-900">{$t('products.images')}</h2>
       <button class="btn btn-secondary btn-sm" onclick={() => showMediaPicker = !showMediaPicker}>
-        {showMediaPicker ? 'Auswahl schließen' : '+ Bild hinzufügen'}
+        {showMediaPicker ? $t('products.closeSelection') : $t('products.addImage')}
       </button>
     </div>
 
     {#if productMediaIds.length === 0 && !showMediaPicker}
-      <p class="text-sm text-gray-400">Keine Bilder zugewiesen.</p>
+      <p class="text-sm text-gray-400">{$t('products.noImages')}</p>
     {/if}
 
     {#if productMediaIds.length > 0}
@@ -497,8 +495,8 @@
             <button
               class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
               onclick={() => toggleMedia(mid)}
-              title="Entfernen"
-            >×</button>
+              title={$t('products.remove')}
+            >&times;</button>
             <p class="text-xs text-gray-500 truncate mt-1">{item?.filename ?? mid}</p>
           </div>
         {/each}
@@ -507,7 +505,7 @@
 
     {#if showMediaPicker}
       {#if allMedia.length === 0}
-        <p class="text-sm text-gray-400">Keine Medien vorhanden. Bitte zuerst unter <a href="{base}/media" class="text-primary-600 underline">Medien</a> hochladen.</p>
+        <p class="text-sm text-gray-400">{$t('products.noMediaAvailable', { values: { link: '' } })}<a href="{base}/media" class="text-primary-600 underline">{$t('products.mediaLinkLabel')}</a></p>
       {:else}
         <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
           {#each allMedia as item}
@@ -535,7 +533,7 @@
             </button>
           {/each}
         </div>
-        <p class="text-xs text-gray-400 mt-2">Klicken zum Auswählen/Abwählen.</p>
+        <p class="text-xs text-gray-400 mt-2">{$t('common.clickToSelectDeselect')}</p>
       {/if}
     {/if}
   </div>
@@ -543,31 +541,31 @@
   <!-- Variants -->
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Varianten</h2>
+      <h2 class="text-lg font-semibold text-gray-900">{$t('products.variants')}</h2>
       <div class="flex gap-2">
         {#if allPropertyGroups.length > 0}
           <button class="btn btn-secondary btn-sm" onclick={() => showGenerateModal = true}>
-            Alle Kombinationen
+            {$t('products.allCombinations')}
           </button>
         {/if}
         <button class="btn btn-secondary btn-sm" onclick={() => showVariantModal = true}>
-          + Variante hinzufügen
+          {$t('products.addVariant')}
         </button>
       </div>
     </div>
 
     {#if variants.length === 0}
-      <p class="text-sm text-gray-400">Keine Varianten vorhanden.</p>
+      <p class="text-sm text-gray-400">{$t('products.noVariants')}</p>
     {:else}
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead>
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Eigenschaften</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preis</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lager</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aktiv</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.sku')}</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.properties')}</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.price')}</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.stock')}</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.active')}</th>
               <th class="px-4 py-2"></th>
             </tr>
           </thead>
@@ -576,21 +574,21 @@
               <tr>
                 <td class="px-4 py-2 text-sm text-gray-700">{v.sku || '—'}</td>
                 <td class="px-4 py-2 text-sm text-gray-500">{variantOptionsLabel(v)}</td>
-                <td class="px-4 py-2 text-sm text-gray-700">{formatPrice(v.price_gross)}</td>
+                <td class="px-4 py-2 text-sm text-gray-700">{$fmt.price(v.price_gross)}</td>
                 <td class="px-4 py-2 text-sm text-gray-700">{v.stock ?? 0}</td>
                 <td class="px-4 py-2 text-sm">
                   {#if v.active}
-                    <span class="badge badge-green">Aktiv</span>
+                    <span class="badge badge-green">{$t('common.active')}</span>
                   {:else}
-                    <span class="badge badge-gray">Inaktiv</span>
+                    <span class="badge badge-gray">{$t('common.inactive')}</span>
                   {/if}
                 </td>
                 <td class="px-4 py-2 text-right flex gap-2 justify-end">
                   <button class="text-primary-600 hover:underline text-xs" onclick={() => openEditVariant(v)}>
-                    Bearbeiten
+                    {$t('common.edit')}
                   </button>
                   <button class="text-red-600 hover:underline text-xs" onclick={() => deleteVariantId = v.id}>
-                    Löschen
+                    {$t('common.delete')}
                   </button>
                 </td>
               </tr>
@@ -604,34 +602,34 @@
 
 <ConfirmModal
   open={showDeleteConfirm}
-  title="Produkt löschen"
-  message="Soll dieses Produkt wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden."
+  title={$t('products.deleteTitle')}
+  message={$t('products.deleteMessage')}
   onConfirm={handleDelete}
   onCancel={() => showDeleteConfirm = false}
 />
 
 <ConfirmModal
   open={!!deleteVariantId}
-  title="Variante löschen"
-  message="Soll diese Variante wirklich gelöscht werden?"
+  title={$t('products.variantDeleteTitle')}
+  message={$t('products.variantDeleteMessage')}
   onConfirm={handleDeleteVariant}
   onCancel={() => deleteVariantId = null}
 />
 
 <!-- Variante hinzufügen -->
-<Modal open={showVariantModal} title="Variante hinzufügen" onClose={() => showVariantModal = false}>
+<Modal open={showVariantModal} title={$t('products.addVariant')} onClose={() => showVariantModal = false}>
   <form onsubmit={handleVariantSubmit} class="space-y-4">
     {#if allPropertyGroups.length > 0}
       <div>
-        <p class="text-sm font-medium text-gray-700 mb-2">Eigenschaften</p>
+        <p class="text-sm font-medium text-gray-700 mb-2">{$t('products.properties')}</p>
         {#each allPropertyGroups as g}
-          {@const gName = g.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? g.id}
+          {@const gName = tr(g.translations, 'name', $locale) || g.id}
           <div class="mb-2">
             <label class="text-xs text-gray-500 uppercase" for="add-variant-{g.id}">{gName}</label>
             <select id="add-variant-{g.id}" class="input mt-1" bind:value={addVariantOptions[g.id]}>
-              <option value="">— keine Auswahl —</option>
+              <option value="">{$t('products.noSelection')}</option>
               {#each g.options ?? [] as o}
-                {@const oName = o.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? o.id}
+                {@const oName = tr(o.translations, 'name', $locale) || o.id}
                 <option value={o.id}>{oName}</option>
               {/each}
             </select>
@@ -640,45 +638,45 @@
       </div>
     {/if}
     <div>
-      <label class="label" for="v-sku">SKU</label>
+      <label class="label" for="v-sku">{$t('products.variantSku')}</label>
       <input id="v-sku" class="input" type="text" bind:value={variantForm.sku} />
     </div>
     <div>
-      <label class="label" for="v-price">Preis brutto (Cent)</label>
+      <label class="label" for="v-price">{$t('products.variantPriceGross')}</label>
       <input id="v-price" class="input" type="number" min="0" bind:value={variantForm.price_gross} placeholder="1999 = 19,99 €" />
     </div>
     <div>
-      <label class="label" for="v-stock">Lagerbestand</label>
+      <label class="label" for="v-stock">{$t('products.variantStock')}</label>
       <input id="v-stock" class="input" type="number" min="0" bind:value={variantForm.stock} />
     </div>
     <div class="flex items-center gap-2">
       <input id="v-active" type="checkbox" bind:checked={variantForm.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-      <label for="v-active" class="text-sm text-gray-700">Aktiv</label>
+      <label for="v-active" class="text-sm text-gray-700">{$t('common.active')}</label>
     </div>
     <div class="flex gap-3 pt-2">
       <button type="submit" class="btn btn-primary" disabled={variantSubmitting}>
-        {variantSubmitting ? 'Speichern...' : 'Hinzufügen'}
+        {variantSubmitting ? $t('common.saving') : $t('common.add')}
       </button>
-      <button type="button" class="btn btn-secondary" onclick={() => showVariantModal = false}>Abbrechen</button>
+      <button type="button" class="btn btn-secondary" onclick={() => showVariantModal = false}>{$t('common.cancel')}</button>
     </div>
   </form>
 </Modal>
 
 <!-- Variante bearbeiten -->
 {#if editVariant}
-  <Modal open={true} title="Variante bearbeiten" onClose={() => editVariant = null}>
+  <Modal open={true} title={$t('common.edit')} onClose={() => editVariant = null}>
     <form onsubmit={handleEditVariantSubmit} class="space-y-4">
       {#if allPropertyGroups.length > 0}
         <div>
-          <p class="text-sm font-medium text-gray-700 mb-2">Eigenschaften</p>
+          <p class="text-sm font-medium text-gray-700 mb-2">{$t('products.properties')}</p>
           {#each allPropertyGroups as g}
-            {@const gName = g.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? g.id}
+            {@const gName = tr(g.translations, 'name', $locale) || g.id}
             <div class="mb-2">
               <label class="text-xs text-gray-500 uppercase" for="edit-variant-{g.id}">{gName}</label>
               <select id="edit-variant-{g.id}" class="input mt-1" bind:value={editVariantOptions[g.id]}>
-                <option value="">— keine Auswahl —</option>
+                <option value="">{$t('products.noSelection')}</option>
                 {#each g.options ?? [] as o}
-                  {@const oName = o.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? o.id}
+                  {@const oName = tr(o.translations, 'name', $locale) || o.id}
                   <option value={o.id}>{oName}</option>
                 {/each}
               </select>
@@ -687,43 +685,43 @@
         </div>
       {/if}
       <div>
-        <label class="label" for="edit-v-sku">SKU</label>
+        <label class="label" for="edit-v-sku">{$t('products.variantSku')}</label>
         <input id="edit-v-sku" class="input" type="text" bind:value={editVariantForm.sku} />
       </div>
       <div>
-        <label class="label" for="edit-v-price">Preis brutto (Cent)</label>
+        <label class="label" for="edit-v-price">{$t('products.variantPriceGross')}</label>
         <input id="edit-v-price" class="input" type="number" min="0" bind:value={editVariantForm.price_gross} />
       </div>
       <div>
-        <label class="label" for="edit-v-stock">Lagerbestand</label>
+        <label class="label" for="edit-v-stock">{$t('products.variantStock')}</label>
         <input id="edit-v-stock" class="input" type="number" min="0" bind:value={editVariantForm.stock} />
       </div>
       <div class="flex items-center gap-2">
         <input id="edit-v-active" type="checkbox" bind:checked={editVariantForm.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="edit-v-active" class="text-sm text-gray-700">Aktiv</label>
+        <label for="edit-v-active" class="text-sm text-gray-700">{$t('common.active')}</label>
       </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={editVariantSubmitting}>
-          {editVariantSubmitting ? 'Speichern...' : 'Speichern'}
+          {editVariantSubmitting ? $t('common.saving') : $t('common.save')}
         </button>
-        <button type="button" class="btn btn-secondary" onclick={() => editVariant = null}>Abbrechen</button>
+        <button type="button" class="btn btn-secondary" onclick={() => editVariant = null}>{$t('common.cancel')}</button>
       </div>
     </form>
   </Modal>
 {/if}
 
 <!-- Alle Kombinationen generieren -->
-<Modal open={showGenerateModal} title="Alle Kombinationen generieren" onClose={() => showGenerateModal = false}>
+<Modal open={showGenerateModal} title={$t('products.generateCombinations')} onClose={() => showGenerateModal = false}>
   <form onsubmit={handleGenerateVariants} class="space-y-4">
-    <p class="text-sm text-gray-500">Wähle für jede Eigenschaftsgruppe die gewünschten Ausprägungen. Es werden alle möglichen Kombinationen als Varianten angelegt.</p>
+    <p class="text-sm text-gray-500">{$t('products.generateDescription')}</p>
     {#each allPropertyGroups as g}
       {#if (g.options?.length ?? 0) > 0}
-        {@const gName = g.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? g.id}
+        {@const gName = tr(g.translations, 'name', $locale) || g.id}
         <div>
           <p class="text-sm font-medium text-gray-700 mb-2">{gName}</p>
           <div class="flex flex-wrap gap-2">
             {#each g.options ?? [] as o}
-              {@const oName = o.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? o.id}
+              {@const oName = tr(o.translations, 'name', $locale) || o.id}
               <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700 border border-gray-200 rounded px-2 py-1">
                 <input
                   type="checkbox"
@@ -743,9 +741,9 @@
     {/each}
     <div class="flex gap-3 pt-2">
       <button type="submit" class="btn btn-primary" disabled={generateSubmitting}>
-        {generateSubmitting ? 'Generiere...' : 'Kombinationen anlegen'}
+        {generateSubmitting ? $t('products.generating') : $t('products.createCombinations')}
       </button>
-      <button type="button" class="btn btn-secondary" onclick={() => showGenerateModal = false}>Abbrechen</button>
+      <button type="button" class="btn btn-secondary" onclick={() => showGenerateModal = false}>{$t('common.cancel')}</button>
     </div>
   </form>
 </Modal>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
   import { tagsApi } from '$lib/api/tags';
   import { notifications } from '$lib/stores/notifications';
   import Modal from '$lib/components/Modal.svelte';
@@ -22,7 +23,7 @@
       const res = await tagsApi.list({ limit: 200 });
       items = res.data ?? [];
     } catch (e) {
-      notifications.error('Tags konnten nicht geladen werden.');
+      notifications.error($t('tags.loadFailed'));
     } finally {
       loading = false;
     }
@@ -34,11 +35,11 @@
     e.preventDefault();
     try {
       await tagsApi.create({ ...newTagForm });
-      notifications.success('Tag erstellt.');
+      notifications.success($t('tags.created'));
       newTagForm = { name: '', slug: '' };
       load();
     } catch (e) {
-      notifications.error('Erstellen fehlgeschlagen.');
+      notifications.error($t('common.createFailed'));
     }
   }
 
@@ -54,12 +55,12 @@
     modalSubmitting = true;
     try {
       await tagsApi.update(editItem.id, { ...modalForm });
-      notifications.success('Tag gespeichert.');
+      notifications.success($t('tags.saved'));
       showModal = false;
       editItem = null;
       load();
     } catch (e) {
-      notifications.error('Speichern fehlgeschlagen.');
+      notifications.error($t('common.saveFailed'));
     } finally {
       modalSubmitting = false;
     }
@@ -75,33 +76,33 @@
     if (!deleteId) return;
     try {
       await tagsApi.delete(deleteId);
-      notifications.success('Tag gelöscht.');
+      notifications.success($t('tags.deleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Tags</h1>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('tags.title')}</h1>
 </div>
 
 <!-- Inline Create Form -->
 <div class="card p-6 mb-6">
-  <h2 class="text-base font-semibold text-gray-900 mb-3">Neuer Tag</h2>
+  <h2 class="text-base font-semibold text-gray-900 mb-3">{$t('tags.newTag')}</h2>
   <form onsubmit={handleCreate} class="flex gap-3 items-end">
     <div class="flex-1">
-      <label class="label" for="new-name">Name *</label>
-      <input id="new-name" class="input" type="text" bind:value={newTagForm.name} required placeholder="Tag-Name" />
+      <label class="label" for="new-name">{$t('common.name')} *</label>
+      <input id="new-name" class="input" type="text" bind:value={newTagForm.name} required placeholder={$t('tags.tagName')} />
     </div>
     <div class="flex-1">
-      <label class="label" for="new-slug">Slug</label>
-      <input id="new-slug" class="input" type="text" bind:value={newTagForm.slug} placeholder="tag-slug" />
+      <label class="label" for="new-slug">{$t('common.slug')}</label>
+      <input id="new-slug" class="input" type="text" bind:value={newTagForm.slug} placeholder={$t('tags.tagSlug')} />
     </div>
-    <button type="submit" class="btn btn-primary">Hinzufügen</button>
+    <button type="submit" class="btn btn-primary">{$t('common.add')}</button>
   </form>
 </div>
 
@@ -116,8 +117,8 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.slug')}</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -127,13 +128,13 @@
               <td class="px-4 py-3 text-sm font-medium text-gray-900">{item.name}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{item.slug}</td>
               <td class="px-4 py-3 text-right">
-                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>Löschen</button>
+                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="3" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Tags gefunden.</td>
+              <td colspan="3" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('tags.noTags')}</td>
             </tr>
           {/if}
         </tbody>
@@ -142,29 +143,29 @@
   {/if}
 </div>
 
-<Modal open={showModal} title="Tag bearbeiten" onClose={() => { showModal = false; editItem = null; }}>
+<Modal open={showModal} title={$t('tags.editTag')} onClose={() => { showModal = false; editItem = null; }}>
   <form onsubmit={handleModalSubmit} class="space-y-4">
     <div>
-      <label class="label" for="edit-name">Name *</label>
+      <label class="label" for="edit-name">{$t('common.name')} *</label>
       <input id="edit-name" class="input" type="text" bind:value={modalForm.name} required />
     </div>
     <div>
-      <label class="label" for="edit-slug">Slug</label>
+      <label class="label" for="edit-slug">{$t('common.slug')}</label>
       <input id="edit-slug" class="input" type="text" bind:value={modalForm.slug} />
     </div>
     <div class="flex gap-3 pt-2">
       <button type="submit" class="btn btn-primary" disabled={modalSubmitting}>
-        {modalSubmitting ? 'Speichern...' : 'Speichern'}
+        {modalSubmitting ? $t('common.saving') : $t('common.save')}
       </button>
-      <button type="button" class="btn btn-secondary" onclick={() => { showModal = false; editItem = null; }}>Abbrechen</button>
+      <button type="button" class="btn btn-secondary" onclick={() => { showModal = false; editItem = null; }}>{$t('common.cancel')}</button>
     </div>
   </form>
 </Modal>
 
 <ConfirmModal
   open={showConfirm}
-  title="Tag löschen"
-  message="Soll dieser Tag wirklich gelöscht werden?"
+  title={$t('tags.deleteTitle')}
+  message={$t('tags.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
 />

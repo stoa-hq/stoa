@@ -108,6 +108,57 @@ type CreatePropertyOptionRequest struct {
 type UpdatePropertyOptionRequest = CreatePropertyOptionRequest
 
 // --------------------------------------------------------------------------
+// Bulk / Import DTOs
+// --------------------------------------------------------------------------
+
+// BulkImportOptionInput describes a property option by name for CSV/bulk import.
+// The service resolves group/option names to IDs via find-or-create.
+type BulkImportOptionInput struct {
+	GroupName  string `json:"group_name"`
+	OptionName string `json:"option_name"`
+	Locale     string `json:"locale"`
+}
+
+// BulkImportVariantInput describes a variant within a bulk import request.
+type BulkImportVariantInput struct {
+	SKU        string                  `json:"sku"`
+	Active     bool                    `json:"active"`
+	Stock      int                     `json:"stock"       validate:"min=0"`
+	PriceNet   *int                    `json:"price_net"`
+	PriceGross *int                    `json:"price_gross"`
+	Options    []BulkImportOptionInput `json:"options"`
+}
+
+// BulkCreateProductRequest extends CreateProductRequest with inline variants.
+type BulkCreateProductRequest struct {
+	CreateProductRequest
+	Variants []BulkImportVariantInput `json:"variants"`
+}
+
+// BulkRequest is the body for the JSON bulk-create endpoint.
+// Max 250 products per request.
+type BulkRequest struct {
+	Products []BulkCreateProductRequest `json:"products" validate:"required,min=1,max=250"`
+}
+
+// BulkResult holds the outcome for a single product within a bulk operation.
+type BulkResult struct {
+	Index   int      `json:"index"`
+	SKU     string   `json:"sku,omitempty"`
+	Success bool     `json:"success"`
+	ID      string   `json:"id,omitempty"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
+// BulkResponse is returned by both the JSON bulk and CSV import endpoints.
+type BulkResponse struct {
+	Results   []BulkResult `json:"results"`
+	Total     int          `json:"total"`
+	Succeeded int          `json:"succeeded"`
+	Failed    int          `json:"failed"`
+}
+
+// --------------------------------------------------------------------------
 // Response DTOs
 // --------------------------------------------------------------------------
 

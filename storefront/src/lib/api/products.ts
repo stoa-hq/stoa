@@ -46,6 +46,7 @@ export interface Product {
 export function getTranslation(product: Product, locale = 'de-DE'): ProductTranslation {
 	return (
 		product.translations.find((t) => t.locale === locale) ??
+		product.translations.find((t) => t.locale === 'de-DE') ??
 		product.translations[0] ?? { locale: '', name: product.sku, description: '', slug: product.sku, meta_title: '', meta_description: '' }
 	);
 }

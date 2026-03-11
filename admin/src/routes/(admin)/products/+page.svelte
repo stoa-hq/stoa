@@ -4,9 +4,12 @@
   import { base } from '$app/paths';
   import { productsApi } from '$lib/api/products';
   import { notifications } from '$lib/stores/notifications';
-  import { formatPrice, formatDate } from '$lib/utils';
   import Pagination from '$lib/components/Pagination.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import ProductImportModal from '$lib/components/ProductImportModal.svelte';
+  import { t, locale } from 'svelte-i18n';
+  import { fmt } from '$lib/i18n/formatters';
+  import { tr } from '$lib/i18n/entity';
 
   let items = $state<any[]>([]);
   let meta = $state<any>(null);
@@ -16,6 +19,14 @@
   let search = $state('');
   let deleteId = $state<string | null>(null);
   let showConfirm = $state(false);
+  let showImport = $state(false);
+
+  function openImport() { showImport = true; }
+
+  function handleImported() {
+    notifications.success($t('products.importSuccess'));
+    load();
+  }
 
   async function load() {
     loading = true;
@@ -24,7 +35,7 @@
       items = res.data?.items ?? [];
       meta = res.meta ?? null;
     } catch (e) {
-      notifications.error('Produkte konnten nicht geladen werden.');
+      notifications.error($t('products.loadFailed'));
     } finally {
       loading = false;
     }
@@ -56,19 +67,22 @@
     if (!deleteId) return;
     try {
       await productsApi.delete(deleteId);
-      notifications.success('Produkt gelöscht.');
+      notifications.success($t('products.deleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Produkte</h1>
-  <a href="{base}/products/new" class="btn btn-primary">+ Neu</a>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('products.title')}</h1>
+  <div class="flex gap-2">
+    <button class="btn btn-secondary" onclick={openImport}>{$t('common.import')}</button>
+    <a href="{base}/products/new" class="btn btn-primary">{$t('common.new')}</a>
+  </div>
 </div>
 
 <div class="card p-6">
@@ -76,7 +90,7 @@
     <input
       class="input max-w-xs"
       type="search"
-      placeholder="Suchen..."
+      placeholder={$t('common.search')}
       bind:value={search}
       oninput={handleSearch}
     />
@@ -91,12 +105,12 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis (brutto)</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lager</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktiv</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erstellt</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.sku')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.priceGross')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.stock')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.createdAt')}</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -107,30 +121,30 @@
               onclick={() => goto(`${base}/products/${item.id}`)}
             >
               <td class="px-4 py-3 text-sm text-gray-600">{item.sku}</td>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{item.translations?.[0]?.name ?? item.sku}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{formatPrice(item.price_gross)}</td>
+              <td class="px-4 py-3 text-sm font-medium text-gray-900">{tr(item.translations, 'name', $locale) || item.sku}</td>
+              <td class="px-4 py-3 text-sm text-gray-700">{$fmt.price(item.price_gross)}</td>
               <td class="px-4 py-3 text-sm text-gray-700">{item.stock ?? 0}</td>
               <td class="px-4 py-3 text-sm">
                 {#if item.active}
-                  <span class="badge badge-green">Aktiv</span>
+                  <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
-                  <span class="badge badge-gray">Inaktiv</span>
+                  <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{formatDate(item.created_at)}</td>
+              <td class="px-4 py-3 text-sm text-gray-500">{$fmt.date(item.created_at)}</td>
               <td class="px-4 py-3 text-right">
                 <button
                   class="btn btn-danger btn-sm"
                   onclick={(e) => confirmDelete(item.id, e)}
                 >
-                  Löschen
+                  {$t('common.delete')}
                 </button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="7" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Produkte gefunden.</td>
+              <td colspan="7" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('products.noProductsFound')}</td>
             </tr>
           {/if}
         </tbody>
@@ -151,8 +165,14 @@
 
 <ConfirmModal
   open={showConfirm}
-  title="Produkt löschen"
-  message="Soll dieses Produkt wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden."
+  title={$t('products.deleteTitle')}
+  message={$t('products.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
+/>
+
+<ProductImportModal
+  open={showImport}
+  onClose={() => { showImport = false; }}
+  onImported={handleImported}
 />

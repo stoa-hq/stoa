@@ -1,0 +1,138 @@
+{
+	"header": {
+		"products": "Produkte",
+		"search": "Suche",
+		"searchAriaLabel": "Suche",
+		"myOrders": "Meine Bestellungen",
+		"logout": "Abmelden",
+		"login": "Anmelden"
+	},
+	"footer": {
+		"copyright": "© {year} stoa. Alle Rechte vorbehalten.",
+		"products": "Produkte",
+		"search": "Suche",
+		"account": "Konto",
+		"cart": "Warenkorb"
+	},
+	"products": {
+		"title": "Produkte",
+		"pageTitle": "Produkte – stoa",
+		"itemCount": "{count} Artikel",
+		"searchPlaceholder": "Suchen...",
+		"categories": "Kategorien",
+		"allProducts": "Alle Produkte",
+		"noProducts": "Keine Produkte gefunden.",
+		"select": "Auswählen →",
+		"soldOut": "Ausverkauft",
+		"addToCart": "+ Warenkorb",
+		"lowStock": "Nur noch {count} verfügbar"
+	},
+	"productDetail": {
+		"pageTitle": "{name} – stoa",
+		"product": "Produkt",
+		"notFound": "Produkt nicht gefunden.",
+		"loadError": "Produkt konnte nicht geladen werden.",
+		"backToOverview": "Zurück zur Übersicht",
+		"breadcrumbProducts": "Produkte",
+		"variant": "Variante",
+		"quantity": "Menge",
+		"addedToCart": "Zum Warenkorb hinzugefügt",
+		"selectVariant": "Bitte Variante wählen",
+		"soldOut": "Ausverkauft",
+		"addToCart": "In den Warenkorb",
+		"lowStock": "Nur noch {count} auf Lager"
+	},
+	"search": {
+		"pageTitle": "Suche – stoa",
+		"pageTitleWithQuery": "\"{query}\" – Suche – stoa",
+		"title": "Suche",
+		"placeholder": "Produkte suchen…",
+		"button": "Suchen",
+		"noResults": "Keine Produkte für <strong>\"{query}\"</strong> gefunden.",
+		"resultCount": "{count} Ergebnis für \"{query}\"",
+		"resultCountPlural": "{count} Ergebnisse für \"{query}\""
+	},
+	"cart": {
+		"pageTitle": "Warenkorb – stoa",
+		"title": "Warenkorb",
+		"empty": "Dein Warenkorb ist leer.",
+		"continueShopping": "Weiter einkaufen",
+		"removeItem": "Artikel entfernen",
+		"subtotal": "Zwischensumme",
+		"total": "Gesamt",
+		"checkout": "Zur Kasse",
+		"fallbackProductName": "Produkt"
+	},
+	"checkout": {
+		"pageTitle": "Kasse – stoa",
+		"title": "Kasse",
+		"loadError": "Fehler beim Laden der Bestelldaten.",
+		"shippingAddress": "Lieferadresse",
+		"firstName": "Vorname",
+		"lastName": "Nachname",
+		"email": "E-Mail",
+		"street": "Straße & Hausnummer",
+		"zip": "PLZ",
+		"city": "Stadt",
+		"sameAsBilling": "Rechnungsadresse ist identisch mit Lieferadresse",
+		"billingAddress": "Rechnungsadresse",
+		"shippingMethod": "Versandart",
+		"paymentMethod": "Zahlungsart",
+		"orderSummary": "Bestellübersicht",
+		"shipping": "Versand",
+		"shippingFree": "kostenlos",
+		"total": "Gesamt",
+		"placeOrder": "Jetzt kaufen",
+		"orderError": "Bestellung fehlgeschlagen.",
+		"fallbackProductName": "Produkt"
+	},
+	"checkoutSuccess": {
+		"pageTitle": "Bestellung erfolgreich – stoa",
+		"title": "Vielen Dank für deine Bestellung!",
+		"orderNumber": "Bestellnummer: #{number}",
+		"confirmation": "Deine Bestellung wurde erfolgreich aufgegeben. Du erhältst in Kürze eine Bestätigung.",
+		"myOrders": "Meine Bestellungen",
+		"continueShopping": "Weiter einkaufen"
+	},
+	"auth": {
+		"loginPageTitle": "Anmelden – stoa",
+		"loginTitle": "Anmelden",
+		"noAccount": "Noch kein Konto?",
+		"register": "Registrieren",
+		"emailLabel": "E-Mail",
+		"passwordLabel": "Passwort",
+		"loginButton": "Anmelden",
+		"loginError": "Anmeldung fehlgeschlagen.",
+		"registerPageTitle": "Registrieren – stoa",
+		"registerTitle": "Konto erstellen",
+		"alreadyRegistered": "Bereits registriert?",
+		"loginLink": "Anmelden",
+		"firstNameLabel": "Vorname",
+		"lastNameLabel": "Nachname",
+		"registerButton": "Registrieren",
+		"registerError": "Registrierung fehlgeschlagen."
+	},
+	"orders": {
+		"pageTitle": "Meine Bestellungen – stoa",
+		"title": "Meine Bestellungen",
+		"logout": "Abmelden",
+		"loadError": "Bestellungen konnten nicht geladen werden.",
+		"noOrders": "Du hast noch keine Bestellungen aufgegeben.",
+		"shopNow": "Jetzt einkaufen",
+		"total": "Gesamt"
+	},
+	"orderStatus": {
+		"pending": "Ausstehend",
+		"confirmed": "Bestätigt",
+		"processing": "In Bearbeitung",
+		"shipped": "Versendet",
+		"delivered": "Zugestellt",
+		"cancelled": "Storniert",
+		"refunded": "Erstattet"
+	},
+	"common": {
+		"loading": "Laden...",
+		"error": "Ein Fehler ist aufgetreten.",
+		"language": "Sprache"
+	}
+}

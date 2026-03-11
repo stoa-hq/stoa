@@ -3,7 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth';
 	import { ordersApi, type Order } from '$lib/api/orders';
-	import { formatPrice, formatDate, orderStatusLabel, orderStatusClass } from '$lib/utils';
+	import { orderStatusClass } from '$lib/utils';
+	import { t } from 'svelte-i18n';
+	import { fmt } from '$lib/i18n/formatters';
 
 	let orders = $state<Order[]>([]);
 	let loading = $state(true);
@@ -18,7 +20,7 @@
 			const res = await ordersApi.myOrders();
 			orders = res.data ?? [];
 		} catch {
-			error = 'Bestellungen konnten nicht geladen werden.';
+			error = $t('orders.loadError');
 		} finally {
 			loading = false;
 		}
@@ -26,13 +28,13 @@
 </script>
 
 <svelte:head>
-	<title>Meine Bestellungen – stoa</title>
+	<title>{$t('orders.pageTitle')}</title>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 	<div class="flex items-center justify-between mb-6">
-		<h1 class="text-2xl font-bold text-gray-900">Meine Bestellungen</h1>
-		<button onclick={() => { authStore.logout(); goto('/'); }} class="btn btn-secondary text-sm">Abmelden</button>
+		<h1 class="text-2xl font-bold text-gray-900">{$t('orders.title')}</h1>
+		<button onclick={() => { authStore.logout(); goto('/'); }} class="btn btn-secondary text-sm">{$t('orders.logout')}</button>
 	</div>
 
 	{#if loading}
@@ -45,8 +47,8 @@
 		<p class="text-red-600">{error}</p>
 	{:else if orders.length === 0}
 		<div class="text-center py-20 text-gray-400">
-			<p>Du hast noch keine Bestellungen aufgegeben.</p>
-			<a href="/" class="btn btn-primary mt-4">Jetzt einkaufen</a>
+			<p>{$t('orders.noOrders')}</p>
+			<a href="/" class="btn btn-primary mt-4">{$t('orders.shopNow')}</a>
 		</div>
 	{:else}
 		<div class="space-y-4">
@@ -55,23 +57,23 @@
 					<div class="flex items-start justify-between gap-4">
 						<div>
 							<p class="font-semibold text-gray-900">#{order.order_number}</p>
-							<p class="text-sm text-gray-500 mt-0.5">{formatDate(order.created_at)}</p>
+							<p class="text-sm text-gray-500 mt-0.5">{$fmt.date(order.created_at)}</p>
 						</div>
-						<span class="badge {orderStatusClass(order.status)}">{orderStatusLabel(order.status)}</span>
+						<span class="badge {orderStatusClass(order.status)}">{$t(`orderStatus.${order.status}`)}</span>
 					</div>
 					{#if order.items && order.items.length > 0}
 						<ul class="mt-3 space-y-1 text-sm text-gray-600">
 							{#each order.items as item}
 								<li class="flex justify-between">
 									<span>{item.name} × {item.quantity}</span>
-									<span>{formatPrice(item.total_gross)}</span>
+									<span>{$fmt.price(item.total_gross)}</span>
 								</li>
 							{/each}
 						</ul>
 					{/if}
 					<div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-						<span class="text-sm text-gray-500">Gesamt</span>
-						<span class="font-bold text-gray-900">{formatPrice(order.total)}</span>
+						<span class="text-sm text-gray-500">{$t('orders.total')}</span>
+						<span class="font-bold text-gray-900">{$fmt.price(order.total)}</span>
 					</div>
 				</div>
 			{/each}

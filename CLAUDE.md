@@ -39,6 +39,7 @@ internal/mcp/                  → MCP infrastructure + store/admin tools
 internal/plugin/               → Plugin registry + hook dispatch
 internal/search/               → PG full-text search
 internal/media/                → Local/S3 storage + image processor
+internal/settings/             → Read-only config endpoint (i18n settings)
 internal/config/               → Viper config
 pkg/sdk/                       → Public plugin SDK
 admin/                         → SvelteKit 5 Admin SPA → internal/admin/build/
@@ -53,7 +54,8 @@ Each domain package: `entity.go`, `repository.go`, `postgres.go`, `service.go`, 
 ## Key Patterns
 
 - **Prices as integers**: cents (1999 = €19.99), tax rates in basis points (1900 = 19.00%)
-- **i18n**: Translatable entities have `*_translations` tables with `(entity_id, locale)` composite key
+- **i18n (entities)**: Translatable entities have `*_translations` tables with `(entity_id, locale)` composite key
+- **i18n (frontend)**: `svelte-i18n` with JSON dictionaries in `{admin,storefront}/src/lib/i18n/`. Keys namespaced by domain (e.g. `products.title`). Locale-aware formatting via `$fmt` store from `formatters.ts`. Language stored in `localStorage` (`stoa_admin_locale` / `storefront_locale`)
 - **Custom fields**: Every entity has `custom_fields JSONB` (user-facing) + `metadata JSONB` (internal)
 - **Response format**: `{"data": ..., "meta": {"total", "page", "limit", "pages"}, "errors": [{"code", "detail", "field"}]}`
 - **Query conventions**: `?page=1&limit=25&sort=created_at&order=desc&filter[active]=true`
@@ -73,7 +75,7 @@ Each domain package: `entity.go`, `repository.go`, `postgres.go`, `service.go`, 
 Both SPAs: SPA mode (`ssr = false`), adapter-static, Vite proxy `/api` → `:8080`
 
 - **Admin** (`/admin`): Auth token in `localStorage` (`stoa_access_token`, `stoa_refresh_token`)
-- **Storefront** (`/`): Auth token (`storefront_access_token`), cart ID (`storefront_cart_id`)
+- **Storefront** (`/`): Auth token (`storefront_access_token`), cart ID (`storefront_cart_id`), locale (`storefront_locale`)
 - **CSRF**: POST/PUT/PATCH/DELETE without Bearer require `X-CSRF-Token` header (cookie value `csrf_token`)
 - **JWT Base64url**: `atob()` needs standard Base64 — `-`→`+`, `_`→`/`, add padding
 

@@ -17,6 +17,7 @@ import (
 
 type mockRepo struct {
 	findByID       func(ctx context.Context, id uuid.UUID) (*Product, error)
+	findBySKU      func(ctx context.Context, sku string) (*Product, error)
 	findAll        func(ctx context.Context, f ProductFilter) ([]Product, int, error)
 	findBySlug     func(ctx context.Context, slug, locale string) (*Product, error)
 	create         func(ctx context.Context, p *Product) error
@@ -28,6 +29,12 @@ type mockRepo struct {
 func (m *mockRepo) FindByID(ctx context.Context, id uuid.UUID) (*Product, error) {
 	if m.findByID != nil {
 		return m.findByID(ctx, id)
+	}
+	return nil, ErrNotFound
+}
+func (m *mockRepo) FindBySKU(ctx context.Context, sku string) (*Product, error) {
+	if m.findBySKU != nil {
+		return m.findBySKU(ctx, sku)
 	}
 	return nil, ErrNotFound
 }
@@ -89,9 +96,29 @@ func (m *mockRepo) DeletePropertyGroup(_ context.Context, _ uuid.UUID) error    
 func (m *mockRepo) FindOptionsByGroupID(_ context.Context, _ uuid.UUID) ([]PropertyOption, error) {
 	return nil, nil
 }
-func (m *mockRepo) CreatePropertyOption(_ context.Context, _ *PropertyOption) error { return nil }
+func (m *mockRepo) CreatePropertyOption(_ context.Context, o *PropertyOption) error {
+	if o.ID == uuid.Nil {
+		o.ID = uuid.New()
+	}
+	return nil
+}
 func (m *mockRepo) UpdatePropertyOption(_ context.Context, _ *PropertyOption) error { return nil }
 func (m *mockRepo) DeletePropertyOption(_ context.Context, _ uuid.UUID) error       { return nil }
+
+// Bulk / Import stubs
+func (m *mockRepo) FindOrCreatePropertyGroup(_ context.Context, _, name string) (*PropertyGroup, error) {
+	return &PropertyGroup{
+		ID:           uuid.New(),
+		Translations: []PropertyGroupTranslation{{Locale: "de", Name: name}},
+	}, nil
+}
+func (m *mockRepo) FindOrCreatePropertyOption(_ context.Context, groupID uuid.UUID, _, name string) (*PropertyOption, error) {
+	return &PropertyOption{
+		ID:           uuid.New(),
+		GroupID:      groupID,
+		Translations: []PropertyOptionTranslation{{Locale: "de", Name: name}},
+	}, nil
+}
 
 // newTestService builds a Service with a no-op HookRegistry and silent logger.
 func newTestService(repo ProductRepository) *Service {

@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { t } from 'svelte-i18n';
+
 	const orderNumber = $derived($page.url.searchParams.get('order') ?? '');
 </script>
 
 <svelte:head>
-	<title>Bestellung erfolgreich – stoa</title>
+	<title>{$t('checkoutSuccess.pageTitle')}</title>
 </svelte:head>
 
 <div class="max-w-lg mx-auto px-4 py-20 text-center">
@@ -13,13 +15,13 @@
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 		</svg>
 	</div>
-	<h1 class="text-2xl font-bold text-gray-900">Vielen Dank für deine Bestellung!</h1>
+	<h1 class="text-2xl font-bold text-gray-900">{$t('checkoutSuccess.title')}</h1>
 	{#if orderNumber}
-		<p class="text-gray-500 mt-2">Bestellnummer: <span class="font-medium text-gray-900">#{orderNumber}</span></p>
+		<p class="text-gray-500 mt-2">{$t('checkoutSuccess.orderNumber', { values: { number: orderNumber } })}</p>
 	{/if}
-	<p class="text-gray-500 mt-4">Deine Bestellung wurde erfolgreich aufgegeben. Du erhältst in Kürze eine Bestätigung.</p>
+	<p class="text-gray-500 mt-4">{$t('checkoutSuccess.confirmation')}</p>
 	<div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-		<a href="/account/orders" class="btn btn-primary">Meine Bestellungen</a>
-		<a href="/" class="btn btn-secondary">Weiter einkaufen</a>
+		<a href="/account/orders" class="btn btn-primary">{$t('checkoutSuccess.myOrders')}</a>
+		<a href="/" class="btn btn-secondary">{$t('checkoutSuccess.continueShopping')}</a>
 	</div>
 </div>

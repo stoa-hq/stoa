@@ -17,7 +17,7 @@ export interface Category {
 }
 
 export function getCategoryName(cat: Category, locale = 'de-DE'): string {
-	const t = cat.translations?.find((t) => t.locale === locale) ?? cat.translations?.[0];
+	const t = cat.translations?.find((t) => t.locale === locale) ?? cat.translations?.find((t) => t.locale === 'de-DE') ?? cat.translations?.[0];
 	return t?.name ?? cat.id;
 }
 

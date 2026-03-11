@@ -2,11 +2,12 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { cartStore } from '$lib/stores/cart';
-	import { productsApi, getTranslation } from '$lib/api/products';
+	import { productsApi, getTranslation, type Product } from '$lib/api/products';
 	import { ordersApi } from '$lib/api/orders';
 	import { shippingApi, getShippingName, type ShippingMethod } from '$lib/api/shipping';
 	import { paymentApi, getPaymentName, type PaymentMethod } from '$lib/api/payment';
-	import { formatPrice } from '$lib/utils';
+	import { t, locale } from 'svelte-i18n';
+	import { fmt } from '$lib/i18n/formatters';
 
 	let step = $state<'address' | 'shipping' | 'confirm'>('address');
 	let loading = $state(true);
@@ -19,18 +20,28 @@
 	let selectedShipping = $state<string>('');
 	let selectedPayment = $state<string>('');
 
-	// Enriched cart items for display + checkout submission
-	interface LineItem {
+	// Raw cart item data with product references for reactive translation
+	interface LineItemData {
 		id: string;
 		product_id: string;
 		variant_id?: string;
 		quantity: number;
-		name: string;
+		product?: Product;
 		sku: string;
 		price_net: number;
 		price_gross: number;
 	}
-	let lineItems = $state<LineItem[]>([]);
+	let lineItemsData = $state<LineItemData[]>([]);
+
+	// Derive display names reactively based on locale
+	const lineItems = $derived(lineItemsData.map((item) => {
+		const loc = $locale ?? 'de-DE';
+		const tr = item.product ? getTranslation(item.product, loc) : null;
+		return {
+			...item,
+			name: tr?.name ?? $t('checkout.fallbackProductName')
+		};
+	}));
 
 	const subtotal = $derived(lineItems.reduce((s, i) => s + i.price_gross * i.quantity, 0));
 	const shippingCost = $derived(() => {
@@ -80,16 +91,15 @@
 			const productMap = new Map(
 				products.flatMap((res) => (res.data ? [[res.data.id, res.data]] : []))
 			);
-			lineItems = items.map((item) => {
+			lineItemsData = items.map((item) => {
 				const product = productMap.get(item.product_id);
-				const t = product ? getTranslation(product) : null;
 				const variant = product?.variants?.find((v) => v.id === item.variant_id);
 				return {
 					id: item.id,
 					product_id: item.product_id,
 					variant_id: item.variant_id,
 					quantity: item.quantity,
-					name: t?.name ?? 'Produkt',
+					product,
 					sku: variant?.sku ?? product?.sku ?? '',
 					price_net: variant?.price_net ?? product?.price_net ?? 0,
 					price_gross: variant?.price_gross ?? product?.price_gross ?? 0
@@ -101,7 +111,7 @@
 			if (shippingMethods.length > 0) selectedShipping = shippingMethods[0].id;
 			if (paymentMethods.length > 0) selectedPayment = paymentMethods[0].id;
 		} catch {
-			error = 'Fehler beim Laden der Bestelldaten.';
+			error = $t('checkout.loadError');
 		} finally {
 			loading = false;
 		}
@@ -152,7 +162,7 @@
 			cartStore.clear();
 			goto(`/checkout/success?order=${res.data?.order_number ?? ''}`);
 		} catch (e: unknown) {
-			error = (e as Error).message ?? 'Bestellung fehlgeschlagen.';
+			error = (e as Error).message ?? $t('checkout.orderError');
 		} finally {
 			submitting = false;
 		}
@@ -160,11 +170,11 @@
 </script>
 
 <svelte:head>
-	<title>Kasse – stoa</title>
+	<title>{$t('checkout.pageTitle')}</title>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-	<h1 class="text-2xl font-bold text-gray-900 mb-6">Kasse</h1>
+	<h1 class="text-2xl font-bold text-gray-900 mb-6">{$t('checkout.title')}</h1>
 
 	{#if loading}
 		<div class="animate-pulse h-40 bg-gray-100 rounded-xl"></div>
@@ -174,30 +184,30 @@
 			<div class="lg:col-span-3 space-y-6">
 				<!-- Shipping Address -->
 				<div class="card p-6">
-					<h2 class="text-lg font-semibold text-gray-900 mb-4">Lieferadresse</h2>
+					<h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('checkout.shippingAddress')}</h2>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label class="label" for="first_name">Vorname</label>
+							<label class="label" for="first_name">{$t('checkout.firstName')}</label>
 							<input class="input" id="first_name" bind:value={form.first_name} required />
 						</div>
 						<div>
-							<label class="label" for="last_name">Nachname</label>
+							<label class="label" for="last_name">{$t('checkout.lastName')}</label>
 							<input class="input" id="last_name" bind:value={form.last_name} required />
 						</div>
 						<div class="col-span-2">
-							<label class="label" for="email">E-Mail</label>
+							<label class="label" for="email">{$t('checkout.email')}</label>
 							<input class="input" id="email" type="email" bind:value={form.email} required />
 						</div>
 						<div class="col-span-2">
-							<label class="label" for="street">Straße & Hausnummer</label>
+							<label class="label" for="street">{$t('checkout.street')}</label>
 							<input class="input" id="street" bind:value={form.street} required />
 						</div>
 						<div>
-							<label class="label" for="zip">PLZ</label>
+							<label class="label" for="zip">{$t('checkout.zip')}</label>
 							<input class="input" id="zip" bind:value={form.zip} required />
 						</div>
 						<div>
-							<label class="label" for="city">Stadt</label>
+							<label class="label" for="city">{$t('checkout.city')}</label>
 							<input class="input" id="city" bind:value={form.city} required />
 						</div>
 					</div>
@@ -211,35 +221,35 @@
 							bind:checked={sameAsShipping}
 							class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
 						/>
-						<span class="text-sm font-medium text-gray-700">Rechnungsadresse ist identisch mit Lieferadresse</span>
+						<span class="text-sm font-medium text-gray-700">{$t('checkout.sameAsBilling')}</span>
 					</label>
 
 					{#if !sameAsShipping}
 						<div class="mt-5">
-							<h2 class="text-lg font-semibold text-gray-900 mb-4">Rechnungsadresse</h2>
+							<h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('checkout.billingAddress')}</h2>
 							<div class="grid grid-cols-2 gap-4">
 								<div>
-									<label class="label" for="billing_first_name">Vorname</label>
+									<label class="label" for="billing_first_name">{$t('checkout.firstName')}</label>
 									<input class="input" id="billing_first_name" bind:value={billingForm.first_name} required />
 								</div>
 								<div>
-									<label class="label" for="billing_last_name">Nachname</label>
+									<label class="label" for="billing_last_name">{$t('checkout.lastName')}</label>
 									<input class="input" id="billing_last_name" bind:value={billingForm.last_name} required />
 								</div>
 								<div class="col-span-2">
-									<label class="label" for="billing_email">E-Mail</label>
+									<label class="label" for="billing_email">{$t('checkout.email')}</label>
 									<input class="input" id="billing_email" type="email" bind:value={billingForm.email} required />
 								</div>
 								<div class="col-span-2">
-									<label class="label" for="billing_street">Straße & Hausnummer</label>
+									<label class="label" for="billing_street">{$t('checkout.street')}</label>
 									<input class="input" id="billing_street" bind:value={billingForm.street} required />
 								</div>
 								<div>
-									<label class="label" for="billing_zip">PLZ</label>
+									<label class="label" for="billing_zip">{$t('checkout.zip')}</label>
 									<input class="input" id="billing_zip" bind:value={billingForm.zip} required />
 								</div>
 								<div>
-									<label class="label" for="billing_city">Stadt</label>
+									<label class="label" for="billing_city">{$t('checkout.city')}</label>
 									<input class="input" id="billing_city" bind:value={billingForm.city} required />
 								</div>
 							</div>
@@ -250,14 +260,14 @@
 				<!-- Shipping -->
 				{#if shippingMethods.length > 0}
 					<div class="card p-6">
-						<h2 class="text-lg font-semibold text-gray-900 mb-4">Versandart</h2>
+						<h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('checkout.shippingMethod')}</h2>
 						<div class="space-y-2">
 							{#each shippingMethods as m}
 								<label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors
 									{selectedShipping === m.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}">
 									<input type="radio" bind:group={selectedShipping} value={m.id} class="text-primary-600" />
-									<span class="flex-1 font-medium text-gray-900">{getShippingName(m)}</span>
-									<span class="font-bold text-gray-900">{formatPrice(m.price_gross)}</span>
+									<span class="flex-1 font-medium text-gray-900">{getShippingName(m, $locale ?? 'de-DE')}</span>
+									<span class="font-bold text-gray-900">{$fmt.price(m.price_gross)}</span>
 								</label>
 							{/each}
 						</div>
@@ -267,13 +277,13 @@
 				<!-- Payment -->
 				{#if paymentMethods.length > 0}
 					<div class="card p-6">
-						<h2 class="text-lg font-semibold text-gray-900 mb-4">Zahlungsart</h2>
+						<h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('checkout.paymentMethod')}</h2>
 						<div class="space-y-2">
 							{#each paymentMethods as m}
 								<label class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors
 									{selectedPayment === m.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}">
 									<input type="radio" bind:group={selectedPayment} value={m.id} class="text-primary-600" />
-									<span class="font-medium text-gray-900">{getPaymentName(m)}</span>
+									<span class="font-medium text-gray-900">{getPaymentName(m, $locale ?? 'de-DE')}</span>
 								</label>
 							{/each}
 						</div>
@@ -284,24 +294,24 @@
 			<!-- Order summary -->
 			<div class="lg:col-span-2">
 				<div class="card p-6 sticky top-24">
-					<h2 class="text-lg font-semibold text-gray-900 mb-4">Bestellübersicht</h2>
+					<h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('checkout.orderSummary')}</h2>
 					<ul class="space-y-3 text-sm">
 						{#each lineItems as item}
 							<li class="flex justify-between">
 								<span class="text-gray-700">{item.name} <span class="text-gray-400">× {item.quantity}</span></span>
-								<span class="font-medium">{formatPrice(item.price_gross * item.quantity)}</span>
+								<span class="font-medium">{$fmt.price(item.price_gross * item.quantity)}</span>
 							</li>
 						{/each}
 					</ul>
 
 					<div class="border-t border-gray-200 mt-4 pt-4 space-y-2 text-sm">
 						<div class="flex justify-between text-gray-600">
-							<span>Versand</span>
-							<span>{shippingCost() > 0 ? formatPrice(shippingCost()) : 'kostenlos'}</span>
+							<span>{$t('checkout.shipping')}</span>
+							<span>{shippingCost() > 0 ? $fmt.price(shippingCost()) : $t('checkout.shippingFree')}</span>
 						</div>
 						<div class="flex justify-between font-bold text-gray-900 text-base">
-							<span>Gesamt</span>
-							<span>{formatPrice(total)}</span>
+							<span>{$t('checkout.total')}</span>
+							<span>{$fmt.price(total)}</span>
 						</div>
 					</div>
 
@@ -321,7 +331,7 @@
 								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
 							</svg>
 						{:else}
-							Jetzt kaufen
+							{$t('checkout.placeOrder')}
 						{/if}
 					</button>
 				</div>

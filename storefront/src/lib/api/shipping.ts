@@ -15,7 +15,7 @@ export interface ShippingMethod {
 }
 
 export function getShippingName(m: ShippingMethod, locale = 'de-DE'): string {
-	const t = m.translations.find((t) => t.locale === locale) ?? m.translations[0];
+	const t = m.translations.find((t) => t.locale === locale) ?? m.translations.find((t) => t.locale === 'de-DE') ?? m.translations[0];
 	return t?.name ?? m.id;
 }
 

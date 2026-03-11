@@ -2,9 +2,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { t } from 'svelte-i18n';
   import { taxApi } from '$lib/api/tax';
   import { notifications } from '$lib/stores/notifications';
-  import { formatTaxRate } from '$lib/utils';
+  import { fmt } from '$lib/i18n/formatters';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
   let items = $state<any[]>([]);
@@ -18,7 +19,7 @@
       const res = await taxApi.list({ limit: 100 });
       items = res.data ?? [];
     } catch (e) {
-      notifications.error('Steuerregeln konnten nicht geladen werden.');
+      notifications.error($t('tax.loadFailed'));
     } finally {
       loading = false;
     }
@@ -36,28 +37,28 @@
     if (!deleteId) return;
     try {
       await taxApi.delete(deleteId);
-      notifications.success('Steuerregel gelöscht.');
+      notifications.success($t('tax.deleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 
   function formatType(type: string) {
     const map: Record<string, string> = {
-      standard: 'Standard',
-      reduced: 'Ermäßigt',
-      zero: 'Nullsatz',
+      standard: $t('tax.standard'),
+      reduced: $t('tax.reduced'),
+      zero: $t('tax.zero'),
     };
     return map[type] ?? type;
   }
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Steuerregeln</h1>
-  <a href="{base}/tax/new" class="btn btn-primary">+ Neu</a>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('tax.title')}</h1>
+  <a href="{base}/tax/new" class="btn btn-primary">{$t('common.new')}</a>
 </div>
 
 <div class="card p-6">
@@ -70,10 +71,10 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Land</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Typ</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('tax.rate')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('tax.country')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.type')}</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -81,17 +82,17 @@
           {#each items as item}
             <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => goto(`${base}/tax/${item.id}`)}>
               <td class="px-4 py-3 text-sm font-medium text-gray-900">{item.name}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{formatTaxRate(item.rate)}</td>
+              <td class="px-4 py-3 text-sm text-gray-700">{$fmt.taxRate(item.rate)}</td>
               <td class="px-4 py-3 text-sm text-gray-700">{item.country_code ?? '—'}</td>
               <td class="px-4 py-3 text-sm text-gray-700">{formatType(item.type)}</td>
               <td class="px-4 py-3 text-right">
-                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>Löschen</button>
+                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Steuerregeln gefunden.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('tax.noTaxRules')}</td>
             </tr>
           {/if}
         </tbody>
@@ -102,8 +103,8 @@
 
 <ConfirmModal
   open={showConfirm}
-  title="Steuerregel löschen"
-  message="Soll diese Steuerregel wirklich gelöscht werden?"
+  title={$t('tax.deleteTitle')}
+  message={$t('tax.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
 />

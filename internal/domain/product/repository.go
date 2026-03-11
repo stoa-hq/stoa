@@ -11,6 +11,10 @@ type ProductRepository interface {
 	// FindByID retrieves a single product with all its relations.
 	FindByID(ctx context.Context, id uuid.UUID) (*Product, error)
 
+	// FindBySKU retrieves a product by its unique SKU.
+	// Returns ErrNotFound when no product has the given SKU.
+	FindBySKU(ctx context.Context, sku string) (*Product, error)
+
 	// FindAll retrieves a paginated, filtered list of products.
 	// It returns the matching products, the total count (for pagination), and any error.
 	FindAll(ctx context.Context, filter ProductFilter) ([]Product, int, error)
@@ -50,6 +54,10 @@ type ProductRepository interface {
 	CreatePropertyOption(ctx context.Context, o *PropertyOption) error
 	UpdatePropertyOption(ctx context.Context, o *PropertyOption) error
 	DeletePropertyOption(ctx context.Context, id uuid.UUID) error
+
+	// Bulk / Import helpers
+	FindOrCreatePropertyGroup(ctx context.Context, locale, name string) (*PropertyGroup, error)
+	FindOrCreatePropertyOption(ctx context.Context, groupID uuid.UUID, locale, name string) (*PropertyOption, error)
 }
 
 // ProductFilter controls the result set returned by FindAll.

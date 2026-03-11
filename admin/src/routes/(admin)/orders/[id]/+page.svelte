@@ -2,9 +2,11 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
+  import { t } from 'svelte-i18n';
   import { ordersApi } from '$lib/api/orders';
   import { notifications } from '$lib/stores/notifications';
-  import { formatPrice, formatDateTime, orderStatusBadge } from '$lib/utils';
+  import { fmt } from '$lib/i18n/formatters';
+  import { orderStatusBadge } from '$lib/utils';
   import Modal from '$lib/components/Modal.svelte';
 
   let id = $derived($page.params.id as string);
@@ -18,14 +20,14 @@
     comment: '',
   });
 
-  const allStatuses: Record<string, string> = {
-    pending: 'Ausstehend',
-    confirmed: 'Bestätigt',
-    processing: 'In Bearbeitung',
-    shipped: 'Versendet',
-    delivered: 'Geliefert',
-    cancelled: 'Storniert',
-    refunded: 'Erstattet',
+  const allStatusKeys: Record<string, string> = {
+    pending: 'orders.pending',
+    confirmed: 'orders.confirmed',
+    processing: 'orders.processing',
+    shipped: 'orders.shipped',
+    delivered: 'orders.delivered',
+    cancelled: 'orders.cancelled',
+    refunded: 'orders.refunded',
   };
 
   const validTransitions: Record<string, string[]> = {
@@ -39,7 +41,7 @@
   };
 
   const statusOptions = $derived(
-    (validTransitions[order?.status ?? ''] ?? []).map((v) => ({ value: v, label: allStatuses[v] }))
+    (validTransitions[order?.status ?? ''] ?? []).map((v) => ({ value: v, key: allStatusKeys[v] }))
   );
 
   onMount(async () => {
@@ -47,7 +49,7 @@
       order = (await ordersApi.get(id)).data;
       statusForm.status = order.status ?? '';
     } catch (e) {
-      notifications.error('Bestellung konnte nicht geladen werden.');
+      notifications.error($t('orders.loadOneFailed'));
     } finally {
       loading = false;
     }
@@ -58,11 +60,11 @@
     statusSubmitting = true;
     try {
       await ordersApi.updateStatus(id, statusForm.status, statusForm.comment || undefined);
-      notifications.success('Status aktualisiert.');
+      notifications.success($t('orders.statusUpdated'));
       order = (await ordersApi.get(id)).data;
       showStatusModal = false;
     } catch (e) {
-      notifications.error('Status-Änderung fehlgeschlagen.');
+      notifications.error($t('orders.statusChangeFailed'));
     } finally {
       statusSubmitting = false;
     }
@@ -70,7 +72,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/orders" class="text-sm text-primary-600 hover:underline">← Zurück</a>
+  <a href="{base}/orders" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -81,38 +83,38 @@
   <!-- Order Info Card -->
   <div class="card p-6 mb-6">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-gray-900">Bestellung #{order.order_number ?? order.id}</h1>
+      <h1 class="text-xl font-bold text-gray-900">{$t('orders.orderNumber')} #{order.order_number ?? order.id}</h1>
       {#if statusOptions.length > 0}
         <button class="btn btn-secondary btn-sm" onclick={() => { statusForm.status = statusOptions[0].value; showStatusModal = true; }}>
-          Status ändern
+          {$t('orders.changeStatus')}
         </button>
       {/if}
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Status</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('common.status')}</p>
         <span class="badge {orderStatusBadge(order.status)} mt-1">{order.status}</span>
       </div>
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Erstellt</p>
-        <p class="text-sm text-gray-900 mt-1">{formatDateTime(order.created_at)}</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('common.createdAt')}</p>
+        <p class="text-sm text-gray-900 mt-1">{$fmt.dateTime(order.created_at)}</p>
       </div>
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Aktualisiert</p>
-        <p class="text-sm text-gray-900 mt-1">{formatDateTime(order.updated_at)}</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('common.updatedAt')}</p>
+        <p class="text-sm text-gray-900 mt-1">{$fmt.dateTime(order.updated_at)}</p>
       </div>
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Zwischensumme</p>
-        <p class="text-sm text-gray-900 mt-1">{formatPrice(order.subtotal_gross)}</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('orders.subtotal')}</p>
+        <p class="text-sm text-gray-900 mt-1">{$fmt.price(order.subtotal_gross)}</p>
       </div>
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Versand</p>
-        <p class="text-sm text-gray-900 mt-1">{formatPrice(order.shipping_cost)}</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('orders.shippingCost')}</p>
+        <p class="text-sm text-gray-900 mt-1">{$fmt.price(order.shipping_cost)}</p>
       </div>
       <div>
-        <p class="text-xs text-gray-500 uppercase font-medium">Gesamt</p>
-        <p class="text-sm font-bold text-gray-900 mt-1">{formatPrice(order.total)}</p>
+        <p class="text-xs text-gray-500 uppercase font-medium">{$t('orders.total')}</p>
+        <p class="text-sm font-bold text-gray-900 mt-1">{$fmt.price(order.total)}</p>
       </div>
     </div>
   </div>
@@ -121,7 +123,7 @@
   {#if order.shipping_address || order.billing_address}
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
     <div class="card p-6">
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Lieferadresse</h2>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{$t('orders.shippingAddress')}</h2>
       {#if order.shipping_address}
         <address class="not-italic text-sm text-gray-800 space-y-1">
           <p class="font-semibold">{order.shipping_address.first_name ?? ''} {order.shipping_address.last_name ?? ''}</p>
@@ -133,11 +135,11 @@
           {#if order.shipping_address.phone}<p class="text-gray-500 text-xs">{order.shipping_address.phone}</p>{/if}
         </address>
       {:else}
-        <p class="text-sm text-gray-400 italic">Keine Lieferadresse angegeben</p>
+        <p class="text-sm text-gray-400 italic">{$t('orders.noShippingAddress')}</p>
       {/if}
     </div>
     <div class="card p-6">
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Rechnungsadresse</h2>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{$t('orders.billingAddress')}</h2>
       {#if order.billing_address}
         <address class="not-italic text-sm text-gray-800 space-y-1">
           <p class="font-semibold">{order.billing_address.first_name ?? ''} {order.billing_address.last_name ?? ''}</p>
@@ -149,7 +151,7 @@
           {#if order.billing_address.phone}<p class="text-gray-500 text-xs">{order.billing_address.phone}</p>{/if}
         </address>
       {:else}
-        <p class="text-sm text-gray-400 italic">Keine Rechnungsadresse angegeben</p>
+        <p class="text-sm text-gray-400 italic">{$t('orders.noBillingAddress')}</p>
       {/if}
     </div>
   </div>
@@ -157,16 +159,16 @@
 
   <!-- Order Items -->
   <div class="card p-6">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Positionen</h2>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('orders.items')}</h2>
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produkt</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Menge</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Einzelpreis</th>
-            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gesamt</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.product')}</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.sku')}</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.quantity')}</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.unitPrice')}</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.total')}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -175,13 +177,13 @@
               <td class="px-4 py-2 text-sm text-gray-900">{item.name ?? '—'}</td>
               <td class="px-4 py-2 text-sm text-gray-600">{item.sku ?? '—'}</td>
               <td class="px-4 py-2 text-sm text-gray-700">{item.quantity}</td>
-              <td class="px-4 py-2 text-sm text-gray-700">{formatPrice(item.unit_price_gross)}</td>
-              <td class="px-4 py-2 text-sm text-gray-700">{formatPrice(item.total_gross)}</td>
+              <td class="px-4 py-2 text-sm text-gray-700">{$fmt.price(item.unit_price_gross)}</td>
+              <td class="px-4 py-2 text-sm text-gray-700">{$fmt.price(item.total_gross)}</td>
             </tr>
           {/each}
           {#if (order.items ?? []).length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-4 text-center text-gray-400 text-sm">Keine Positionen.</td>
+              <td colspan="5" class="px-4 py-4 text-center text-gray-400 text-sm">{$t('orders.noItems')}</td>
             </tr>
           {/if}
         </tbody>
@@ -190,25 +192,25 @@
   </div>
 {/if}
 
-<Modal open={showStatusModal} title="Status ändern" onClose={() => showStatusModal = false}>
+<Modal open={showStatusModal} title={$t('orders.changeStatus')} onClose={() => showStatusModal = false}>
   <form onsubmit={handleStatusSubmit} class="space-y-4">
     <div>
-      <label class="label" for="status">Status</label>
+      <label class="label" for="status">{$t('common.status')}</label>
       <select id="status" class="input" bind:value={statusForm.status}>
         {#each statusOptions as opt}
-          <option value={opt.value}>{opt.label}</option>
+          <option value={opt.value}>{$t(opt.key)}</option>
         {/each}
       </select>
     </div>
     <div>
-      <label class="label" for="comment">Kommentar (optional)</label>
+      <label class="label" for="comment">{$t('orders.comment')}</label>
       <textarea id="comment" class="input" rows="3" bind:value={statusForm.comment}></textarea>
     </div>
     <div class="flex gap-3 pt-2">
       <button type="submit" class="btn btn-primary" disabled={statusSubmitting}>
-        {statusSubmitting ? 'Speichern...' : 'Speichern'}
+        {statusSubmitting ? $t('common.saving') : $t('common.save')}
       </button>
-      <button type="button" class="btn btn-secondary" onclick={() => showStatusModal = false}>Abbrechen</button>
+      <button type="button" class="btn btn-secondary" onclick={() => showStatusModal = false}>{$t('common.cancel')}</button>
     </div>
   </form>
 </Modal>

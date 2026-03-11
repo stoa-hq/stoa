@@ -3,14 +3,14 @@
 	import { page } from '$app/stores';
 	import { productsApi, getTranslation, type Product, type ProductVariant } from '$lib/api/products';
 	import { cartStore } from '$lib/stores/cart';
-	import { formatPrice } from '$lib/utils';
-
-	const LOCALE = 'de-DE';
+	import { t, locale } from 'svelte-i18n';
+	import { fmt } from '$lib/i18n/formatters';
 
 	function variantLabel(v: ProductVariant): string {
+		const loc = $locale ?? 'de-DE';
 		if (!v.options || v.options.length === 0) return v.sku;
 		return v.options
-			.map((o) => o.translations?.find((t) => t.locale === LOCALE)?.name ?? o.translations?.[0]?.name ?? o.id)
+			.map((o) => o.translations?.find((t) => t.locale === loc)?.name ?? o.translations?.find((t) => t.locale === 'de-DE')?.name ?? o.translations?.[0]?.name ?? o.id)
 			.join(', ');
 	}
 
@@ -23,7 +23,7 @@
 	let added = $state(false);
 
 	const slug = $derived($page.params.slug);
-	const translation = $derived(product ? getTranslation(product) : null);
+	const translation = $derived(product ? getTranslation(product, $locale ?? 'de-DE') : null);
 	const activeVariants = $derived(product?.variants?.filter((v) => v.active) ?? []);
 	const needsVariantSelection = $derived(activeVariants.length > 0 && !selectedVariantId);
 
@@ -50,11 +50,11 @@
 
 	onMount(async () => {
 		try {
-			const res = await productsApi.getBySlug(slug);
+			const res = await productsApi.getBySlug(slug as string);
 			product = res.data ?? null;
-			if (!product) error = 'Produkt nicht gefunden.';
+			if (!product) error = $t('productDetail.notFound');
 		} catch {
-			error = 'Produkt konnte nicht geladen werden.';
+			error = $t('productDetail.loadError');
 		} finally {
 			loading = false;
 		}
@@ -74,7 +74,7 @@
 </script>
 
 <svelte:head>
-	<title>{translation?.name ?? 'Produkt'} – stoa</title>
+	<title>{translation?.name ?? $t('productDetail.product')} – stoa</title>
 </svelte:head>
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -86,12 +86,12 @@
 	{:else if error}
 		<div class="text-center py-20">
 			<p class="text-gray-500">{error}</p>
-			<a href="/" class="btn btn-primary mt-4">Zurück zur Übersicht</a>
+			<a href="/" class="btn btn-primary mt-4">{$t('productDetail.backToOverview')}</a>
 		</div>
 	{:else if product && translation}
 		<!-- Breadcrumb -->
 		<nav class="text-sm text-gray-500 mb-6">
-			<a href="/" class="hover:text-gray-900">Produkte</a>
+			<a href="/" class="hover:text-gray-900">{$t('productDetail.breadcrumbProducts')}</a>
 			<span class="mx-2">/</span>
 			<span class="text-gray-900">{translation.name}</span>
 		</nav>
@@ -124,7 +124,7 @@
 				<p class="text-sm text-gray-400 mb-1">{product.sku}</p>
 				<h1 class="text-3xl font-bold text-gray-900">{translation.name}</h1>
 
-				<p class="text-3xl font-bold text-primary-700 mt-4">{formatPrice(displayPrice())}</p>
+				<p class="text-3xl font-bold text-primary-700 mt-4">{$fmt.price(displayPrice())}</p>
 
 				{#if translation.description}
 					<div class="mt-4 text-gray-600 leading-relaxed prose prose-sm max-w-none">
@@ -135,9 +135,10 @@
 				<!-- Variants -->
 				{#if activeVariants.length > 0}
 					<div class="mt-6">
-						<p class="text-sm font-medium text-gray-700 mb-2">Variante</p>
+						<p class="text-sm font-medium text-gray-700 mb-2">{$t('productDetail.variant')}</p>
 						<div class="flex flex-wrap gap-2">
 							{#each activeVariants as v}
+								{@const loc = $locale ?? 'de-DE'}
 								<button
 									onclick={() => selectedVariantId = v.id}
 									class="px-3 py-1.5 rounded-lg text-sm border-2 transition-colors flex items-center gap-1.5
@@ -149,7 +150,7 @@
 											{#if o.color_hex}
 												<span class="w-3 h-3 rounded-full border border-gray-300 shrink-0" style="background:{o.color_hex}"></span>
 											{/if}
-											<span>{o.translations?.find(t => t.locale === LOCALE)?.name ?? o.translations?.[0]?.name ?? o.id}</span>
+											<span>{o.translations?.find(t => t.locale === loc)?.name ?? o.translations?.find(t => t.locale === 'de-DE')?.name ?? o.translations?.[0]?.name ?? o.id}</span>
 										{/each}
 									{:else}
 										{v.sku}
@@ -162,7 +163,7 @@
 
 				<!-- Quantity -->
 				<div class="mt-6">
-					<p class="text-sm font-medium text-gray-700 mb-2">Menge</p>
+					<p class="text-sm font-medium text-gray-700 mb-2">{$t('productDetail.quantity')}</p>
 					<div class="flex items-center gap-3">
 						<button
 							onclick={() => quantity = Math.max(1, quantity - 1)}
@@ -183,18 +184,18 @@
 					class="btn btn-primary btn-lg mt-6 w-full"
 				>
 					{#if added}
-						✓ Zum Warenkorb hinzugefügt
+						{$t('productDetail.addedToCart')}
 					{:else if adding}
 						<svg class="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
 							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
 							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
 						</svg>
 					{:else if needsVariantSelection}
-						Bitte Variante wählen
+						{$t('productDetail.selectVariant')}
 					{:else if !inStock()}
-						Ausverkauft
+						{$t('productDetail.soldOut')}
 					{:else}
-						In den Warenkorb
+						{$t('productDetail.addToCart')}
 					{/if}
 				</button>
 
@@ -202,10 +203,10 @@
 				{#if selectedVariantId}
 					{@const sv = activeVariants.find(v => v.id === selectedVariantId)}
 					{#if sv && sv.stock > 0 && sv.stock <= 5}
-						<p class="text-sm text-amber-600 mt-2 text-center">Nur noch {sv.stock} auf Lager</p>
+						<p class="text-sm text-amber-600 mt-2 text-center">{$t('productDetail.lowStock', { values: { count: sv.stock } })}</p>
 					{/if}
 				{:else if !needsVariantSelection && inStock() && product.stock <= 5}
-					<p class="text-sm text-amber-600 mt-2 text-center">Nur noch {product.stock} auf Lager</p>
+					<p class="text-sm text-amber-600 mt-2 text-center">{$t('productDetail.lowStock', { values: { count: product.stock } })}</p>
 				{/if}
 			</div>
 		</div>

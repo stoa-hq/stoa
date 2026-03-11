@@ -4,7 +4,9 @@
   import { productsApi } from '$lib/api/products';
   import { customersApi } from '$lib/api/customers';
   import { notifications } from '$lib/stores/notifications';
-  import { formatPrice, formatDateTime, orderStatusBadge } from '$lib/utils';
+  import { orderStatusBadge } from '$lib/utils';
+  import { t } from 'svelte-i18n';
+  import { fmt } from '$lib/i18n/formatters';
 
   let loading = $state(true);
   let stats = $state({
@@ -37,7 +39,7 @@
         totalRevenue,
       };
     } catch (e) {
-      notifications.error('Dashboard-Daten konnten nicht geladen werden.');
+      notifications.error($t('dashboard.loadFailed'));
     } finally {
       loading = false;
     }
@@ -53,37 +55,37 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="card p-6">
-        <p class="text-sm text-gray-500">Bestellungen gesamt</p>
+        <p class="text-sm text-gray-500">{$t('dashboard.totalOrders')}</p>
         <p class="text-3xl font-bold text-gray-900 mt-1">{stats.totalOrders}</p>
       </div>
       <div class="card p-6">
-        <p class="text-sm text-gray-500">Kunden gesamt</p>
+        <p class="text-sm text-gray-500">{$t('dashboard.totalCustomers')}</p>
         <p class="text-3xl font-bold text-gray-900 mt-1">{stats.totalCustomers}</p>
       </div>
       <div class="card p-6">
-        <p class="text-sm text-gray-500">Produkte gesamt</p>
+        <p class="text-sm text-gray-500">{$t('dashboard.totalProducts')}</p>
         <p class="text-3xl font-bold text-gray-900 mt-1">{stats.totalProducts}</p>
       </div>
       <div class="card p-6">
-        <p class="text-sm text-gray-500">Umsatz (letzte 5 Bestellungen)</p>
-        <p class="text-3xl font-bold text-gray-900 mt-1">{formatPrice(stats.totalRevenue)}</p>
+        <p class="text-sm text-gray-500">{$t('dashboard.revenueLastOrders')}</p>
+        <p class="text-3xl font-bold text-gray-900 mt-1">{$fmt.price(stats.totalRevenue)}</p>
       </div>
     </div>
 
     <!-- Recent Orders -->
     <div class="card p-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Letzte Bestellungen</h2>
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('dashboard.recentOrders')}</h2>
       {#if recentOrders.length === 0}
-        <p class="text-gray-500 text-sm">Keine Bestellungen vorhanden.</p>
+        <p class="text-gray-500 text-sm">{$t('dashboard.noOrders')}</p>
       {:else}
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bestellnr.</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gesamt</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erstellt</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('dashboard.orderNumber')}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.status')}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('dashboard.total')}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.createdAt')}</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -94,8 +96,8 @@
                   <td class="px-4 py-3 text-sm">
                     <span class="badge {badgeClass}">{order.status}</span>
                   </td>
-                  <td class="px-4 py-3 text-sm text-gray-700">{formatPrice(order.total)}</td>
-                  <td class="px-4 py-3 text-sm text-gray-500">{formatDateTime(order.created_at)}</td>
+                  <td class="px-4 py-3 text-sm text-gray-700">{$fmt.price(order.total)}</td>
+                  <td class="px-4 py-3 text-sm text-gray-500">{$fmt.dateTime(order.created_at)}</td>
                 </tr>
               {/each}
             </tbody>

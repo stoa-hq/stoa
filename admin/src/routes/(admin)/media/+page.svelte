@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
   import { mediaApi } from '$lib/api/media';
   import { notifications } from '$lib/stores/notifications';
   import { formatBytes } from '$lib/utils';
@@ -19,7 +20,7 @@
       const res = await mediaApi.list({ limit: 100 });
       items = res.data ?? [];
     } catch (e) {
-      notifications.error('Medien konnten nicht geladen werden.');
+      notifications.error($t('media.loadFailed'));
     } finally {
       loading = false;
     }
@@ -34,10 +35,10 @@
       for (const file of Array.from(files)) {
         await mediaApi.upload(file);
       }
-      notifications.success('Dateien hochgeladen.');
+      notifications.success($t('media.uploadSuccess'));
       load();
     } catch (e) {
-      notifications.error('Hochladen fehlgeschlagen.');
+      notifications.error($t('media.uploadFailed'));
     } finally {
       uploading = false;
     }
@@ -67,12 +68,12 @@
     if (!deleteId) return;
     try {
       await mediaApi.delete(deleteId);
-      notifications.success('Datei gelöscht.');
+      notifications.success($t('media.fileDeleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 
@@ -82,7 +83,7 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Medien</h1>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('media.title')}</h1>
 </div>
 
 <!-- Upload Area -->
@@ -102,9 +103,9 @@
     </svg>
     <p class="text-sm text-gray-600">
       {#if uploading}
-        Wird hochgeladen...
+        {$t('media.uploading')}
       {:else}
-        Dateien hierher ziehen oder <span class="text-primary-600 font-medium">klicken zum Auswählen</span>
+        {$t('media.dropOrClick', { values: { click: '' } }).replace('{click}', '')}<span class="text-primary-600 font-medium">{$t('media.clickToSelect')}</span>
       {/if}
     </p>
   </div>
@@ -124,7 +125,7 @@
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
     </div>
   {:else if items.length === 0}
-    <p class="text-center text-gray-400 text-sm py-8">Keine Medien vorhanden.</p>
+    <p class="text-center text-gray-400 text-sm py-8">{$t('media.noMedia')}</p>
   {:else}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {#each items as item}
@@ -145,7 +146,7 @@
           <button
             class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-danger btn-sm !p-1"
             onclick={() => confirmDelete(item.id)}
-            title="Löschen"
+            title={$t('common.delete')}
           >
             <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -159,8 +160,8 @@
 
 <ConfirmModal
   open={showConfirm}
-  title="Datei löschen"
-  message="Soll diese Datei wirklich gelöscht werden?"
+  title={$t('media.deleteTitle')}
+  message={$t('media.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
 />

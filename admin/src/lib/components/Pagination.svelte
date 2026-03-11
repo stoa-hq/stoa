@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t } from 'svelte-i18n';
+
 	interface Props {
 		currentPage: number;
 		totalPages: number;
@@ -14,7 +16,7 @@
 			class="btn btn-secondary btn-sm"
 			disabled={currentPage <= 1}
 			onclick={() => onPageChange(currentPage - 1)}
-		>‹ Zurück</button>
+		>‹ {$t('pagination.previous')}</button>
 		{#each Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
 			if (totalPages <= 7) return i + 1;
 			if (currentPage <= 4) return i + 1;
@@ -32,7 +34,7 @@
 			class="btn btn-secondary btn-sm"
 			disabled={currentPage >= totalPages}
 			onclick={() => onPageChange(currentPage + 1)}
-		>Weiter ›</button>
+		>{$t('pagination.next')} ›</button>
 	</div>
 </div>
 {/if}

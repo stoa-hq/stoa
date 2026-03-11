@@ -1,0 +1,138 @@
+{
+	"header": {
+		"products": "Products",
+		"search": "Search",
+		"searchAriaLabel": "Search",
+		"myOrders": "My Orders",
+		"logout": "Sign Out",
+		"login": "Sign In"
+	},
+	"footer": {
+		"copyright": "© {year} stoa. All rights reserved.",
+		"products": "Products",
+		"search": "Search",
+		"account": "Account",
+		"cart": "Cart"
+	},
+	"products": {
+		"title": "Products",
+		"pageTitle": "Products – stoa",
+		"itemCount": "{count} items",
+		"searchPlaceholder": "Search...",
+		"categories": "Categories",
+		"allProducts": "All Products",
+		"noProducts": "No products found.",
+		"select": "Select →",
+		"soldOut": "Sold Out",
+		"addToCart": "+ Cart",
+		"lowStock": "Only {count} left"
+	},
+	"productDetail": {
+		"pageTitle": "{name} – stoa",
+		"product": "Product",
+		"notFound": "Product not found.",
+		"loadError": "Product could not be loaded.",
+		"backToOverview": "Back to overview",
+		"breadcrumbProducts": "Products",
+		"variant": "Variant",
+		"quantity": "Quantity",
+		"addedToCart": "Added to cart",
+		"selectVariant": "Please select a variant",
+		"soldOut": "Sold Out",
+		"addToCart": "Add to Cart",
+		"lowStock": "Only {count} left in stock"
+	},
+	"search": {
+		"pageTitle": "Search – stoa",
+		"pageTitleWithQuery": "\"{query}\" – Search – stoa",
+		"title": "Search",
+		"placeholder": "Search products…",
+		"button": "Search",
+		"noResults": "No products found for <strong>\"{query}\"</strong>.",
+		"resultCount": "{count} result for \"{query}\"",
+		"resultCountPlural": "{count} results for \"{query}\""
+	},
+	"cart": {
+		"pageTitle": "Cart – stoa",
+		"title": "Cart",
+		"empty": "Your cart is empty.",
+		"continueShopping": "Continue shopping",
+		"removeItem": "Remove item",
+		"subtotal": "Subtotal",
+		"total": "Total",
+		"checkout": "Proceed to Checkout",
+		"fallbackProductName": "Product"
+	},
+	"checkout": {
+		"pageTitle": "Checkout – stoa",
+		"title": "Checkout",
+		"loadError": "Failed to load order data.",
+		"shippingAddress": "Shipping Address",
+		"firstName": "First Name",
+		"lastName": "Last Name",
+		"email": "Email",
+		"street": "Street & Number",
+		"zip": "ZIP Code",
+		"city": "City",
+		"sameAsBilling": "Billing address is the same as shipping address",
+		"billingAddress": "Billing Address",
+		"shippingMethod": "Shipping Method",
+		"paymentMethod": "Payment Method",
+		"orderSummary": "Order Summary",
+		"shipping": "Shipping",
+		"shippingFree": "free",
+		"total": "Total",
+		"placeOrder": "Place Order",
+		"orderError": "Order failed.",
+		"fallbackProductName": "Product"
+	},
+	"checkoutSuccess": {
+		"pageTitle": "Order Successful – stoa",
+		"title": "Thank you for your order!",
+		"orderNumber": "Order number: #{number}",
+		"confirmation": "Your order has been placed successfully. You will receive a confirmation shortly.",
+		"myOrders": "My Orders",
+		"continueShopping": "Continue shopping"
+	},
+	"auth": {
+		"loginPageTitle": "Sign In – stoa",
+		"loginTitle": "Sign In",
+		"noAccount": "Don't have an account?",
+		"register": "Register",
+		"emailLabel": "Email",
+		"passwordLabel": "Password",
+		"loginButton": "Sign In",
+		"loginError": "Sign in failed.",
+		"registerPageTitle": "Register – stoa",
+		"registerTitle": "Create Account",
+		"alreadyRegistered": "Already registered?",
+		"loginLink": "Sign In",
+		"firstNameLabel": "First Name",
+		"lastNameLabel": "Last Name",
+		"registerButton": "Register",
+		"registerError": "Registration failed."
+	},
+	"orders": {
+		"pageTitle": "My Orders – stoa",
+		"title": "My Orders",
+		"logout": "Sign Out",
+		"loadError": "Orders could not be loaded.",
+		"noOrders": "You haven't placed any orders yet.",
+		"shopNow": "Shop now",
+		"total": "Total"
+	},
+	"orderStatus": {
+		"pending": "Pending",
+		"confirmed": "Confirmed",
+		"processing": "Processing",
+		"shipped": "Shipped",
+		"delivered": "Delivered",
+		"cancelled": "Cancelled",
+		"refunded": "Refunded"
+	},
+	"common": {
+		"loading": "Loading...",
+		"error": "An error occurred.",
+		"language": "Language"
+	}
+}

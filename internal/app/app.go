@@ -39,6 +39,7 @@ import (
 	"github.com/stoa-hq/stoa/internal/plugin"
 	"github.com/stoa-hq/stoa/internal/search"
 	"github.com/stoa-hq/stoa/internal/server"
+	"github.com/stoa-hq/stoa/internal/settings"
 )
 
 type App struct {
@@ -215,6 +216,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	tagH      := tag.NewHandler(tagSvc, log)
 	auditH    := audit.NewHandler(auditSvc, log)
 	mediaH    := domainmedia.NewHandler(mediaSvc, log)
+	settingsH := settings.NewHandler(cfg, log)
 
 	// ── Routes ────────────────────────────────────────────────────────────────
 
@@ -246,6 +248,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		tagH.RegisterAdminRoutes(r)
 		auditH.RegisterAdminRoutes(r)
 		mediaH.RegisterAdminRoutes(r)
+		settingsH.RegisterAdminRoutes(r)
 	})
 
 	// ── Search ────────────────────────────────────────────────────────────────
@@ -266,6 +269,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		shippingH.RegisterStoreRoutes(r)
 		paymentH.RegisterStoreRoutes(r)
 		searchH.RegisterStoreRoutes(r)
+		settingsH.RegisterStoreRoutes(r)
 	})
 
 	// ── Uploaded media files ──────────────────────────────────────────────────

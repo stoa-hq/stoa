@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { t, locale } from 'svelte-i18n';
   import { paymentApi } from '$lib/api/payment';
+  import { tr } from '$lib/i18n/entity';
   import { notifications } from '$lib/stores/notifications';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
@@ -17,7 +19,7 @@
       const res = await paymentApi.list({ limit: 100 });
       items = res.data ?? [];
     } catch (e) {
-      notifications.error('Zahlungsmethoden konnten nicht geladen werden.');
+      notifications.error($t('payment.loadFailed'));
     } finally {
       loading = false;
     }
@@ -35,19 +37,19 @@
     if (!deleteId) return;
     try {
       await paymentApi.delete(deleteId);
-      notifications.success('Zahlungsmethode gelöscht.');
+      notifications.success($t('payment.deleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Zahlungsmethoden</h1>
-  <a href="{base}/payment/new" class="btn btn-primary">+ Neu</a>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('payment.title')}</h1>
+  <a href="{base}/payment/new" class="btn btn-primary">{$t('common.new')}</a>
 </div>
 
 <div class="card p-6">
@@ -60,32 +62,32 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktiv</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.provider')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           {#each items as item}
             <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => goto(`${base}/payment/${item.id}`)}>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{item.translations?.[0]?.name ?? item.id}</td>
+              <td class="px-4 py-3 text-sm font-medium text-gray-900">{tr(item.translations, 'name', $locale) || item.id}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{item.provider}</td>
               <td class="px-4 py-3 text-sm">
                 {#if item.active}
-                  <span class="badge badge-green">Aktiv</span>
+                  <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
-                  <span class="badge badge-gray">Inaktiv</span>
+                  <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
               <td class="px-4 py-3 text-right">
-                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>Löschen</button>
+                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Zahlungsmethoden gefunden.</td>
+              <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('payment.noPaymentMethods')}</td>
             </tr>
           {/if}
         </tbody>
@@ -96,8 +98,8 @@
 
 <ConfirmModal
   open={showConfirm}
-  title="Zahlungsmethode löschen"
-  message="Soll diese Zahlungsmethode wirklich gelöscht werden?"
+  title={$t('payment.deleteTitle')}
+  message={$t('payment.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
 />

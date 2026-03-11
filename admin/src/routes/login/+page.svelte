@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { ApiClientError } from '$lib/api/client';
+	import { t } from 'svelte-i18n';
 
 	let email = $state('');
 	let password = $state('');
@@ -19,9 +20,9 @@
 			goto(`${base}/`);
 		} catch (err) {
 			if (err instanceof ApiClientError) {
-				notifications.error(err.errors[0]?.detail ?? 'Login fehlgeschlagen');
+				notifications.error(err.errors[0]?.detail ?? $t('login.failed'));
 			} else {
-				notifications.error('Verbindungsfehler');
+				notifications.error($t('login.connectionError'));
 			}
 		} finally {
 			loading = false;
@@ -32,13 +33,13 @@
 <div class="min-h-screen flex items-center justify-center bg-gray-100">
 	<div class="card w-full max-w-sm p-8">
 		<div class="text-center mb-8">
-			<h1 class="text-2xl font-bold text-gray-900">Commerce Admin</h1>
-			<p class="text-sm text-gray-500 mt-1">Melden Sie sich an</p>
+			<h1 class="text-2xl font-bold text-gray-900">{$t('login.title')}</h1>
+			<p class="text-sm text-gray-500 mt-1">{$t('login.subtitle')}</p>
 		</div>
 
 		<form onsubmit={handleSubmit} class="space-y-4">
 			<div>
-				<label class="label" for="email">E-Mail</label>
+				<label class="label" for="email">{$t('login.email')}</label>
 				<input
 					id="email"
 					type="email"
@@ -50,7 +51,7 @@
 				/>
 			</div>
 			<div>
-				<label class="label" for="password">Passwort</label>
+				<label class="label" for="password">{$t('login.password')}</label>
 				<input
 					id="password"
 					type="password"
@@ -61,7 +62,7 @@
 				/>
 			</div>
 			<button type="submit" class="btn btn-primary w-full" disabled={loading}>
-				{loading ? 'Anmelden…' : 'Anmelden'}
+				{loading ? $t('login.submitting') : $t('login.submit')}
 			</button>
 		</form>
 	</div>

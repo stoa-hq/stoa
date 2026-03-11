@@ -66,6 +66,48 @@ func (r *postgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Produ
 }
 
 // --------------------------------------------------------------------------
+// FindBySKU
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindBySKU(ctx context.Context, sku string) (*Product, error) {
+	const query = `
+		SELECT
+			p.id, p.sku, p.active, p.price_net, p.price_gross, p.currency,
+			p.tax_rule_id, p.stock, p.weight, p.custom_fields, p.metadata,
+			p.created_at, p.updated_at
+		FROM products p
+		WHERE p.sku = $1`
+
+	p := &Product{}
+	var customFieldsRaw, metadataRaw []byte
+
+	err := r.db.QueryRow(ctx, query, sku).Scan(
+		&p.ID, &p.SKU, &p.Active, &p.PriceNet, &p.PriceGross, &p.Currency,
+		&p.TaxRuleID, &p.Stock, &p.Weight, &customFieldsRaw, &metadataRaw,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("product FindBySKU: %w", err)
+	}
+
+	if err := unmarshalJSON(customFieldsRaw, &p.CustomFields); err != nil {
+		return nil, fmt.Errorf("product FindBySKU custom_fields: %w", err)
+	}
+	if err := unmarshalJSON(metadataRaw, &p.Metadata); err != nil {
+		return nil, fmt.Errorf("product FindBySKU metadata: %w", err)
+	}
+
+	if err := r.loadRelations(ctx, p); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+// --------------------------------------------------------------------------
 // FindAll
 // --------------------------------------------------------------------------
 
@@ -1251,6 +1293,79 @@ func (r *postgresRepository) DeletePropertyOption(ctx context.Context, id uuid.U
 		return ErrNotFound
 	}
 	return nil
+}
+
+// --------------------------------------------------------------------------
+// FindOrCreatePropertyGroup
+// --------------------------------------------------------------------------
+
+// FindOrCreatePropertyGroup looks up a property group by locale + name and
+// creates one if it does not exist yet. Used during CSV/bulk import.
+func (r *postgresRepository) FindOrCreatePropertyGroup(ctx context.Context, locale, name string) (*PropertyGroup, error) {
+	const findQuery = `
+		SELECT pg.id, pg.position, pg.created_at, pg.updated_at
+		FROM property_groups pg
+		JOIN property_group_translations pgt ON pgt.property_group_id = pg.id
+		WHERE pgt.locale = $1 AND pgt.name = $2
+		LIMIT 1`
+
+	g := &PropertyGroup{}
+	err := r.db.QueryRow(ctx, findQuery, locale, name).Scan(&g.ID, &g.Position, &g.CreatedAt, &g.UpdatedAt)
+	if err == nil {
+		g.Translations = []PropertyGroupTranslation{{GroupID: g.ID, Locale: locale, Name: name}}
+		return g, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("FindOrCreatePropertyGroup find: %w", err)
+	}
+
+	// Not found – create a new group.
+	g = &PropertyGroup{
+		Translations: []PropertyGroupTranslation{{Locale: locale, Name: name}},
+	}
+	if err := r.CreatePropertyGroup(ctx, g); err != nil {
+		return nil, fmt.Errorf("FindOrCreatePropertyGroup create: %w", err)
+	}
+	g.Translations[0].GroupID = g.ID
+	return g, nil
+}
+
+// --------------------------------------------------------------------------
+// FindOrCreatePropertyOption
+// --------------------------------------------------------------------------
+
+// FindOrCreatePropertyOption looks up a property option by group ID, locale,
+// and name. Creates one if it does not exist. Used during CSV/bulk import.
+func (r *postgresRepository) FindOrCreatePropertyOption(ctx context.Context, groupID uuid.UUID, locale, name string) (*PropertyOption, error) {
+	const findQuery = `
+		SELECT po.id, po.group_id, po.color_hex, po.position, po.created_at, po.updated_at
+		FROM property_options po
+		JOIN property_option_translations pot ON pot.option_id = po.id
+		WHERE po.group_id = $1 AND pot.locale = $2 AND pot.name = $3
+		LIMIT 1`
+
+	o := &PropertyOption{}
+	err := r.db.QueryRow(ctx, findQuery, groupID, locale, name).Scan(
+		&o.ID, &o.GroupID, &o.ColorHex, &o.Position, &o.CreatedAt, &o.UpdatedAt,
+	)
+	if err == nil {
+		o.Translations = []PropertyOptionTranslation{{OptionID: o.ID, Locale: locale, Name: name}}
+		return o, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("FindOrCreatePropertyOption find: %w", err)
+	}
+
+	// Not found – create a new option.
+	o = &PropertyOption{
+		GroupID:      groupID,
+		Translations: []PropertyOptionTranslation{{Locale: locale, Name: name}},
+	}
+	if err := r.CreatePropertyOption(ctx, o); err != nil {
+		return nil, fmt.Errorf("FindOrCreatePropertyOption create: %w", err)
+	}
+	o.Translations[0].OptionID = o.ID
+	return o, nil
 }
 
 // --------------------------------------------------------------------------

@@ -1,12 +1,12 @@
-export function formatPrice(cents: number, currency = 'EUR'): string {
-	return new Intl.NumberFormat('de-DE', {
+export function formatPrice(cents: number, currency = 'EUR', locale = 'de-DE'): string {
+	return new Intl.NumberFormat(locale, {
 		style: 'currency',
 		currency
 	}).format(cents / 100);
 }
 
-export function formatDate(dateStr: string): string {
-	return new Intl.DateTimeFormat('de-DE', {
+export function formatDate(dateStr: string, locale = 'de-DE'): string {
+	return new Intl.DateTimeFormat(locale, {
 		day: '2-digit',
 		month: '2-digit',
 		year: 'numeric'

@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { productsApi, type Product } from '$lib/api/products';
 	import ProductCard from '$lib/components/ProductCard.svelte';
+	import { t } from 'svelte-i18n';
 
 	let query = $state($page.url.searchParams.get('q') ?? '');
 	let products = $state<Product[]>([]);
@@ -34,20 +35,20 @@
 </script>
 
 <svelte:head>
-	<title>{query ? `"${query}" – Suche` : 'Suche'} – stoa</title>
+	<title>{query ? $t('search.pageTitleWithQuery', { values: { query } }) : $t('search.pageTitle')}</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-	<h1 class="text-2xl font-bold text-gray-900 mb-6">Suche</h1>
+	<h1 class="text-2xl font-bold text-gray-900 mb-6">{$t('search.title')}</h1>
 
 	<form onsubmit={handleSubmit} class="flex gap-3 max-w-xl mb-8">
 		<input
 			class="input flex-1"
 			type="search"
-			placeholder="Produkte suchen…"
+			placeholder={$t('search.placeholder')}
 			bind:value={query}
 		/>
-		<button type="submit" class="btn btn-primary">Suchen</button>
+		<button type="submit" class="btn btn-primary">{$t('search.button')}</button>
 	</form>
 
 	{#if loading}
@@ -57,9 +58,9 @@
 			{/each}
 		</div>
 	{:else if searched && products.length === 0}
-		<p class="text-gray-500">Keine Produkte für <strong>„{query}"</strong> gefunden.</p>
+		<p class="text-gray-500">{@html $t('search.noResults', { values: { query } })}</p>
 	{:else if products.length > 0}
-		<p class="text-sm text-gray-500 mb-4">{products.length} Ergebnis{products.length !== 1 ? 'se' : ''} für „{query}"</p>
+		<p class="text-sm text-gray-500 mb-4">{$t(products.length !== 1 ? 'search.resultCountPlural' : 'search.resultCount', { values: { count: products.length, query } })}</p>
 		<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 			{#each products as product (product.id)}
 				<ProductCard {product} />

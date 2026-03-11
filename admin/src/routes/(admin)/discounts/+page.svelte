@@ -2,9 +2,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
+  import { t } from 'svelte-i18n';
   import { discountsApi } from '$lib/api/discounts';
   import { notifications } from '$lib/stores/notifications';
-  import { formatDate } from '$lib/utils';
+  import { fmt } from '$lib/i18n/formatters';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
   let items = $state<any[]>([]);
@@ -18,7 +19,7 @@
       const res = await discountsApi.list({ limit: 100 });
       items = res.data ?? [];
     } catch (e) {
-      notifications.error('Rabatte konnten nicht geladen werden.');
+      notifications.error($t('discounts.loadFailed'));
     } finally {
       loading = false;
     }
@@ -36,17 +37,17 @@
     if (!deleteId) return;
     try {
       await discountsApi.delete(deleteId);
-      notifications.success('Rabatt gelöscht.');
+      notifications.success($t('discounts.deleted'));
       showConfirm = false;
       deleteId = null;
       load();
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 
   function formatType(type: string) {
-    return type === 'percentage' ? 'Prozent' : 'Fixbetrag';
+    return type === 'percentage' ? $t('discounts.percentage') : $t('discounts.fixed');
   }
 
   function formatValue(item: any) {
@@ -56,8 +57,8 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">Rabatte</h1>
-  <a href="{base}/discounts/new" class="btn btn-primary">+ Neu</a>
+  <h1 class="text-2xl font-bold text-gray-900">{$t('discounts.title')}</h1>
+  <a href="{base}/discounts/new" class="btn btn-primary">{$t('common.new')}</a>
 </div>
 
 <div class="card p-6">
@@ -70,12 +71,12 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Typ</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wert</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verwendungen</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gültig bis</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktiv</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('discounts.code')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('discounts.type')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('discounts.value')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('discounts.usages')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('discounts.validUntil')}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -88,22 +89,22 @@
               <td class="px-4 py-3 text-sm text-gray-700">
                 {item.used_count ?? 0}{item.max_uses ? ` / ${item.max_uses}` : ''}
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{item.valid_until ? formatDate(item.valid_until) : '—'}</td>
+              <td class="px-4 py-3 text-sm text-gray-500">{item.valid_until ? $fmt.date(item.valid_until) : '—'}</td>
               <td class="px-4 py-3 text-sm">
                 {#if item.active}
-                  <span class="badge badge-green">Aktiv</span>
+                  <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
-                  <span class="badge badge-gray">Inaktiv</span>
+                  <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
               <td class="px-4 py-3 text-right">
-                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>Löschen</button>
+                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="7" class="px-4 py-6 text-center text-gray-400 text-sm">Keine Rabatte gefunden.</td>
+              <td colspan="7" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('discounts.noDiscounts')}</td>
             </tr>
           {/if}
         </tbody>
@@ -114,8 +115,8 @@
 
 <ConfirmModal
   open={showConfirm}
-  title="Rabatt löschen"
-  message="Soll dieser Rabatt wirklich gelöscht werden?"
+  title={$t('discounts.deleteTitle')}
+  message={$t('discounts.deleteMessage')}
   onConfirm={doDelete}
   onCancel={() => { showConfirm = false; deleteId = null; }}
 />

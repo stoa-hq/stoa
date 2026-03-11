@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { authApi } from '$lib/api/auth';
 	import { authStore } from '$lib/stores/auth';
+	import { t } from 'svelte-i18n';
 
 	let email = $state('');
 	let password = $state('');
@@ -19,7 +20,7 @@
 				goto('/account/orders');
 			}
 		} catch (err: unknown) {
-			error = (err as Error).message ?? 'Anmeldung fehlgeschlagen.';
+			error = (err as Error).message ?? $t('auth.loginError');
 		} finally {
 			loading = false;
 		}
@@ -27,25 +28,25 @@
 </script>
 
 <svelte:head>
-	<title>Anmelden – stoa</title>
+	<title>{$t('auth.loginPageTitle')}</title>
 </svelte:head>
 
 <div class="min-h-[60vh] flex items-center justify-center px-4 py-12">
 	<div class="w-full max-w-sm">
 		<div class="text-center mb-8">
-			<h1 class="text-2xl font-bold text-gray-900">Anmelden</h1>
-			<p class="text-gray-500 mt-1 text-sm">Noch kein Konto?
-				<a href="/account/register" class="text-primary-700 font-medium hover:underline">Registrieren</a>
+			<h1 class="text-2xl font-bold text-gray-900">{$t('auth.loginTitle')}</h1>
+			<p class="text-gray-500 mt-1 text-sm">{$t('auth.noAccount')}
+				<a href="/account/register" class="text-primary-700 font-medium hover:underline">{$t('auth.register')}</a>
 			</p>
 		</div>
 
 		<form onsubmit={submit} class="card p-6 space-y-4">
 			<div>
-				<label class="label" for="email">E-Mail</label>
+				<label class="label" for="email">{$t('auth.emailLabel')}</label>
 				<input class="input" id="email" type="email" bind:value={email} required autocomplete="email" />
 			</div>
 			<div>
-				<label class="label" for="password">Passwort</label>
+				<label class="label" for="password">{$t('auth.passwordLabel')}</label>
 				<input class="input" id="password" type="password" bind:value={password} required autocomplete="current-password" />
 			</div>
 
@@ -60,7 +61,7 @@
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
 					</svg>
 				{:else}
-					Anmelden
+					{$t('auth.loginButton')}
 				{/if}
 			</button>
 		</form>

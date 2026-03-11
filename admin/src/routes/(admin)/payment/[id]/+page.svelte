@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
+  import { t, locale } from 'svelte-i18n';
   import { paymentApi } from '$lib/api/payment';
   import { notifications } from '$lib/stores/notifications';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -40,7 +41,7 @@
       };
       translations = translationsFromArray(method.translations, FIELDS);
     } catch (e) {
-      notifications.error('Zahlungsmethode konnte nicht geladen werden.');
+      notifications.error($t('payment.loadOneFailed'));
     } finally {
       loading = false;
     }
@@ -49,7 +50,7 @@
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     if (!translations[DEFAULT_LOCALE].name.trim()) {
-      notifications.error(`Bitte Name auf ${LOCALE_LABELS[DEFAULT_LOCALE]} ausfüllen.`);
+      notifications.error($t('common.pleaseNameInLocale', { values: { locale: LOCALE_LABELS[DEFAULT_LOCALE] } }));
       return;
     }
     submitting = true;
@@ -59,9 +60,9 @@
         active: form.active,
         translations: translationsToArray(translations),
       } as any);
-      notifications.success('Zahlungsmethode gespeichert.');
+      notifications.success($t('payment.saved'));
     } catch (e) {
-      notifications.error('Speichern fehlgeschlagen.');
+      notifications.error($t('common.saveFailed'));
     } finally {
       submitting = false;
     }
@@ -70,16 +71,16 @@
   async function handleDelete() {
     try {
       await paymentApi.delete(id);
-      notifications.success('Zahlungsmethode gelöscht.');
+      notifications.success($t('payment.deleted'));
       goto(`${base}/payment`);
     } catch (e) {
-      notifications.error('Löschen fehlgeschlagen.');
+      notifications.error($t('common.deleteFailed'));
     }
   }
 </script>
 
 <div class="mb-6">
-  <a href="{base}/payment" class="text-sm text-primary-600 hover:underline">← Zurück</a>
+  <a href="{base}/payment" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -89,25 +90,25 @@
 {:else}
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">Zahlungsmethode bearbeiten</h1>
-      <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>Löschen</button>
+      <h1 class="text-xl font-bold text-gray-900">{$t('payment.editPayment')}</h1>
+      <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>{$t('common.delete')}</button>
     </div>
 
     <form onsubmit={handleSubmit} class="space-y-4">
       <div>
-        <label class="label" for="provider">Provider *</label>
+        <label class="label" for="provider">{$t('common.provider')} *</label>
         <input id="provider" class="input" type="text" bind:value={form.provider} required />
       </div>
 
       <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">Übersetzungen</h3>
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('common.translations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}
           primaryLocale={DEFAULT_LOCALE}
           fields={[
-            { key: 'name', label: 'Name', type: 'input', required: true },
-            { key: 'description', label: 'Beschreibung', type: 'textarea', rows: 3 },
+            { key: 'name', label: $t('common.name'), type: 'input', required: true },
+            { key: 'description', label: $t('common.description'), type: 'textarea', rows: 3 },
           ]}
           bind:value={translations}
         />
@@ -115,14 +116,14 @@
 
       <div class="flex items-center gap-2">
         <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="active" class="text-sm text-gray-700">Aktiv</label>
+        <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
       </div>
 
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Speichern...' : 'Speichern'}
+          {submitting ? $t('common.saving') : $t('common.save')}
         </button>
-        <a href="{base}/payment" class="btn btn-secondary">Abbrechen</a>
+        <a href="{base}/payment" class="btn btn-secondary">{$t('common.cancel')}</a>
       </div>
     </form>
   </div>
@@ -130,8 +131,8 @@
 
 <ConfirmModal
   open={showDeleteConfirm}
-  title="Zahlungsmethode löschen"
-  message="Soll diese Zahlungsmethode wirklich gelöscht werden?"
+  title={$t('payment.deleteTitle')}
+  message={$t('payment.deleteMessage')}
   onConfirm={handleDelete}
   onCancel={() => showDeleteConfirm = false}
 />

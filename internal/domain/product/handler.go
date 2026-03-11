@@ -14,6 +14,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const maxCSVUploadBytes = 10 << 20 // 10 MB
+
 // ---------------------------------------------------------------------------
 // API envelope types (local to handler)
 // ---------------------------------------------------------------------------
@@ -66,6 +68,9 @@ func NewHandler(service *Service, validate *validator.Validate, logger zerolog.L
 func (h *Handler) RegisterAdminRoutes(r chi.Router) {
 	r.Get("/products", h.adminList)
 	r.Post("/products", h.adminCreate)
+	r.Post("/products/bulk", h.adminBulkCreate)
+	r.Post("/products/import", h.adminImportCSV)
+	r.Get("/products/import/template", h.adminCSVTemplate)
 	r.Get("/products/{id}", h.adminGetByID)
 	r.Put("/products/{id}", h.adminUpdate)
 	r.Delete("/products/{id}", h.adminDelete)
@@ -226,6 +231,54 @@ func (h *Handler) adminDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// adminBulkCreate handles POST /products/bulk
+// Body: BulkRequest with up to 250 CreateProductRequest entries (+ inline variants).
+func (h *Handler) adminBulkCreate(w http.ResponseWriter, r *http.Request) {
+	var req BulkRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	resp := h.service.BulkCreate(r.Context(), req.Products)
+	h.writeJSON(w, http.StatusMultiStatus, apiResponse{Data: resp})
+}
+
+// adminImportCSV handles POST /products/import (multipart/form-data, field "file").
+func (h *Handler) adminImportCSV(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(maxCSVUploadBytes); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid_form", "failed to parse multipart form: "+err.Error(), "")
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "missing_file", "form field 'file' is required", "file")
+		return
+	}
+	defer file.Close()
+
+	resp, err := h.service.ParseCSV(r.Context(), file)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "csv_parse_error", err.Error(), "file")
+		return
+	}
+
+	h.writeJSON(w, http.StatusMultiStatus, apiResponse{Data: resp})
+}
+
+// adminCSVTemplate handles GET /products/import/template
+// Returns a ready-to-fill CSV file as a download.
+func (h *Handler) adminCSVTemplate(w http.ResponseWriter, r *http.Request) {
+	data := CSVTemplate()
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="product_import_template.csv"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 // adminCreateOrGenerateVariants handles POST /products/{id}/variants.

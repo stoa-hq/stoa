@@ -1,27 +1,28 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
+	import { t } from 'svelte-i18n';
 
 	interface NavItem {
 		href: string;
-		label: string;
+		labelKey: string;
 		icon: string;
 	}
 
 	const nav: NavItem[] = [
-		{ href: '/', label: 'Dashboard', icon: '⊞' },
-		{ href: '/products', label: 'Produkte', icon: '📦' },
-		{ href: '/categories', label: 'Kategorien', icon: '🗂' },
-		{ href: '/property-groups', label: 'Eigenschaften', icon: '🔧' },
-		{ href: '/customers', label: 'Kunden', icon: '👥' },
-		{ href: '/orders', label: 'Bestellungen', icon: '🛒' },
-		{ href: '/media', label: 'Medien', icon: '🖼' },
-		{ href: '/discounts', label: 'Rabatte', icon: '🏷' },
-		{ href: '/tags', label: 'Tags', icon: '🔖' },
-		{ href: '/tax', label: 'Steuern', icon: '📊' },
-		{ href: '/shipping', label: 'Versand', icon: '🚚' },
-		{ href: '/payment', label: 'Zahlungen', icon: '💳' },
-		{ href: '/audit', label: 'Audit-Log', icon: '📋' }
+		{ href: '/', labelKey: 'nav.dashboard', icon: '⊞' },
+		{ href: '/products', labelKey: 'nav.products', icon: '📦' },
+		{ href: '/categories', labelKey: 'nav.categories', icon: '🗂' },
+		{ href: '/property-groups', labelKey: 'nav.propertyGroups', icon: '🔧' },
+		{ href: '/customers', labelKey: 'nav.customers', icon: '👥' },
+		{ href: '/orders', labelKey: 'nav.orders', icon: '🛒' },
+		{ href: '/media', labelKey: 'nav.media', icon: '🖼' },
+		{ href: '/discounts', labelKey: 'nav.discounts', icon: '🏷' },
+		{ href: '/tags', labelKey: 'nav.tags', icon: '🔖' },
+		{ href: '/tax', labelKey: 'nav.tax', icon: '📊' },
+		{ href: '/shipping', labelKey: 'nav.shipping', icon: '🚚' },
+		{ href: '/payment', labelKey: 'nav.payment', icon: '💳' },
+		{ href: '/audit', labelKey: 'nav.audit', icon: '📋' }
 	];
 
 	function isActive(href: string): boolean {
@@ -48,7 +49,7 @@
 				class:hover:bg-gray-800={!isActive(item.href)}
 			>
 				<span class="text-base">{item.icon}</span>
-				{item.label}
+				{$t(item.labelKey)}
 			</a>
 		{/each}
 	</nav>

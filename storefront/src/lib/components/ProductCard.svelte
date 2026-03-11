@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { formatPrice } from '$lib/utils';
 	import { cartStore } from '$lib/stores/cart';
 	import type { Product } from '$lib/api/products';
 	import { getTranslation } from '$lib/api/products';
+	import { t, locale } from 'svelte-i18n';
+	import { fmt } from '$lib/i18n/formatters';
 
 	interface Props {
 		product: Product;
 	}
 	let { product }: Props = $props();
 
-	const translation = $derived(getTranslation(product));
+	const translation = $derived(getTranslation(product, $locale ?? 'de-DE'));
 	const firstImage = $derived(product.media?.find((m) => m.url));
 	let adding = $state(false);
 
@@ -44,9 +45,9 @@
 				{translation.name}
 			</h3>
 			<div class="mt-3 flex items-center justify-between">
-				<span class="text-lg font-bold text-gray-900">{formatPrice(product.price_gross)}</span>
+				<span class="text-lg font-bold text-gray-900">{$fmt.price(product.price_gross)}</span>
 				{#if product.has_variants}
-					<span class="btn btn-secondary btn-sm">Auswählen →</span>
+					<span class="btn btn-secondary btn-sm">{$t('products.select')}</span>
 				{:else}
 					<button
 						onclick={addToCart}
@@ -59,15 +60,15 @@
 								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
 							</svg>
 						{:else if product.stock === 0}
-							Ausverkauft
+							{$t('products.soldOut')}
 						{:else}
-							+ Warenkorb
+							{$t('products.addToCart')}
 						{/if}
 					</button>
 				{/if}
 			</div>
 			{#if product.stock > 0 && product.stock <= 5 && !product.has_variants}
-				<p class="text-xs text-amber-600 mt-2">Nur noch {product.stock} verfügbar</p>
+				<p class="text-xs text-amber-600 mt-2">{$t('products.lowStock', { values: { count: product.stock } })}</p>
 			{/if}
 		</div>
 	</div>

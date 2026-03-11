@@ -97,6 +97,44 @@ export interface ProductVariant {
 	active: boolean;
 }
 
+export interface BulkImportOptionInput {
+	group_name: string;
+	option_name: string;
+	locale: string;
+}
+
+export interface BulkImportVariantInput {
+	sku: string;
+	active: boolean;
+	stock: number;
+	price_net?: number;
+	price_gross?: number;
+	options: BulkImportOptionInput[];
+}
+
+export interface BulkCreateProductRequest extends CreateProductRequest {
+	variants?: BulkImportVariantInput[];
+}
+
+export interface BulkRequest {
+	products: BulkCreateProductRequest[];
+}
+
+export interface BulkResult {
+	index: number;
+	sku?: string;
+	success: boolean;
+	id?: string;
+	errors?: string[];
+}
+
+export interface BulkResponse {
+	results: BulkResult[];
+	total: number;
+	succeeded: number;
+	failed: number;
+}
+
 // ── Category ─────────────────────────────────────────────────────────────────
 
 export interface CategoryTranslation {
