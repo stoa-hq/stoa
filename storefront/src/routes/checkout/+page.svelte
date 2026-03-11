@@ -49,6 +49,18 @@
 		email: ''
 	});
 
+	let sameAsShipping = $state(true);
+
+	let billingForm = $state({
+		first_name: '',
+		last_name: '',
+		street: '',
+		city: '',
+		zip: '',
+		country_code: 'DE',
+		email: ''
+	});
+
 	onMount(async () => {
 		await cartStore.load();
 		const items = $cartStore.items;
@@ -99,7 +111,7 @@
 		submitting = true;
 		error = '';
 		try {
-			const address = {
+			const shippingAddress = {
 				first_name: form.first_name,
 				last_name: form.last_name,
 				street: form.street,
@@ -109,10 +121,20 @@
 				email: form.email
 			};
 
+			const billingAddress = sameAsShipping ? shippingAddress : {
+				first_name: billingForm.first_name,
+				last_name: billingForm.last_name,
+				street: billingForm.street,
+				city: billingForm.city,
+				zip: billingForm.zip,
+				country_code: billingForm.country_code,
+				email: billingForm.email
+			};
+
 			const res = await ordersApi.checkout({
 				currency: 'EUR',
-				billing_address: address,
-				shipping_address: address,
+				billing_address: billingAddress,
+				shipping_address: shippingAddress,
 				shipping_method_id: selectedShipping || undefined,
 				payment_method_id: selectedPayment || undefined,
 				items: lineItems.map((i) => ({
@@ -150,7 +172,7 @@
 		<div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
 			<!-- Form -->
 			<div class="lg:col-span-3 space-y-6">
-				<!-- Address -->
+				<!-- Shipping Address -->
 				<div class="card p-6">
 					<h2 class="text-lg font-semibold text-gray-900 mb-4">Lieferadresse</h2>
 					<div class="grid grid-cols-2 gap-4">
@@ -179,6 +201,50 @@
 							<input class="input" id="city" bind:value={form.city} required />
 						</div>
 					</div>
+				</div>
+
+				<!-- Billing Address -->
+				<div class="card p-6">
+					<label class="flex items-center gap-3 cursor-pointer select-none">
+						<input
+							type="checkbox"
+							bind:checked={sameAsShipping}
+							class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+						/>
+						<span class="text-sm font-medium text-gray-700">Rechnungsadresse ist identisch mit Lieferadresse</span>
+					</label>
+
+					{#if !sameAsShipping}
+						<div class="mt-5">
+							<h2 class="text-lg font-semibold text-gray-900 mb-4">Rechnungsadresse</h2>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="label" for="billing_first_name">Vorname</label>
+									<input class="input" id="billing_first_name" bind:value={billingForm.first_name} required />
+								</div>
+								<div>
+									<label class="label" for="billing_last_name">Nachname</label>
+									<input class="input" id="billing_last_name" bind:value={billingForm.last_name} required />
+								</div>
+								<div class="col-span-2">
+									<label class="label" for="billing_email">E-Mail</label>
+									<input class="input" id="billing_email" type="email" bind:value={billingForm.email} required />
+								</div>
+								<div class="col-span-2">
+									<label class="label" for="billing_street">Straße & Hausnummer</label>
+									<input class="input" id="billing_street" bind:value={billingForm.street} required />
+								</div>
+								<div>
+									<label class="label" for="billing_zip">PLZ</label>
+									<input class="input" id="billing_zip" bind:value={billingForm.zip} required />
+								</div>
+								<div>
+									<label class="label" for="billing_city">Stadt</label>
+									<input class="input" id="billing_city" bind:value={billingForm.city} required />
+								</div>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Shipping -->
@@ -245,7 +311,8 @@
 
 					<button
 						onclick={placeOrder}
-						disabled={submitting || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip}
+						disabled={submitting || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip
+							|| (!sameAsShipping && (!billingForm.first_name || !billingForm.last_name || !billingForm.street || !billingForm.city || !billingForm.zip))}
 						class="btn btn-primary btn-lg w-full mt-4"
 					>
 						{#if submitting}

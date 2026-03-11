@@ -117,6 +117,44 @@
     </div>
   </div>
 
+  <!-- Addresses -->
+  {#if order.shipping_address || order.billing_address}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+    <div class="card p-6">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Lieferadresse</h2>
+      {#if order.shipping_address}
+        <address class="not-italic text-sm text-gray-800 space-y-1">
+          <p class="font-semibold">{order.shipping_address.first_name ?? ''} {order.shipping_address.last_name ?? ''}</p>
+          {#if order.shipping_address.company}<p class="text-gray-500">{order.shipping_address.company}</p>{/if}
+          <p>{order.shipping_address.street ?? ''}</p>
+          <p>{order.shipping_address.zip ?? ''} {order.shipping_address.city ?? ''}</p>
+          <p class="uppercase tracking-wider text-xs text-gray-500">{order.shipping_address.country_code ?? ''}</p>
+          {#if order.shipping_address.email}<p class="text-primary-600 text-xs mt-2">{order.shipping_address.email}</p>{/if}
+          {#if order.shipping_address.phone}<p class="text-gray-500 text-xs">{order.shipping_address.phone}</p>{/if}
+        </address>
+      {:else}
+        <p class="text-sm text-gray-400 italic">Keine Lieferadresse angegeben</p>
+      {/if}
+    </div>
+    <div class="card p-6">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Rechnungsadresse</h2>
+      {#if order.billing_address}
+        <address class="not-italic text-sm text-gray-800 space-y-1">
+          <p class="font-semibold">{order.billing_address.first_name ?? ''} {order.billing_address.last_name ?? ''}</p>
+          {#if order.billing_address.company}<p class="text-gray-500">{order.billing_address.company}</p>{/if}
+          <p>{order.billing_address.street ?? ''}</p>
+          <p>{order.billing_address.zip ?? ''} {order.billing_address.city ?? ''}</p>
+          <p class="uppercase tracking-wider text-xs text-gray-500">{order.billing_address.country_code ?? ''}</p>
+          {#if order.billing_address.email}<p class="text-primary-600 text-xs mt-2">{order.billing_address.email}</p>{/if}
+          {#if order.billing_address.phone}<p class="text-gray-500 text-xs">{order.billing_address.phone}</p>{/if}
+        </address>
+      {:else}
+        <p class="text-sm text-gray-400 italic">Keine Rechnungsadresse angegeben</p>
+      {/if}
+    </div>
+  </div>
+  {/if}
+
   <!-- Order Items -->
   <div class="card p-6">
     <h2 class="text-lg font-semibold text-gray-900 mb-4">Positionen</h2>
