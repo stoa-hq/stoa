@@ -412,7 +412,7 @@
       </div>
 
       <div>
-        <label class="label">Kategorien</label>
+        <p class="label">Kategorien</p>
         {#if allCategories.length === 0}
           <p class="text-sm text-gray-400">Keine Kategorien vorhanden.</p>
         {:else}
@@ -433,7 +433,7 @@
       </div>
 
       <div>
-        <label class="label">Tags</label>
+        <p class="label">Tags</p>
         {#if allTags.length === 0}
           <p class="text-sm text-gray-400">Keine Tags vorhanden.</p>
         {:else}
@@ -627,8 +627,8 @@
         {#each allPropertyGroups as g}
           {@const gName = g.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? g.id}
           <div class="mb-2">
-            <label class="text-xs text-gray-500 uppercase">{gName}</label>
-            <select class="input mt-1" bind:value={addVariantOptions[g.id]}>
+            <label class="text-xs text-gray-500 uppercase" for="add-variant-{g.id}">{gName}</label>
+            <select id="add-variant-{g.id}" class="input mt-1" bind:value={addVariantOptions[g.id]}>
               <option value="">— keine Auswahl —</option>
               {#each g.options ?? [] as o}
                 {@const oName = o.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? o.id}
@@ -674,8 +674,8 @@
           {#each allPropertyGroups as g}
             {@const gName = g.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? g.id}
             <div class="mb-2">
-              <label class="text-xs text-gray-500 uppercase">{gName}</label>
-              <select class="input mt-1" bind:value={editVariantOptions[g.id]}>
+              <label class="text-xs text-gray-500 uppercase" for="edit-variant-{g.id}">{gName}</label>
+              <select id="edit-variant-{g.id}" class="input mt-1" bind:value={editVariantOptions[g.id]}>
                 <option value="">— keine Auswahl —</option>
                 {#each g.options ?? [] as o}
                   {@const oName = o.translations?.find((t) => t.locale === DEFAULT_LOCALE)?.name ?? o.id}

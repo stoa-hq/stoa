@@ -17,7 +17,7 @@
 		class="fixed inset-0 z-40 flex items-center justify-center p-4"
 		transition:fade={{ duration: 150 }}
 	>
-		<div class="absolute inset-0 bg-black/40" onclick={onClose}></div>
+		<div class="absolute inset-0 bg-black/40" onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()} role="button" tabindex="-1" aria-label="Modal schließen"></div>
 		<div
 			class="relative z-50 bg-white rounded-xl shadow-xl w-full max-w-lg"
 			transition:scale={{ duration: 150, start: 0.95 }}
