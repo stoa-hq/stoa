@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/pkg/sdk"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 // TaxRateFn looks up the integer basis-point tax rate for a given tax rule ID.

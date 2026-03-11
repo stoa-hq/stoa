@@ -132,7 +132,7 @@
 						<button onclick={() => updateQty(item.id, item.quantity + 1)} class="w-8 h-8 rounded border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50">+</button>
 					</div>
 					<p class="w-24 text-right font-semibold text-gray-900">{formatPrice(item.price_gross * item.quantity)}</p>
-					<button onclick={() => updateQty(item.id, 0)} class="text-gray-400 hover:text-red-500 transition-colors">
+					<button onclick={() => updateQty(item.id, 0)} class="text-gray-400 hover:text-red-500 transition-colors" aria-label="Artikel entfernen">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 						</svg>

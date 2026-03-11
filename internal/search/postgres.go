@@ -32,29 +32,30 @@ func (e *PostgresEngine) Search(ctx context.Context, req SearchRequest) (*Search
 		locale = "de-DE"
 	}
 
-	// Determine the PostgreSQL text search configuration based on locale
+	// Determine the PostgreSQL text search configuration based on locale.
+	// tsConfig is used as $3::regconfig to avoid SQL interpolation entirely.
 	tsConfig := localeToTSConfig(locale)
 
 	// Search products using full-text search
-	query := fmt.Sprintf(`
+	const query = `
 		SELECT
 			p.id::text,
 			'product' AS type,
-			ts_rank(to_tsvector('%s', coalesce(pt.name, '') || ' ' || coalesce(pt.description, '')),
-				plainto_tsquery('%s', $1)) AS score,
+			ts_rank(to_tsvector($3::regconfig, coalesce(pt.name, '') || ' ' || coalesce(pt.description, '')),
+				plainto_tsquery($3::regconfig, $1)) AS score,
 			pt.name AS title,
 			COALESCE(LEFT(pt.description, 200), '') AS description,
 			pt.slug
 		FROM products p
 		JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
 		WHERE p.active = true
-			AND to_tsvector('%s', coalesce(pt.name, '') || ' ' || coalesce(pt.description, ''))
-			@@ plainto_tsquery('%s', $1)
+			AND to_tsvector($3::regconfig, coalesce(pt.name, '') || ' ' || coalesce(pt.description, ''))
+			@@ plainto_tsquery($3::regconfig, $1)
 		ORDER BY score DESC
-		LIMIT $3 OFFSET $4
-	`, tsConfig, tsConfig, tsConfig, tsConfig)
+		LIMIT $4 OFFSET $5
+	`
 
-	rows, err := e.pool.Query(ctx, query, req.Query, locale, req.Limit, offset)
+	rows, err := e.pool.Query(ctx, query, req.Query, locale, tsConfig, req.Limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("searching products: %w", err)
 	}
@@ -70,17 +71,17 @@ func (e *PostgresEngine) Search(ctx context.Context, req SearchRequest) (*Search
 	}
 
 	// Count total results
-	countQuery := fmt.Sprintf(`
+	const countQuery = `
 		SELECT COUNT(*)
 		FROM products p
 		JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
 		WHERE p.active = true
-			AND to_tsvector('%s', coalesce(pt.name, '') || ' ' || coalesce(pt.description, ''))
-			@@ plainto_tsquery('%s', $1)
-	`, tsConfig, tsConfig)
+			AND to_tsvector($3::regconfig, coalesce(pt.name, '') || ' ' || coalesce(pt.description, ''))
+			@@ plainto_tsquery($3::regconfig, $1)
+	`
 
 	var total int
-	if err := e.pool.QueryRow(ctx, countQuery, req.Query, locale).Scan(&total); err != nil {
+	if err := e.pool.QueryRow(ctx, countQuery, req.Query, locale, tsConfig).Scan(&total); err != nil {
 		return nil, fmt.Errorf("counting search results: %w", err)
 	}
 

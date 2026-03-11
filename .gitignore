@@ -15,3 +15,5 @@ project
 commerce
 internal/admin/build
 internal/storefront/build
+CLAUDE.local.md
+.claude/settings.local.json

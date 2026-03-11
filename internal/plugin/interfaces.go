@@ -1,6 +1,6 @@
 package plugin
 
-import "github.com/epoxx-arch/stoa/pkg/sdk"
+import "github.com/stoa-hq/stoa/pkg/sdk"
 
 // Plugin re-exports the SDK plugin interface.
 type Plugin = sdk.Plugin

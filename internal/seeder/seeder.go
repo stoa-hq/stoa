@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/internal/auth"
+	"github.com/stoa-hq/stoa/internal/auth"
 )
 
 // ErrAlreadySeeded is returned when the database already contains data and

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/epoxx-arch/stoa/pkg/sdk"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 // stockChecker is a narrow interface that the service uses to verify product

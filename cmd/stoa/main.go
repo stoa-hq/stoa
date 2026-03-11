@@ -11,11 +11,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/epoxx-arch/stoa/internal/app"
-	"github.com/epoxx-arch/stoa/internal/auth"
-	"github.com/epoxx-arch/stoa/internal/config"
-	"github.com/epoxx-arch/stoa/internal/database"
-	"github.com/epoxx-arch/stoa/internal/seeder"
+	"github.com/stoa-hq/stoa/internal/app"
+	"github.com/stoa-hq/stoa/internal/auth"
+	"github.com/stoa-hq/stoa/internal/config"
+	"github.com/stoa-hq/stoa/internal/database"
+	"github.com/stoa-hq/stoa/internal/seeder"
 )
 
 var (

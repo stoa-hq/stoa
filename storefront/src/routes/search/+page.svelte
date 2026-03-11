@@ -46,7 +46,6 @@
 			type="search"
 			placeholder="Produkte suchen…"
 			bind:value={query}
-			autofocus
 		/>
 		<button type="submit" class="btn btn-primary">Suchen</button>
 	</form>
