@@ -2,10 +2,11 @@
 
 BINARY=bin/stoa
 VERSION?=dev
+MODFILE_FLAG=$(shell [ -f go.plugins.mod ] && echo "-modfile=go.plugins.mod")
 
 build: admin-build storefront-build
 	@mkdir -p bin
-	go build -ldflags="-s -w -X main.version=$(VERSION)" -o $(BINARY) ./cmd/stoa
+	go build $(MODFILE_FLAG) -ldflags="-s -w -X main.version=$(VERSION)" -o $(BINARY) ./cmd/stoa
 
 run: build
 	./$(BINARY) serve
