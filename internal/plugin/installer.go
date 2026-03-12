@@ -13,7 +13,8 @@ import (
 
 // KnownPlugins maps short names to their full Go import paths.
 var KnownPlugins = map[string]string{
-	"n8n": "github.com/stoa-hq/stoa-plugins/n8n",
+	"n8n":    "github.com/stoa-hq/stoa-plugins/n8n",
+	"stripe": "github.com/stoa-hq/stoa-plugins/stripe",
 }
 
 // ResolvePackage resolves a short plugin name or full Go import path.
