@@ -23,6 +23,7 @@ import (
 	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/internal/config"
 	"github.com/stoa-hq/stoa/internal/database"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 	"github.com/stoa-hq/stoa/internal/domain/audit"
 	"github.com/stoa-hq/stoa/internal/domain/cart"
 	"github.com/stoa-hq/stoa/internal/domain/category"
@@ -73,6 +74,19 @@ func New(cfg *config.Config) (*App, error) {
 	pluginRegistry := plugin.NewRegistry(logger)
 
 	srv := server.New(cfg, db, logger)
+
+	// Auto-register plugins that called sdk.Register() in their init().
+	pluginAppCtx := &plugin.AppContext{
+		DB:     db.Pool,
+		Router: srv.Router(),
+		Config: cfg.Plugins,
+		Logger: logger,
+	}
+	for _, p := range sdk.RegisteredPlugins() {
+		if err := pluginRegistry.Register(p, pluginAppCtx); err != nil {
+			logger.Warn().Err(err).Str("plugin", p.Name()).Msg("failed to register plugin")
+		}
+	}
 
 	a := &App{
 		Config:         cfg,
