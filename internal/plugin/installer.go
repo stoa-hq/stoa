@@ -80,18 +80,35 @@ func NewInstaller(moduleRoot, binaryPath string) *Installer {
 	return &Installer{moduleRoot: moduleRoot, binaryPath: binaryPath}
 }
 
-// ensurePluginsModFile creates go.plugins.mod as a copy of go.mod if it
-// does not exist yet. This gives us an isolated modfile for plugin deps.
+// ensurePluginsModFile creates go.plugins.mod as a copy of go.mod (and
+// go.plugins.sum as a copy of go.sum) if they do not exist yet.
+// This gives us an isolated modfile for plugin deps while keeping the
+// existing checksums so that `go build -modfile=go.plugins.mod` succeeds.
 func (i *Installer) ensurePluginsModFile() error {
-	dst := filepath.Join(i.moduleRoot, pluginsModFile)
-	if _, err := os.Stat(dst); err == nil {
-		return nil // already exists
+	dstMod := filepath.Join(i.moduleRoot, pluginsModFile)
+	if _, err := os.Stat(dstMod); err != nil {
+		src, err := os.ReadFile(filepath.Join(i.moduleRoot, "go.mod"))
+		if err != nil {
+			return fmt.Errorf("reading go.mod: %w", err)
+		}
+		if err := os.WriteFile(dstMod, src, 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", pluginsModFile, err)
+		}
 	}
-	src, err := os.ReadFile(filepath.Join(i.moduleRoot, "go.mod"))
-	if err != nil {
-		return fmt.Errorf("reading go.mod: %w", err)
+
+	pluginsSumFile := strings.TrimSuffix(pluginsModFile, ".mod") + ".sum"
+	dstSum := filepath.Join(i.moduleRoot, pluginsSumFile)
+	if _, err := os.Stat(dstSum); err != nil {
+		src, err := os.ReadFile(filepath.Join(i.moduleRoot, "go.sum"))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("reading go.sum: %w", err)
+		}
+		if err := os.WriteFile(dstSum, src, 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", pluginsSumFile, err)
+		}
 	}
-	return os.WriteFile(dst, src, 0644)
+
+	return nil
 }
 
 // Install fetches the plugin package, adds it to the generated imports file,
