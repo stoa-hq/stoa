@@ -1,4 +1,4 @@
-.PHONY: build run test lint migrate-up migrate-down docker-up docker-down clean admin-build admin-dev storefront-build storefront-dev mcp-store-build mcp-admin-build mcp-store-run mcp-admin-run
+.PHONY: build run test lint migrate-up migrate-down docker-up docker-down clean admin-build admin-dev storefront-build storefront-dev mcp-store-build mcp-admin-build mcp-store-run mcp-admin-run install
 
 BINARY=bin/stoa
 VERSION?=dev
@@ -38,6 +38,13 @@ docker-down:
 
 docker-build:
 	docker compose build
+
+INSTALL_DIR?=$(HOME)/.local/bin
+
+install: build
+	@mkdir -p $(INSTALL_DIR)
+	install -m 755 $(BINARY) $(INSTALL_DIR)/stoa
+	@echo "Installed to $(INSTALL_DIR)/stoa — ensure $(INSTALL_DIR) is in your PATH"
 
 clean:
 	rm -rf bin/ coverage.out coverage.html
