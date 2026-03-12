@@ -60,7 +60,4 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 	t, _ = listOrdersTool()
 	s.AddTool(t, listOrdersHandler(client))
 
-	// Payment plugins
-	t, _ = stripeCreatePaymentIntentTool()
-	s.AddTool(t, stripeCreatePaymentIntentHandler(client))
 }

@@ -12,6 +12,7 @@ import (
 
 	stoamcp "github.com/stoa-hq/stoa/internal/mcp"
 	"github.com/stoa-hq/stoa/internal/mcp/store"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 func main() {
@@ -37,6 +38,15 @@ Prices are in cents (e.g. 1999 = 19.99 EUR). Tax rates are in basis points (1900
 	)
 
 	store.RegisterTools(s, client)
+
+	// Let installed plugins register their own Store MCP tools.
+	// client satisfies sdk.StoreAPIClient — no type assertion needed.
+	for _, p := range sdk.RegisteredPlugins() {
+		if mp, ok := p.(sdk.MCPStorePlugin); ok {
+			mp.RegisterStoreMCPTools(s, client)
+			log.Printf("registered store MCP tools from plugin: %s", p.Name())
+		}
+	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	sseServer := server.NewSSEServer(s,
