@@ -17,12 +17,36 @@ var KnownPlugins = map[string]string{
 }
 
 // ResolvePackage resolves a short plugin name or full Go import path.
+// Local paths (starting with ./, ../, or /) are returned unchanged.
 // Unknown names are returned as-is (treated as a full import path).
 func ResolvePackage(nameOrPath string) string {
+	if IsLocalPath(nameOrPath) {
+		return nameOrPath
+	}
 	if pkg, ok := KnownPlugins[nameOrPath]; ok {
 		return pkg
 	}
 	return nameOrPath
+}
+
+// IsLocalPath reports whether s refers to a local directory.
+func IsLocalPath(s string) bool {
+	return strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") || filepath.IsAbs(s)
+}
+
+// readModuleName extracts the module name from the go.mod in dir.
+func readModuleName(dir string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return "", fmt.Errorf("reading go.mod in %s: %w", dir, err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module ")), nil
+		}
+	}
+	return "", fmt.Errorf("module directive not found in %s/go.mod", dir)
 }
 
 // FindModuleRoot walks up from dir until it finds a go.mod file.
@@ -40,6 +64,10 @@ func FindModuleRoot(dir string) (string, error) {
 	}
 }
 
+// pluginsModFile is the gitignored modfile used for user-specific plugin deps.
+// It keeps go.mod and go.sum clean so plugin installations are never committed.
+const pluginsModFile = "go.plugins.mod"
+
 // Installer manages plugin installation within a Go module source tree.
 type Installer struct {
 	moduleRoot string
@@ -52,9 +80,35 @@ func NewInstaller(moduleRoot, binaryPath string) *Installer {
 	return &Installer{moduleRoot: moduleRoot, binaryPath: binaryPath}
 }
 
+// ensurePluginsModFile creates go.plugins.mod as a copy of go.mod if it
+// does not exist yet. This gives us an isolated modfile for plugin deps.
+func (i *Installer) ensurePluginsModFile() error {
+	dst := filepath.Join(i.moduleRoot, pluginsModFile)
+	if _, err := os.Stat(dst); err == nil {
+		return nil // already exists
+	}
+	src, err := os.ReadFile(filepath.Join(i.moduleRoot, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("reading go.mod: %w", err)
+	}
+	return os.WriteFile(dst, src, 0644)
+}
+
 // Install fetches the plugin package, adds it to the generated imports file,
 // and rebuilds the binary in-place.
+// pkg may be a remote import path, a short name, or a local directory path.
 func (i *Installer) Install(pkg string) error {
+	if IsLocalPath(pkg) {
+		return i.installLocal(pkg)
+	}
+	return i.installRemote(pkg)
+}
+
+func (i *Installer) installRemote(pkg string) error {
+	if err := i.ensurePluginsModFile(); err != nil {
+		return err
+	}
+
 	imports, err := i.readImports()
 	if err != nil {
 		return err
@@ -66,11 +120,108 @@ func (i *Installer) Install(pkg string) error {
 	}
 
 	fmt.Printf("Fetching %s...\n", pkg)
-	if err := i.run("go", "get", pkg+"@latest"); err != nil {
+	if err := i.run("go", "get", "-modfile="+pluginsModFile, pkg+"@latest"); err != nil {
 		return fmt.Errorf("go get: %w", err)
 	}
 
 	if err := i.writePluginsFile(append(imports, pkg)); err != nil {
+		return fmt.Errorf("updating plugins file: %w", err)
+	}
+
+	return i.rebuild()
+}
+
+func (i *Installer) installLocal(localPath string) error {
+	absPath, err := filepath.Abs(localPath)
+	if err != nil {
+		return fmt.Errorf("resolving path: %w", err)
+	}
+
+	// If the path is inside the Stoa module, it is already part of the same
+	// module — no replace directive or go get needed.
+	if strings.HasPrefix(absPath, i.moduleRoot+string(filepath.Separator)) {
+		return i.installInternal(absPath)
+	}
+
+	return i.installExternal(absPath)
+}
+
+// internalImportPath derives the Go import path for a plugin inside the Stoa module.
+func (i *Installer) internalImportPath(absPath string) (string, error) {
+	stoaModule, err := readModuleName(i.moduleRoot)
+	if err != nil {
+		return "", err
+	}
+	relPath, err := filepath.Rel(i.moduleRoot, absPath)
+	if err != nil {
+		return "", fmt.Errorf("computing relative path: %w", err)
+	}
+	return stoaModule + "/" + filepath.ToSlash(relPath), nil
+}
+
+// installInternal handles plugins that live inside the Stoa source tree.
+// The import path is derived from the Stoa module name + relative path.
+func (i *Installer) installInternal(absPath string) error {
+	importPath, err := i.internalImportPath(absPath)
+	if err != nil {
+		return err
+	}
+
+	imports, err := i.readImports()
+	if err != nil {
+		return err
+	}
+	for _, imp := range imports {
+		if imp == importPath {
+			return fmt.Errorf("plugin %q is already installed", importPath)
+		}
+	}
+
+	fmt.Printf("Installing internal plugin %s\n", importPath)
+	if err := i.writePluginsFile(append(imports, importPath)); err != nil {
+		return fmt.Errorf("updating plugins file: %w", err)
+	}
+
+	return i.rebuild()
+}
+
+// installExternal handles plugins outside the Stoa source tree.
+// A replace directive is added to go.plugins.mod so go.mod stays clean.
+func (i *Installer) installExternal(absPath string) error {
+	if err := i.ensurePluginsModFile(); err != nil {
+		return err
+	}
+
+	moduleName, err := readModuleName(absPath)
+	if err != nil {
+		return err
+	}
+
+	imports, err := i.readImports()
+	if err != nil {
+		return err
+	}
+	for _, imp := range imports {
+		if imp == moduleName {
+			return fmt.Errorf("plugin %q is already installed", moduleName)
+		}
+	}
+
+	relPath, err := filepath.Rel(i.moduleRoot, absPath)
+	if err != nil {
+		return fmt.Errorf("computing relative path: %w", err)
+	}
+
+	fmt.Printf("Linking external plugin %s → %s\n", moduleName, relPath)
+	modfile := "-modfile=" + pluginsModFile
+	if err := i.run("go", "mod", "edit", modfile, "-require="+moduleName+"@v0.0.0"); err != nil {
+		return fmt.Errorf("go mod edit -require: %w", err)
+	}
+	if err := i.run("go", "mod", "edit", modfile, "-replace="+moduleName+"="+relPath); err != nil {
+		return fmt.Errorf("go mod edit -replace: %w", err)
+	}
+
+	if err := i.writePluginsFile(append(imports, moduleName)); err != nil {
 		return fmt.Errorf("updating plugins file: %w", err)
 	}
 
@@ -101,8 +252,12 @@ func (i *Installer) Remove(pkg string) error {
 		return fmt.Errorf("updating plugins file: %w", err)
 	}
 
+	// Drop replace directive if one exists (no-op for remote plugins).
+	modfile := "-modfile=" + pluginsModFile
+	_ = i.run("go", "mod", "edit", modfile, "-dropreplace="+pkg)
+
 	fmt.Println("Running go mod tidy...")
-	if err := i.run("go", "mod", "tidy"); err != nil {
+	if err := i.run("go", "mod", "tidy", modfile); err != nil {
 		return fmt.Errorf("go mod tidy: %w", err)
 	}
 
@@ -163,7 +318,8 @@ func (i *Installer) writePluginsFile(imports []string) error {
 
 func (i *Installer) rebuild() error {
 	fmt.Printf("Building stoa → %s\n", i.binaryPath)
-	if err := i.run("go", "build", "-o", i.binaryPath, "./cmd/stoa"); err != nil {
+	args := []string{"build", "-modfile=" + pluginsModFile, "-o", i.binaryPath, "./cmd/stoa"}
+	if err := i.run("go", args...); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 	fmt.Println("Done. Restart stoa to apply changes.")

@@ -122,6 +122,66 @@ func TestInstallerWriteEmpty(t *testing.T) {
 	}
 }
 
+func TestIsLocalPath(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"./my-plugin", true},
+		{"../my-plugin", true},
+		{"/home/user/my-plugin", true},
+		{"n8n", false},
+		{"github.com/example/plugin", false},
+	}
+	for _, tt := range cases {
+		if got := IsLocalPath(tt.input); got != tt.want {
+			t.Errorf("IsLocalPath(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestReadModuleName(t *testing.T) {
+	tmp := t.TempDir()
+	gomod := "module github.com/example/my-plugin\n\ngo 1.21\n"
+	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte(gomod), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readModuleName(tmp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "github.com/example/my-plugin" {
+		t.Errorf("readModuleName = %q, want %q", got, "github.com/example/my-plugin")
+	}
+}
+
+func TestInternalImportPath(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte("module github.com/stoa-hq/stoa\ngo 1.21\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pluginDir := filepath.Join(tmp, "plugins", "meinplugin")
+	installer := NewInstaller(tmp, "")
+
+	got, err := installer.internalImportPath(pluginDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "github.com/stoa-hq/stoa/plugins/meinplugin"
+	if got != want {
+		t.Errorf("internalImportPath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePackageLocalPath(t *testing.T) {
+	// Local paths must not be looked up in KnownPlugins.
+	got := ResolvePackage("./my-local-plugin")
+	if got != "./my-local-plugin" {
+		t.Errorf("ResolvePackage(local) = %q, want %q", got, "./my-local-plugin")
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStr(s, sub))
 }
