@@ -1,0 +1,1 @@
+Use the stoa-test skill to write or review tests following Stoa conventions.

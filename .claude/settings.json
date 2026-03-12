@@ -15,6 +15,10 @@
     "stoa-test": {
       "description": "Stoa test conventions: mock patterns, handler tests, Chi URL params. Use when writing or reviewing tests.",
       "path": ".claude/skills/stoa-test.md"
+    },
+    "stoa-docs": {
+      "description": "Document a new feature or change in the stoa-docs VitePress repo. Use when creating or updating documentation for any Stoa feature, plugin, API endpoint, or domain.",
+      "path": ".claude/skills/stoa-docs.md"
     }
   }
 }

@@ -1,0 +1,1 @@
+Use the stoa-docs skill to document a new feature or change in the stoa-docs VitePress repo.

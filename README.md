@@ -44,15 +44,15 @@ docker compose exec stoa ./stoa admin create --email admin@example.com --passwor
 
 ## Documentation
 
-Full documentation is available in the **[Stoa Wiki](https://stoa-hq.github.io/wiki)**:
+Full documentation is available in the **[StoA Docs](https://stoa-hq.github.io/docs/)**:
 
-- [Introduction](https://stoa-hq.github.io/wiki/guide/introduction) -- what Stoa is and why it exists
-- [Quick Start](https://stoa-hq.github.io/wiki/guide/quick-start) -- get up and running in minutes
-- [Configuration](https://stoa-hq.github.io/wiki/guide/configuration) -- all config options explained
-- [API Overview](https://stoa-hq.github.io/wiki/api/overview) -- authentication, endpoints, and usage
-- [MCP Servers](https://stoa-hq.github.io/wiki/mcp/overview) -- AI agent integration
-- [Plugin System](https://stoa-hq.github.io/wiki/plugins/overview) -- extend Stoa without forking
-- [Payment Integration](https://stoa-hq.github.io/wiki/plugins/payment) -- integrate any PSP
+- [Introduction](https://stoa-hq.github.io/docs/guide/introduction) -- what Stoa is and why it exists
+- [Quick Start](https://stoa-hq.github.io/docs/guide/quick-start) -- get up and running in minutes
+- [Configuration](https://stoa-hq.github.io/docs/guide/configuration) -- all config options explained
+- [API Overview](https://stoa-hq.github.io/docs/api/overview) -- authentication, endpoints, and usage
+- [MCP Servers](https://stoa-hq.github.io/docs/mcp/overview) -- AI agent integration
+- [Plugin System](https://stoa-hq.github.io/docs/plugins/overview) -- extend Stoa without forking
+- [Payment Integration](https://stoa-hq.github.io/docs/plugins/payment) -- integrate any PSP
 
 ## License
 

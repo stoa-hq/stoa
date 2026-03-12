@@ -1,0 +1,1 @@
+Use the stoa-new-domain skill to create a new domain package.

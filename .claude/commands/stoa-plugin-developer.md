@@ -1,0 +1,1 @@
+Use the stoa-plugin-developer skill to develop a Stoa plugin.
