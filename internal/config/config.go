@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Auth     AuthConfig     `mapstructure:"auth"`
-	Media    MediaConfig    `mapstructure:"media"`
-	Search   SearchConfig   `mapstructure:"search"`
-	I18n     I18nConfig     `mapstructure:"i18n"`
-	Security SecurityConfig `mapstructure:"security"`
-	Payment  PaymentConfig  `mapstructure:"payment"`
+	Server   ServerConfig           `mapstructure:"server"`
+	Database DatabaseConfig         `mapstructure:"database"`
+	Auth     AuthConfig             `mapstructure:"auth"`
+	Media    MediaConfig            `mapstructure:"media"`
+	Search   SearchConfig           `mapstructure:"search"`
+	I18n     I18nConfig             `mapstructure:"i18n"`
+	Security SecurityConfig         `mapstructure:"security"`
+	Payment  PaymentConfig          `mapstructure:"payment"`
+	Plugins  map[string]interface{} `mapstructure:"plugins"`
 }
 
 type PaymentConfig struct {

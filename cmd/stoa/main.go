@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/internal/config"
 	"github.com/stoa-hq/stoa/internal/database"
+	"github.com/stoa-hq/stoa/internal/plugin"
 	"github.com/stoa-hq/stoa/internal/seeder"
 )
 
@@ -229,12 +231,86 @@ func pluginCmd() *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List installed plugins",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("No plugins installed")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := plugin.FindModuleRoot(mustCwd())
+			if err != nil {
+				fmt.Println("No plugins installed.")
+				return nil
+			}
+			imports, err := plugin.NewInstaller(root, "").ListInstalled()
+			if err != nil || len(imports) == 0 {
+				fmt.Println("No plugins installed.")
+				return nil
+			}
+			for _, imp := range imports {
+				fmt.Println(" •", imp)
+			}
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "install <package>",
+		Short: "Install a plugin (short name or full Go import path)",
+		Long: `Install a plugin by short name or full Go import path.
+
+Examples:
+  stoa plugin install n8n
+  stoa plugin install github.com/stoa-hq/stoa-plugins/n8n`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pkg := plugin.ResolvePackage(args[0])
+			root, err := plugin.FindModuleRoot(mustCwd())
+			if err != nil {
+				return err
+			}
+			bin, err := resolveExecutable()
+			if err != nil {
+				return err
+			}
+			return plugin.NewInstaller(root, bin).Install(pkg)
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "remove <package>",
+		Short: "Remove an installed plugin (short name or full Go import path)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pkg := plugin.ResolvePackage(args[0])
+			root, err := plugin.FindModuleRoot(mustCwd())
+			if err != nil {
+				return err
+			}
+			bin, err := resolveExecutable()
+			if err != nil {
+				return err
+			}
+			return plugin.NewInstaller(root, bin).Remove(pkg)
 		},
 	})
 
 	return cmd
+}
+
+func mustCwd() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return cwd
+}
+
+func resolveExecutable() (string, error) {
+	bin, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("finding executable path: %w", err)
+	}
+	bin, err = filepath.EvalSymlinks(bin)
+	if err != nil {
+		return "", fmt.Errorf("resolving executable path: %w", err)
+	}
+	return bin, nil
 }
 
 func versionCmd() *cobra.Command {
