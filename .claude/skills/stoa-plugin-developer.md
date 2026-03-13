@@ -30,6 +30,14 @@ type AppContext struct {
     Hooks  *HookRegistry          // Event system
     Config map[string]interface{} // Plugin-specific config
     Logger zerolog.Logger         // Structured logger (zerolog)
+    Auth   *AuthHelper            // Auth middleware + context helpers
+}
+
+type AuthHelper struct {
+    OptionalAuth func(http.Handler) http.Handler  // Extracts auth if present, never blocks
+    Required     func(http.Handler) http.Handler  // Requires valid token, returns 401
+    UserID       func(ctx context.Context) uuid.UUID // Authenticated user ID
+    UserType     func(ctx context.Context) string    // "admin", "customer", "api_key"
 }
 ```
 
@@ -238,27 +246,36 @@ type Discount struct {
 
 Plugins can register custom HTTP routes via `app.Router`. Routes are mounted under the main chi router.
 
+**IMPORTANT**: The plugin router is the ROOT chi router. It does NOT inherit Stoa's store middleware (`OptionalAuth`). You MUST apply auth middleware explicitly using `app.Auth.Required` or `app.Auth.OptionalAuth`.
+
 ```go
 func (p *MyPlugin) Init(app *sdk.AppContext) error {
     p.db = app.DB
+    p.auth = app.Auth
     p.logger = app.Logger.With().Str("plugin", p.Name()).Logger()
 
-    app.Router.Route("/api/v1/plugin/wishlist", func(r chi.Router) {
+    // Store-facing routes: ALWAYS apply auth middleware
+    app.Router.Route("/api/v1/store/wishlist", func(r chi.Router) {
+        r.Use(app.Auth.Required) // Requires authentication
         r.Get("/", p.handleListWishlist)
         r.Post("/", p.handleAddToWishlist)
         r.Delete("/{id}", p.handleRemoveFromWishlist)
     })
 
+    // Webhook routes: no auth middleware (verified by signature/secret)
+    app.Router.Post("/plugins/myplugin/webhook", p.handleWebhook)
+
     return nil
 }
 
 func (p *MyPlugin) handleListWishlist(w http.ResponseWriter, r *http.Request) {
-    customerID := auth.UserID(r.Context()) // Get authenticated user
+    customerID := p.auth.UserID(r.Context()) // Use AuthHelper, not internal/auth
     if customerID == uuid.Nil {
         http.Error(w, "unauthorized", http.StatusUnauthorized)
         return
     }
 
+    // Always filter by customer_id to prevent IDOR attacks
     rows, err := p.db.Query(r.Context(),
         `SELECT id, product_id, created_at FROM wishlists WHERE customer_id = $1`,
         customerID)
@@ -317,15 +334,26 @@ func (p *MyPlugin) Init(app *sdk.AppContext) error {
 
 ## Auth Context Helpers
 
-Use these to access the authenticated user in custom route handlers:
+Use the `AuthHelper` from `AppContext` to access the authenticated user. **Do not import `internal/auth` directly** — use `app.Auth` instead:
 
 ```go
-import "github.com/stoa-hq/stoa/internal/auth"
+// In Init: store the AuthHelper
+p.auth = app.Auth
 
-auth.UserID(r.Context())    // uuid.UUID — authenticated user ID (uuid.Nil if anonymous)
-auth.UserType(r.Context())  // string — "admin", "customer", or "api_key"
-auth.UserRole(r.Context())  // auth.Role — "super_admin", "admin", "manager", "customer", "api_client"
+// In handlers:
+userID := p.auth.UserID(r.Context())     // uuid.UUID — uuid.Nil if anonymous
+userType := p.auth.UserType(r.Context()) // "admin", "customer", "api_key", or ""
+
+// Apply middleware to routes:
+r.Use(app.Auth.Required)     // Requires valid token, returns 401 otherwise
+r.Use(app.Auth.OptionalAuth) // Extracts auth if present, never blocks
 ```
+
+### Security Rules for Store-Facing Endpoints
+
+1. **Always apply auth middleware** — the plugin router does NOT inherit `/api/v1/store/*` middleware
+2. **Always verify ownership** — filter DB queries by `customer_id = authenticated user` to prevent IDOR
+3. **Never leak internal errors** — return generic error messages to API consumers
 
 ## Plugin Registration
 
@@ -386,13 +414,91 @@ func TestMyHook(t *testing.T) {
 }
 ```
 
+## MCP Store Tools (Optional)
+
+Plugins can register additional tools on the Store MCP server by implementing `sdk.MCPStorePlugin`:
+
+```go
+type MCPStorePlugin interface {
+    Plugin
+    RegisterStoreMCPTools(server any, client StoreAPIClient)
+}
+
+type StoreAPIClient interface {
+    Get(path string) ([]byte, error)   // Only /api/v1/store/* paths allowed
+    Post(path string, body interface{}) ([]byte, error)
+}
+```
+
+### MCP Tool Pattern
+
+```go
+// toolAdder is satisfied by both *server.MCPServer and *mcp.ScopedMCPServer.
+type toolAdder interface {
+    AddTool(mcp.Tool, server.ToolHandlerFunc)
+}
+
+func (p *Plugin) RegisterStoreMCPTools(srv any, client sdk.StoreAPIClient) {
+    s := srv.(toolAdder)  // Interface assertion — NOT srv.(*server.MCPServer)
+
+    tool := mcp.NewTool("store_myplugin_action",  // MUST use prefix store_{pluginName}_
+        mcp.WithDescription("Description for AI agents"),
+        mcp.WithString("order_id", mcp.Required()),
+    )
+    s.AddTool(tool, func(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+        data, err := client.Post("/api/v1/store/myplugin/action", map[string]interface{}{
+            "order_id": req.GetString("order_id", ""),
+        })
+        if err != nil {
+            return mcp.NewToolResultError("action failed"), nil  // Sanitize errors!
+        }
+        return mcp.NewToolResultText(string(data)), nil
+    })
+}
+```
+
+### MCP Security Rules
+
+- **Tool names MUST use prefix `store_{pluginName}_`** — enforced by ScopedMCPServer, panics on violation
+- **Use interface assertion** `srv.(toolAdder)` — NOT `srv.(*server.MCPServer)`. The server passes a scoped wrapper
+- **StoreAPIClient is restricted** to `/api/v1/store/*` paths — admin endpoints are blocked
+- **Sanitize error messages** — return generic errors, never `err.Error()` directly to MCP consumers
+- **Panic recovery** — if registration panics, plugin is skipped and MCP server continues
+
+## Webhook Handler Security
+
+When writing webhook handlers (Stripe, PayPal, etc.):
+
+1. **Verify signatures** — always validate webhook signatures with the raw body before processing
+2. **Use `context.Background()` with timeout** for goroutines — not `r.Context()` which is canceled when the handler returns
+3. **Implement idempotency** — use `ON CONFLICT (provider_reference) DO NOTHING` to handle duplicate webhook deliveries
+4. **Return 204 quickly** — process webhooks async in goroutines to avoid Stripe/provider timeouts
+
+```go
+// WRONG — context canceled after handler returns
+go handleEvent(r.Context(), event, db)
+
+// CORRECT — detached context with timeout
+bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+go func() {
+    defer cancel()
+    handleEvent(bgCtx, event, db)
+}()
+w.WriteHeader(http.StatusNoContent)
+```
+
 ## Checklist for New Plugins
 
 1. Implement all 5 methods of `sdk.Plugin`
-2. Store `app.DB` and `app.Logger` in `Init`
+2. Store `app.DB`, `app.Logger`, and `app.Auth` in `Init`
 3. Use SDK hook constants, not strings
 4. Before-hooks: return errors to cancel; after-hooks: log errors, don't fail
-5. Custom routes: use `app.Router.Route("/api/v1/plugin/<name>", ...)`
-6. DB tables: use `CREATE TABLE IF NOT EXISTS` in Init
-7. Cleanup: close connections/goroutines in `Shutdown()`
-8. Prices in cents, tax rates in basis points
+5. **Apply `app.Auth.Required` or `app.Auth.OptionalAuth`** to store-facing routes
+6. **Verify ownership** — always filter by `customer_id` in store-facing DB queries
+7. Custom routes: use `app.Router.Route("/api/v1/store/<name>", ...)`
+8. DB tables: use `CREATE TABLE IF NOT EXISTS` in Init
+9. Cleanup: close connections/goroutines in `Shutdown()`
+10. Prices in cents, tax rates in basis points
+11. MCP tool names: prefix `store_{pluginName}_*`
+12. MCP errors: sanitize — never expose internal details
+13. Webhooks: verify signatures, use background context, implement idempotency

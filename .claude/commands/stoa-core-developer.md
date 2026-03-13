@@ -1,0 +1,1 @@
+Use the stoa-core-developer skill when working on the Stoa core: domain packages, handlers, services, auth, MCP infrastructure, plugin system internals, or security hardening.

@@ -95,8 +95,20 @@ Both SPAs: SPA mode (`ssr = false`), adapter-static, Vite proxy `/api` → `:808
 
 ## Plugin System
 
-Plugins implement `sdk.Plugin`, receive `AppContext` (DB pool, chi sub-router, hook registry).
+Plugins implement `sdk.Plugin`, receive `AppContext` (DB pool, chi sub-router, hook registry, auth helper).
 Hooks: `entity.before_action` / `entity.after_action` — before-hooks can abort operations.
+
+### Plugin Security Rules
+
+- **Auth on store routes**: Plugin router is the ROOT Chi router — it does NOT inherit `/api/v1/store/*` middleware. Always apply `app.Auth.Required` or `app.Auth.OptionalAuth` explicitly.
+- **Ownership checks**: Store-facing endpoints must verify `customer_id` matches the authenticated user (IDOR prevention).
+- **MCP tool names**: Must use prefix `store_{pluginName}_*` — enforced by `ScopedMCPServer` in `internal/mcp/scoped.go`.
+- **MCP client paths**: `StoreAPIClient` is restricted to `/api/v1/store/*` — enforced by `StoreScopedClient` in `internal/mcp/store_client.go`.
+- **MCP type assertion**: Plugins must use interface assertion `srv.(toolAdder)` — not `srv.(*server.MCPServer)`.
+- **MCP error sanitization**: Return generic errors to MCP consumers — never `err.Error()` directly.
+- **Webhook idempotency**: Use `ON CONFLICT DO NOTHING` on `provider_reference` to handle duplicate deliveries.
+- **Webhook goroutines**: Use `context.Background()` with timeout — not `r.Context()` which is canceled after handler returns.
+- **Panic recovery**: Plugin MCP registration is wrapped in `recover()` — a buggy plugin won't crash the server.
 
 ## Skills
 
@@ -106,3 +118,4 @@ Hooks: `entity.before_action` / `entity.after_action` — before-hooks can abort
 | `/stoa-routes` | All API routes + MCP server (tools, config, Claude integration) |
 | `/stoa-test` | Test patterns: mocks, handler tests, Chi URL params |
 | `/stoa-plugin-developer` | Develops plugins for Stoa |
+| `/stoa-core-developer` | Core development: domain packages, DI, auth, MCP infra, security |
