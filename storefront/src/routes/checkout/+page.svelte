@@ -8,6 +8,7 @@
 	import { paymentApi, getPaymentName, type PaymentMethod } from '$lib/api/payment';
 	import { t, locale } from 'svelte-i18n';
 	import { fmt } from '$lib/i18n/formatters';
+	import PluginSlot from '$lib/components/PluginSlot.svelte';
 
 	let step = $state<'address' | 'shipping' | 'confirm'>('address');
 	let loading = $state(true);
@@ -289,6 +290,12 @@
 						</div>
 					</div>
 				{/if}
+
+				<!-- Plugin UI extensions for payment -->
+				<PluginSlot
+					slot="storefront:checkout:payment"
+					context={{ paymentMethodId: selectedPayment, amount: total, currency: 'EUR' }}
+				/>
 			</div>
 
 			<!-- Order summary -->

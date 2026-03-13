@@ -8,6 +8,7 @@
   import { notifications } from '$lib/stores/notifications';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
   import TranslationsInput from '$lib/components/TranslationsInput.svelte';
+  import PluginSlot from '$lib/components/PluginSlot.svelte';
   import {
     AVAILABLE_LOCALES,
     DEFAULT_LOCALE,
@@ -127,6 +128,12 @@
       </div>
     </form>
   </div>
+
+  <!-- Plugin UI extensions for payment settings -->
+  <PluginSlot
+    slot="admin:payment:settings"
+    context={{ paymentMethodId: id, provider: form.provider }}
+  />
 {/if}
 
 <ConfirmModal

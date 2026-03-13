@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { authStore } from '$lib/stores/auth';
+	import { loadPluginManifest } from '$lib/stores/plugins';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
@@ -19,6 +20,7 @@
 			goto(`${base}/login`);
 		} else {
 			ready = true;
+			loadPluginManifest();
 		}
 	});
 </script>

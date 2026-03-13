@@ -21,12 +21,13 @@ type Plugin interface {
 
 // AppContext provides plugins access to application resources.
 type AppContext struct {
-	DB     *pgxpool.Pool
-	Router chi.Router
-	Hooks  *HookRegistry
-	Config map[string]interface{}
-	Logger zerolog.Logger
-	Auth   *AuthHelper
+	DB          *pgxpool.Pool
+	Router      chi.Router
+	AssetRouter chi.Router // mounted under /plugins/{name}/assets/
+	Hooks       *HookRegistry
+	Config      map[string]interface{}
+	Logger      zerolog.Logger
+	Auth        *AuthHelper
 }
 
 // AuthHelper gives plugins access to authentication middleware and context

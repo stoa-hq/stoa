@@ -76,23 +76,32 @@ func New(cfg *config.Config) (*App, error) {
 	srv := server.New(cfg, db, logger)
 
 	// Auto-register plugins that called sdk.Register() in their init().
-	pluginAppCtx := &plugin.AppContext{
-		DB:     db.Pool,
-		Router: srv.Router(),
-		Config: cfg.Plugins,
-		Logger: logger,
-		Auth: &sdk.AuthHelper{
-			OptionalAuth: authMiddleware.OptionalAuth,
-			Required:     authMiddleware.Authenticate,
-			UserID:       auth.UserID,
-			UserType:     auth.UserType,
-		},
-	}
 	for _, p := range sdk.RegisteredPlugins() {
+		// Create a per-plugin asset router mounted at /plugins/{name}/assets/
+		assetPrefix := "/plugins/" + p.Name() + "/assets"
+		assetRouter := chi.NewRouter()
+		srv.Router().Mount(assetPrefix, assetRouter)
+
+		pluginAppCtx := &plugin.AppContext{
+			DB:          db.Pool,
+			Router:      srv.Router(),
+			AssetRouter: assetRouter,
+			Config:      cfg.Plugins,
+			Logger:      logger,
+			Auth: &sdk.AuthHelper{
+				OptionalAuth: authMiddleware.OptionalAuth,
+				Required:     authMiddleware.Authenticate,
+				UserID:       auth.UserID,
+				UserType:     auth.UserType,
+			},
+		}
 		if err := pluginRegistry.Register(p, pluginAppCtx); err != nil {
 			logger.Warn().Err(err).Str("plugin", p.Name()).Msg("failed to register plugin")
 		}
 	}
+
+	// Collect UI extensions from all registered plugins.
+	pluginRegistry.CollectUIExtensions()
 
 	a := &App{
 		Config:         cfg,
@@ -242,6 +251,9 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 	r := a.Server.Router()
 
+	// ── Plugin Manifest ──────────────────────────────────────────────────────
+	manifestH := plugin.NewManifestHandler(a.PluginRegistry)
+
 	// /api/v1/auth/* – no authentication required
 	authH.RegisterRoutes(r)
 
@@ -269,6 +281,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		auditH.RegisterAdminRoutes(r)
 		mediaH.RegisterAdminRoutes(r)
 		settingsH.RegisterAdminRoutes(r)
+		r.Get("/plugin-manifest", manifestH.AdminManifest)
 	})
 
 	// ── Search ────────────────────────────────────────────────────────────────
@@ -290,6 +303,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		paymentH.RegisterStoreRoutes(r)
 		searchH.RegisterStoreRoutes(r)
 		settingsH.RegisterStoreRoutes(r)
+		r.Get("/plugin-manifest", manifestH.StoreManifest)
 	})
 
 	// ── Uploaded media files ──────────────────────────────────────────────────
@@ -300,10 +314,14 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(uploadsDir)))
 	}
 
+	// ── Dynamic CSP from plugin external scripts ────────────────────────────
+
+	csp := buildCSP(a.PluginRegistry.UIExtensions())
+
 	// ── Admin Frontend ────────────────────────────────────────────────────────
 
 	// Serve embedded SvelteKit SPA under /admin/*
-	adminHandler := admin.Handler()
+	adminHandler := admin.HandlerWithCSP(csp)
 	r.Handle("/admin", adminHandler)
 	r.Handle("/admin/*", adminHandler)
 
@@ -311,7 +329,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 	// Serve embedded SvelteKit storefront SPA at the root.
 	// Registered last so that /api and /admin take priority.
-	storefrontHandler := storefront.Handler()
+	storefrontHandler := storefront.HandlerWithCSP(csp)
 	r.Handle("/", storefrontHandler)
 	r.Handle("/*", storefrontHandler)
 
@@ -384,6 +402,24 @@ func (a *storageAdapter) Delete(ctx context.Context, storagePath string) error {
 
 func (a *storageAdapter) URL(storagePath string) string {
 	return a.s.URL(storagePath)
+}
+
+// buildCSP constructs a CSP string that includes plugin external script sources.
+func buildCSP(extensions []sdk.UIExtension) string {
+	scriptSources := "'self' 'unsafe-inline'"
+	seen := make(map[string]bool)
+	for _, ext := range extensions {
+		if ext.Component == nil {
+			continue
+		}
+		for _, src := range ext.Component.ExternalScripts {
+			if !seen[src] {
+				seen[src] = true
+				scriptSources += " " + src
+			}
+		}
+	}
+	return "default-src 'self'; script-src " + scriptSources + "; style-src 'self' 'unsafe-inline'"
 }
 
 func (a *App) migratePaymentEncryption(cfg *config.Config) error {

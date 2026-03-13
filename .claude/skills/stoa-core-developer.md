@@ -309,21 +309,24 @@ Public API for plugins:
 
 ```
 pkg/sdk/
-├── plugin.go    → Plugin interface, AppContext, AuthHelper
+├── plugin.go    → Plugin interface, AppContext (incl. AssetRouter), AuthHelper
 ├── registry.go  → Global Register/RegisteredPlugins (sync.Mutex)
 ├── hooks.go     → HookRegistry (sync.RWMutex), HookEvent, hook constants
 ├── mcp.go       → MCPStorePlugin, StoreAPIClient interfaces
+├── ui.go        → UIPlugin, UIExtension, UISchema, UIComponent, ValidateUIExtension()
 ├── entities.go  → BaseEntity shared fields
 ```
 
 **AppContext wiring** (in `internal/app/app.go`):
 
 ```go
+// Per-plugin AppContext with dedicated asset router
 pluginAppCtx := &sdk.AppContext{
-    DB:     db.Pool,
-    Router: srv.Router(),  // ROOT chi router
-    Config: cfg.Plugins,
-    Logger: logger,
+    DB:          db.Pool,
+    Router:      srv.Router(),      // ROOT chi router
+    AssetRouter: assetRouter,       // Mounted at /plugins/{name}/assets/
+    Config:      cfg.Plugins,
+    Logger:      logger,
     Auth: &sdk.AuthHelper{
         OptionalAuth: authMiddleware.OptionalAuth,
         Required:     authMiddleware.Authenticate,
@@ -339,10 +342,13 @@ pluginAppCtx := &sdk.AppContext{
 
 ```
 internal/plugin/
-├── registry.go    → Registry.Register/ShutdownAll, maintains order for reverse shutdown
-├── installer.go   → KnownPlugins, Install/Remove/ListInstalled, code generation
-├── interfaces.go  → Type aliases: Plugin = sdk.Plugin, AppContext = sdk.AppContext, etc.
+├── registry.go          → Registry.Register/ShutdownAll/CollectUIExtensions/UIExtensions
+├── manifest_handler.go  → ManifestHandler: GET /api/v1/{store,admin}/plugin-manifest
+├── installer.go         → KnownPlugins, Install/Remove/ListInstalled, code generation
+├── interfaces.go        → Type aliases: Plugin = sdk.Plugin, AppContext = sdk.AppContext, etc.
 ```
+
+**UI Extension Collection**: After all plugins are registered, `CollectUIExtensions()` iterates over plugins implementing `sdk.UIPlugin`, validates their extensions, and caches them. `ManifestHandler` serves them filtered by slot prefix (`storefront:*` or `admin:*`).
 
 **Installer workflow**:
 1. `ResolvePackage` — short name → import path (via `KnownPlugins` map)
@@ -457,6 +463,7 @@ Never expose internal errors to API consumers. Log the full error with `logger.E
 7. **Webhook handlers**: verify signatures, use background context for goroutines, implement idempotency
 8. **Plugin isolation**: ScopedMCPServer (tool prefix), StoreScopedClient (path restriction), panic recovery
 9. **Context propagation**: always pass `ctx` through layers; use `context.Background()` with timeout for detached goroutines
+10. **Plugin UI extensions**: Tag name prefix `stoa-{pluginName}-`, URL path traversal prevention, closed Shadow DOM, SRI verification, scoped plugin API client, dynamic CSP
 
 ## Adding a New Domain
 

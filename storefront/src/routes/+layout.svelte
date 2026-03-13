@@ -4,6 +4,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { cartStore } from '$lib/stores/cart';
+	import { loadPluginManifest } from '$lib/stores/plugins';
 	import { onMount } from 'svelte';
 	import { isLoading } from 'svelte-i18n';
 
@@ -14,6 +15,7 @@
 
 	onMount(() => {
 		cartStore.load();
+		loadPluginManifest();
 	});
 </script>
 

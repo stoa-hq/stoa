@@ -5,14 +5,16 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 type Registry struct {
-	mu      sync.RWMutex
-	plugins map[string]Plugin
-	order   []string
-	hooks   *HookRegistry
-	logger  zerolog.Logger
+	mu           sync.RWMutex
+	plugins      map[string]Plugin
+	order        []string
+	hooks        *HookRegistry
+	logger       zerolog.Logger
+	uiExtensions []sdk.UIExtension
 }
 
 func NewRegistry(logger zerolog.Logger) *Registry {
@@ -64,6 +66,40 @@ func (r *Registry) List() []Plugin {
 		result = append(result, r.plugins[name])
 	}
 	return result
+}
+
+// CollectUIExtensions iterates over all registered plugins, checks for the
+// UIPlugin interface, validates extensions, and caches them. Call once after
+// all plugins have been registered.
+func (r *Registry) CollectUIExtensions() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var exts []sdk.UIExtension
+	for _, name := range r.order {
+		p := r.plugins[name]
+		uiPlugin, ok := p.(sdk.UIPlugin)
+		if !ok {
+			continue
+		}
+
+		for _, ext := range uiPlugin.UIExtensions() {
+			if err := sdk.ValidateUIExtension(name, ext); err != nil {
+				r.logger.Warn().Err(err).Str("plugin", name).Msg("invalid UI extension, skipping")
+				continue
+			}
+			exts = append(exts, ext)
+		}
+		r.logger.Info().Str("plugin", name).Int("extensions", len(exts)).Msg("collected UI extensions")
+	}
+	r.uiExtensions = exts
+}
+
+// UIExtensions returns all validated UI extensions collected from plugins.
+func (r *Registry) UIExtensions() []sdk.UIExtension {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.uiExtensions
 }
 
 func (r *Registry) ShutdownAll() error {

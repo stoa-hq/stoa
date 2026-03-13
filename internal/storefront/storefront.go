@@ -16,10 +16,23 @@ import (
 //go:embed all:build
 var Files embed.FS
 
+// defaultCSP is the Content-Security-Policy applied when no plugins add external scripts.
+const defaultCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+
+// HandlerWithCSP returns an http.Handler like Handler() but with a custom CSP
+// header, allowing plugins to whitelist external scripts.
+func HandlerWithCSP(csp string) http.Handler {
+	return handlerWithCSP(csp)
+}
+
 // Handler returns an http.Handler that serves the embedded storefront SPA.
 // Mount it at /* in the router – the more specific /api and /admin routes
 // are registered first and take priority in chi's radix tree.
 func Handler() http.Handler {
+	return handlerWithCSP(defaultCSP)
+}
+
+func handlerWithCSP(csp string) http.Handler {
 	sub, err := fs.Sub(Files, "build")
 	if err != nil {
 		panic("storefront: build directory missing – run `make storefront-build`")
@@ -35,7 +48,7 @@ func Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rel := r.URL.Path
 		if rel == "" || rel == "/" {
-			serveIndex(w, indexHTML)
+			serveIndex(w, indexHTML, csp)
 			return
 		}
 
@@ -46,7 +59,7 @@ func Handler() http.Handler {
 		}
 
 		if assetPath == "index.html" {
-			serveIndex(w, indexHTML)
+			serveIndex(w, indexHTML, csp)
 			return
 		}
 
@@ -61,13 +74,12 @@ func Handler() http.Handler {
 		}
 
 		// Unknown path → SPA routing.
-		serveIndex(w, indexHTML)
+		serveIndex(w, indexHTML, csp)
 	})
 }
 
-func serveIndex(w http.ResponseWriter, html []byte) {
-	w.Header().Set("Content-Security-Policy",
-		"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+func serveIndex(w http.ResponseWriter, html []byte, csp string) {
+	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write(html) //nolint:errcheck
