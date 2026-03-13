@@ -12,19 +12,25 @@ type StoreAPIClient interface {
 // additional tools on the Store MCP server.
 //
 // RegisterStoreMCPTools is called once during Store MCP server startup, after
-// the built-in tools are registered. The server parameter is
-// *github.com/mark3labs/mcp-go/server.MCPServer — passed as any to avoid an
-// import of mcp-go in pkg/sdk.
+// the built-in tools are registered. The server parameter satisfies the
+// toolAdder interface (AddTool method) — use an interface assertion, not a
+// concrete type assertion, for forward compatibility:
 //
-// Example:
+//	import (
+//	    "github.com/mark3labs/mcp-go/mcp"
+//	    "github.com/mark3labs/mcp-go/server"
+//	)
 //
-//	import "github.com/mark3labs/mcp-go/server"
+//	type toolAdder interface { AddTool(mcp.Tool, server.ToolHandlerFunc) }
 //
 //	func (p *Plugin) RegisterStoreMCPTools(srv any, client sdk.StoreAPIClient) {
-//	    s := srv.(*server.MCPServer)
-//	    tool := mcp.NewTool("my_tool", ...)
+//	    s := srv.(toolAdder)
+//	    tool := mcp.NewTool("store_myplugin_action", ...)
 //	    s.AddTool(tool, myHandler(client))
 //	}
+//
+// Tool names MUST use the prefix "store_{pluginName}_" to prevent collisions
+// with built-in tools or other plugins.
 type MCPStorePlugin interface {
 	Plugin
 	RegisterStoreMCPTools(server any, client StoreAPIClient)

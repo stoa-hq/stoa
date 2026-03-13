@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_payment_transactions_provider_reference;
