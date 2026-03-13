@@ -95,8 +95,20 @@ Both SPAs: SPA mode (`ssr = false`), adapter-static, Vite proxy `/api` → `:808
 
 ## Plugin System
 
-Plugins implement `sdk.Plugin`, receive `AppContext` (DB pool, chi sub-router, hook registry, auth helper).
+Plugins implement `sdk.Plugin`, receive `AppContext` (DB pool, chi sub-router, asset router, hook registry, auth helper).
 Hooks: `entity.before_action` / `entity.after_action` — before-hooks can abort operations.
+
+### Plugin UI Extensions
+
+Plugins can extend Admin Panel and Storefront UI by implementing `sdk.UIPlugin`:
+- **Schema-based**: Declarative forms (text, password, toggle, select, number, textarea) — rendered from JSON descriptors
+- **Web Components**: Complex UIs loaded from plugin-embedded assets into closed Shadow DOM with SRI verification
+- Manifest API: `GET /api/v1/store/plugin-manifest` (storefront slots) and `GET /api/v1/admin/plugin-manifest` (admin slots)
+- Frontend: `<PluginSlot slot="..." />` component renders extensions at predefined slots
+- Slots: `storefront:checkout:payment`, `admin:payment:settings`, `admin:sidebar`, `admin:dashboard:widget`
+- Tag names must use `stoa-{pluginName}-` prefix; URLs must not contain path traversal
+- Dynamic CSP: plugin `ExternalScripts` are added to Content-Security-Policy headers
+- Key files: `pkg/sdk/ui.go` (types + validation), `internal/plugin/manifest_handler.go` (API), `{admin,storefront}/src/lib/components/PluginSlot.svelte`
 
 ### Plugin Security Rules
 
@@ -109,6 +121,11 @@ Hooks: `entity.before_action` / `entity.after_action` — before-hooks can abort
 - **Webhook idempotency**: Use `ON CONFLICT DO NOTHING` on `provider_reference` to handle duplicate deliveries.
 - **Webhook goroutines**: Use `context.Background()` with timeout — not `r.Context()` which is canceled after handler returns.
 - **Panic recovery**: Plugin MCP registration is wrapped in `recover()` — a buggy plugin won't crash the server.
+- **UI tag name prefix**: Web Component tag names must start with `stoa-{pluginName}-`.
+- **UI URL validation**: Schema/component URLs must not contain `..` or absolute URLs (`http://`, `https://`).
+- **Shadow DOM isolation**: Web Components render in `mode: 'closed'` shadow roots.
+- **SRI verification**: Plugin scripts are loaded with `integrity` attribute for browser-side verification.
+- **Scoped plugin API client**: Frontend plugin client only allows `/api/v1/store/*`, `/api/v1/admin/*`, and `/plugins/*` paths.
 
 ## Skills
 

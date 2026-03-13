@@ -17,9 +17,22 @@ import (
 //go:embed all:build
 var Files embed.FS
 
+// defaultCSP is the Content-Security-Policy applied when no plugins add external scripts.
+const defaultCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+
+// HandlerWithCSP returns an http.Handler like Handler() but with a custom CSP
+// header, allowing plugins to whitelist external scripts.
+func HandlerWithCSP(csp string) http.Handler {
+	return handlerWithCSP(csp)
+}
+
 // Handler returns an http.Handler that serves the embedded admin SPA.
 // Mount it at /admin and /admin/* in the router.
 func Handler() http.Handler {
+	return handlerWithCSP(defaultCSP)
+}
+
+func handlerWithCSP(csp string) http.Handler {
 	sub, err := fs.Sub(Files, "build")
 	if err != nil {
 		panic("admin: build directory missing – run `make admin-build`")
@@ -44,12 +57,7 @@ func Handler() http.Handler {
 
 		// Empty path or explicit "index.html" → serve SPA shell directly.
 		if rel == "" || rel == "index.html" {
-			// SvelteKit needs inline scripts; relax CSP for the admin SPA.
-			w.Header().Set("Content-Security-Policy",
-				"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusOK)
-			w.Write(indexHTML) //nolint:errcheck
+			serveIndex(w, indexHTML, csp)
 			return
 		}
 
@@ -66,12 +74,15 @@ func Handler() http.Handler {
 		}
 
 		// Unknown path → SPA client-side routing handles it.
-		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write(indexHTML) //nolint:errcheck
+		serveIndex(w, indexHTML, csp)
 	})
+}
+
+func serveIndex(w http.ResponseWriter, html []byte, csp string) {
+	w.Header().Set("Content-Security-Policy", csp)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write(html) //nolint:errcheck
 }
 
 // withPath returns a shallow copy of r with URL.Path replaced by p.

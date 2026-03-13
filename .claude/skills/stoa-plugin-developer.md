@@ -25,12 +25,13 @@ type Plugin interface {
 }
 
 type AppContext struct {
-    DB     *pgxpool.Pool          // PostgreSQL connection pool (pgx v5)
-    Router chi.Router             // chi/v5 router for custom endpoints
-    Hooks  *HookRegistry          // Event system
-    Config map[string]interface{} // Plugin-specific config
-    Logger zerolog.Logger         // Structured logger (zerolog)
-    Auth   *AuthHelper            // Auth middleware + context helpers
+    DB          *pgxpool.Pool          // PostgreSQL connection pool (pgx v5)
+    Router      chi.Router             // chi/v5 router for custom endpoints
+    AssetRouter chi.Router             // Mounted at /plugins/{name}/assets/
+    Hooks       *HookRegistry          // Event system
+    Config      map[string]interface{} // Plugin-specific config
+    Logger      zerolog.Logger         // Structured logger (zerolog)
+    Auth        *AuthHelper            // Auth middleware + context helpers
 }
 
 type AuthHelper struct {
@@ -487,6 +488,99 @@ go func() {
 w.WriteHeader(http.StatusNoContent)
 ```
 
+## UI Extensions (Optional)
+
+Plugins can extend Admin Panel and Storefront UI by implementing `sdk.UIPlugin`:
+
+```go
+type UIPlugin interface {
+    Plugin
+    UIExtensions() []UIExtension
+}
+```
+
+### Schema-based Form (simple settings)
+
+```go
+func (p *Plugin) UIExtensions() []sdk.UIExtension {
+    return []sdk.UIExtension{
+        {
+            ID:   "myplugin_settings",
+            Slot: "admin:payment:settings",
+            Type: "schema",
+            Schema: &sdk.UISchema{
+                Fields: []sdk.UISchemaField{
+                    {Key: "api_key", Type: "password", Label: map[string]string{"en": "API Key", "de": "API-Schlüssel"}},
+                    {Key: "mode", Type: "select", Label: map[string]string{"en": "Mode"},
+                        Options: []sdk.UISelectOption{
+                            {Value: "test", Label: map[string]string{"en": "Test"}},
+                            {Value: "live", Label: map[string]string{"en": "Live"}},
+                        },
+                    },
+                },
+                SubmitURL: "/api/v1/admin/plugins/myplugin/settings",
+                LoadURL:   "/api/v1/admin/plugins/myplugin/settings",
+            },
+        },
+    }
+}
+```
+
+Field types: `text`, `password`, `toggle`, `select`, `number`, `textarea`.
+Labels support i18n via `map[string]string` (locale → text).
+
+### Web Component (complex UI)
+
+```go
+{
+    ID:   "myplugin_checkout",
+    Slot: "storefront:checkout:payment",
+    Type: "component",
+    Component: &sdk.UIComponent{
+        TagName:         "stoa-myplugin-checkout",  // MUST start with stoa-{pluginName}-
+        ScriptURL:       "/plugins/myplugin/assets/checkout.js",
+        Integrity:       "sha256-...",
+        ExternalScripts: []string{"https://js.example.com/v3/"},
+    },
+}
+```
+
+Web components receive `context` (slot-specific data) and `apiClient` (scoped HTTP client) as properties.
+Dispatch `plugin-event` CustomEvents to communicate with the host page.
+
+### Serving Embedded Assets
+
+```go
+//go:embed frontend/dist
+var assetsFS embed.FS
+
+func (p *Plugin) Init(app *sdk.AppContext) error {
+    sub, _ := fs.Sub(assetsFS, "frontend/dist")
+    app.AssetRouter.Handle("/*", http.StripPrefix(
+        "/plugins/"+p.Name()+"/assets",
+        http.FileServerFS(sub),
+    ))
+    return nil
+}
+```
+
+### Available Slots
+
+| Slot | Location | SPA |
+|------|----------|-----|
+| `storefront:checkout:payment` | After payment selection | Storefront |
+| `storefront:checkout:after_order` | After order confirmation | Storefront |
+| `admin:payment:settings` | Payment method detail page | Admin |
+| `admin:sidebar` | Sidebar navigation | Admin |
+| `admin:dashboard:widget` | Dashboard widgets | Admin |
+
+### UI Extension Validation Rules
+
+- Slot must start with `storefront:` or `admin:`
+- Tag names must use `stoa-{pluginName}-` prefix
+- URLs must not contain `..` (path traversal) or absolute URLs
+- Invalid extensions are skipped with a warning at startup
+
 ## Checklist for New Plugins
 
 1. Implement all 5 methods of `sdk.Plugin`
@@ -502,3 +596,6 @@ w.WriteHeader(http.StatusNoContent)
 11. MCP tool names: prefix `store_{pluginName}_*`
 12. MCP errors: sanitize — never expose internal details
 13. Webhooks: verify signatures, use background context, implement idempotency
+14. UI extensions: implement `UIPlugin` if the plugin needs frontend UI
+15. Web Component tag names: `stoa-{pluginName}-*` prefix required
+16. Asset serving: use `app.AssetRouter` for embedded frontend files

@@ -38,6 +38,7 @@ GET|DELETE      /api/v1/admin/media/{id}
 POST            /api/v1/admin/api-keys
 GET             /api/v1/admin/api-keys
 DELETE          /api/v1/admin/api-keys/{id}
+GET             /api/v1/admin/plugin-manifest
 
 # Store (OptionalAuth)
 GET             /api/v1/store/products
@@ -57,8 +58,12 @@ GET             /api/v1/store/shipping-methods/{id}
 GET             /api/v1/store/payment-methods
 GET             /api/v1/store/payment-methods/{id}
 GET             /api/v1/store/search?q=
+GET             /api/v1/store/plugin-manifest
 
-# SPAs
+# Plugin Assets
+/plugins/{name}/assets/*  → Per-plugin embedded static files
+
+# SPAs (with dynamic CSP from plugin ExternalScripts)
 /admin    → Admin SPA (internal/admin/build/, embed.FS)
 /admin/*  → Admin SPA catch-all
 /         → Storefront SPA (internal/storefront/build/, embed.FS)
