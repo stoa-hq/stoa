@@ -22,3 +22,4 @@ CLAUDE.local.md
 go.plugins.mod
 go.plugins.sum
 cmd/stoa/plugins_generated.go
+cmd/stoa-store-mcp/plugins_generated.go

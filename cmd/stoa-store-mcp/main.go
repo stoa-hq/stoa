@@ -12,7 +12,22 @@ import (
 
 	stoamcp "github.com/stoa-hq/stoa/internal/mcp"
 	"github.com/stoa-hq/stoa/internal/mcp/store"
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
+
+// safeRegisterPluginTools wraps plugin MCP tool registration in a recover
+// to prevent a panicking plugin from crashing the server. It passes a
+// ScopedMCPServer that enforces tool name prefixes (store_{pluginName}_*).
+func safeRegisterPluginTools(mp sdk.MCPStorePlugin, s *server.MCPServer, client sdk.StoreAPIClient) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	scoped := stoamcp.NewScopedMCPServer(s, mp.Name())
+	mp.RegisterStoreMCPTools(scoped, client)
+	return nil
+}
 
 func main() {
 	cfg := stoamcp.LoadConfig()
@@ -37,6 +52,20 @@ Prices are in cents (e.g. 1999 = 19.99 EUR). Tax rates are in basis points (1900
 	)
 
 	store.RegisterTools(s, client)
+
+	// Let installed plugins register their own Store MCP tools.
+	// Plugins receive a store-scoped client (restricted to /api/v1/store/* paths)
+	// and a scoped MCP server (enforcing tool name prefixes).
+	scopedClient := stoamcp.NewStoreScopedClient(client)
+	for _, p := range sdk.RegisteredPlugins() {
+		if mp, ok := p.(sdk.MCPStorePlugin); ok {
+			if err := safeRegisterPluginTools(mp, s, scopedClient); err != nil {
+				log.Printf("WARNING: plugin %s failed to register MCP tools: %v", p.Name(), err)
+				continue
+			}
+			log.Printf("registered store MCP tools from plugin: %s", p.Name())
+		}
+	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	sseServer := server.NewSSEServer(s,
