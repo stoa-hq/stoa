@@ -81,6 +81,12 @@ func New(cfg *config.Config) (*App, error) {
 		Router: srv.Router(),
 		Config: cfg.Plugins,
 		Logger: logger,
+		Auth: &sdk.AuthHelper{
+			OptionalAuth: authMiddleware.OptionalAuth,
+			Required:     authMiddleware.Authenticate,
+			UserID:       auth.UserID,
+			UserType:     auth.UserType,
+		},
 	}
 	for _, p := range sdk.RegisteredPlugins() {
 		if err := pluginRegistry.Register(p, pluginAppCtx); err != nil {

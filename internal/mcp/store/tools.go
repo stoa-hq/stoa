@@ -59,4 +59,5 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 
 	t, _ = listOrdersTool()
 	s.AddTool(t, listOrdersHandler(client))
+
 }
