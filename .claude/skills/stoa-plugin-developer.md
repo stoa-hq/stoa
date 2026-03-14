@@ -212,9 +212,11 @@ type Order struct {
     ID, OrderNumber, CustomerID, Status, Currency,
     SubtotalNet, SubtotalGross, ShippingCost, TaxTotal, Total,
     BillingAddress, ShippingAddress, PaymentMethodID, ShippingMethodID,
-    Notes, CustomFields, Items, StatusHistory
+    Notes, GuestToken, CustomFields, Items, StatusHistory
 }
 ```
+
+`GuestToken` is a UUID string set for guest (unauthenticated) orders. It is `""` for authenticated customer orders.
 
 **Cart / CartItem** (`internal/domain/cart/entity.go`):
 ```go
@@ -353,8 +355,37 @@ r.Use(app.Auth.OptionalAuth) // Extracts auth if present, never blocks
 ### Security Rules for Store-Facing Endpoints
 
 1. **Always apply auth middleware** — the plugin router does NOT inherit `/api/v1/store/*` middleware
-2. **Always verify ownership** — filter DB queries by `customer_id = authenticated user` to prevent IDOR
+2. **Always verify ownership** — filter DB queries by `customer_id` for authenticated users, or by `guest_token` for guest orders (see Guest Checkout below)
 3. **Never leak internal errors** — return generic error messages to API consumers
+
+### Guest Checkout Ownership
+
+For endpoints that support guest users (e.g. payment), use `OptionalAuth` and verify ownership with either `customer_id` or `guest_token`:
+
+```go
+r.Use(app.Auth.OptionalAuth) // NOT Required — guests have no token
+
+func (p *Plugin) handleAction(w http.ResponseWriter, r *http.Request) {
+    userID := p.auth.UserID(r.Context())
+    var query string
+    var args []interface{}
+
+    if userID != uuid.Nil {
+        // Authenticated customer
+        query = `SELECT ... FROM orders WHERE id = $1 AND customer_id = $2`
+        args = []interface{}{orderID, userID}
+    } else {
+        // Guest — require guest_token
+        if req.GuestToken == "" {
+            writeError(w, http.StatusUnauthorized, "authentication or guest token required")
+            return
+        }
+        query = `SELECT ... FROM orders WHERE id = $1 AND guest_token = $2 AND customer_id IS NULL`
+        args = []interface{}{orderID, req.GuestToken}
+    }
+    // ...
+}
+```
 
 ## Plugin Registration
 
@@ -540,7 +571,7 @@ Labels support i18n via `map[string]string` (locale → text).
         TagName:         "stoa-myplugin-checkout",  // MUST start with stoa-{pluginName}-
         ScriptURL:       "/plugins/myplugin/assets/checkout.js",
         Integrity:       "sha256-...",
-        ExternalScripts: []string{"https://js.example.com/v3/"},
+        ExternalScripts: []string{"https://js.example.com/v3/", "https://api.example.com"},
     },
 }
 ```
@@ -548,7 +579,15 @@ Labels support i18n via `map[string]string` (locale → text).
 Web components receive `context` (slot-specific data) and `apiClient` (scoped HTTP client) as properties.
 Dispatch `plugin-event` CustomEvents to communicate with the host page.
 
+**Rendering: Light DOM with scoped CSS.** Web components render in **Light DOM** (no Shadow DOM). Third-party services like Stripe require direct DOM access for iframes and cannot work inside Shadow DOM. Use scoped CSS class prefixes (e.g. `.stoa-myplugin-`) to avoid style collisions.
+
+**ExternalScripts** are added to the Content-Security-Policy `script-src`, `frame-src`, AND `connect-src` directives. Include all external domains your component needs (e.g. both `js.stripe.com` and `api.stripe.com` for Stripe).
+
+**apiClient** already unwraps the API response envelope — `await this.apiClient.post(...)` returns `{ client_secret, ... }` directly, NOT `{ data: { client_secret } }`.
+
 ### Serving Embedded Assets
+
+The core mounts `app.AssetRouter` at `/plugins/{name}/assets/` with path stripping already applied. Plugins just serve the filesystem directly:
 
 ```go
 //go:embed frontend/dist
@@ -556,10 +595,7 @@ var assetsFS embed.FS
 
 func (p *Plugin) Init(app *sdk.AppContext) error {
     sub, _ := fs.Sub(assetsFS, "frontend/dist")
-    app.AssetRouter.Handle("/*", http.StripPrefix(
-        "/plugins/"+p.Name()+"/assets",
-        http.FileServerFS(sub),
-    ))
+    app.AssetRouter.Handle("/*", http.FileServerFS(sub))
     return nil
 }
 ```
@@ -588,7 +624,7 @@ func (p *Plugin) Init(app *sdk.AppContext) error {
 3. Use SDK hook constants, not strings
 4. Before-hooks: return errors to cancel; after-hooks: log errors, don't fail
 5. **Apply `app.Auth.Required` or `app.Auth.OptionalAuth`** to store-facing routes
-6. **Verify ownership** — always filter by `customer_id` in store-facing DB queries
+6. **Verify ownership** — filter by `customer_id` (authenticated) or `guest_token` (guest) in store-facing DB queries
 7. Custom routes: use `app.Router.Route("/api/v1/store/<name>", ...)`
 8. DB tables: use `CREATE TABLE IF NOT EXISTS` in Init
 9. Cleanup: close connections/goroutines in `Shutdown()`

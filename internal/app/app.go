@@ -77,10 +77,11 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Auto-register plugins that called sdk.Register() in their init().
 	for _, p := range sdk.RegisteredPlugins() {
-		// Create a per-plugin asset router mounted at /plugins/{name}/assets/
+		// Create a per-plugin asset router at /plugins/{name}/assets/*
+		// Use StripPrefix so http.FileServer sees paths relative to the FS root.
 		assetPrefix := "/plugins/" + p.Name() + "/assets"
 		assetRouter := chi.NewRouter()
-		srv.Router().Mount(assetPrefix, assetRouter)
+		srv.Router().Handle(assetPrefix+"/*", http.StripPrefix(assetPrefix, assetRouter))
 
 		pluginAppCtx := &plugin.AppContext{
 			DB:          db.Pool,
@@ -405,8 +406,12 @@ func (a *storageAdapter) URL(storagePath string) string {
 }
 
 // buildCSP constructs a CSP string that includes plugin external script sources.
+// Domains from ExternalScripts are also added to frame-src and connect-src
+// because payment providers like Stripe embed iframes and make API calls.
 func buildCSP(extensions []sdk.UIExtension) string {
 	scriptSources := "'self' 'unsafe-inline'"
+	frameSources := "'self'"
+	connectSources := "'self'"
 	seen := make(map[string]bool)
 	for _, ext := range extensions {
 		if ext.Component == nil {
@@ -416,10 +421,15 @@ func buildCSP(extensions []sdk.UIExtension) string {
 			if !seen[src] {
 				seen[src] = true
 				scriptSources += " " + src
+				frameSources += " " + src
+				connectSources += " " + src
 			}
 		}
 	}
-	return "default-src 'self'; script-src " + scriptSources + "; style-src 'self' 'unsafe-inline'"
+	return "default-src 'self'; script-src " + scriptSources +
+		"; frame-src " + frameSources +
+		"; connect-src " + connectSources +
+		"; style-src 'self' 'unsafe-inline'"
 }
 
 func (a *App) migratePaymentEncryption(cfg *config.Config) error {

@@ -91,7 +91,7 @@ Both SPAs: SPA mode (`ssr = false`), adapter-static, Vite proxy `/api` → `:808
 
 - Config via Viper: `config.yaml` → ENV (`STOA_` prefix). Defaults in `internal/config/config.go`
 - PostgreSQL 16+, pgxpool, golang-migrate, extensions: `uuid-ossp`, `pg_trgm`
-- Single migration: `migrations/000001_init.up.sql` (~300 lines SQL)
+- Migrations: `migrations/000001_init.up.sql` (~300 lines SQL) + incremental migrations (cart upsert, shipping tax, payment tx unique, guest token)
 
 ## Plugin System
 
@@ -102,18 +102,18 @@ Hooks: `entity.before_action` / `entity.after_action` — before-hooks can abort
 
 Plugins can extend Admin Panel and Storefront UI by implementing `sdk.UIPlugin`:
 - **Schema-based**: Declarative forms (text, password, toggle, select, number, textarea) — rendered from JSON descriptors
-- **Web Components**: Complex UIs loaded from plugin-embedded assets into closed Shadow DOM with SRI verification
+- **Web Components**: Complex UIs loaded from plugin-embedded assets into Light DOM with scoped CSS and SRI verification
 - Manifest API: `GET /api/v1/store/plugin-manifest` (storefront slots) and `GET /api/v1/admin/plugin-manifest` (admin slots)
 - Frontend: `<PluginSlot slot="..." />` component renders extensions at predefined slots
 - Slots: `storefront:checkout:payment`, `admin:payment:settings`, `admin:sidebar`, `admin:dashboard:widget`
 - Tag names must use `stoa-{pluginName}-` prefix; URLs must not contain path traversal
-- Dynamic CSP: plugin `ExternalScripts` are added to Content-Security-Policy headers
+- Dynamic CSP: plugin `ExternalScripts` are added to `script-src`, `frame-src`, and `connect-src` in Content-Security-Policy headers
 - Key files: `pkg/sdk/ui.go` (types + validation), `internal/plugin/manifest_handler.go` (API), `{admin,storefront}/src/lib/components/PluginSlot.svelte`
 
 ### Plugin Security Rules
 
 - **Auth on store routes**: Plugin router is the ROOT Chi router — it does NOT inherit `/api/v1/store/*` middleware. Always apply `app.Auth.Required` or `app.Auth.OptionalAuth` explicitly.
-- **Ownership checks**: Store-facing endpoints must verify `customer_id` matches the authenticated user (IDOR prevention).
+- **Ownership checks**: Store-facing endpoints must verify `customer_id` matches the authenticated user (IDOR prevention). For guest checkout, verify ownership via `guest_token` (stored in orders table).
 - **MCP tool names**: Must use prefix `store_{pluginName}_*` — enforced by `ScopedMCPServer` in `internal/mcp/scoped.go`.
 - **MCP client paths**: `StoreAPIClient` is restricted to `/api/v1/store/*` — enforced by `StoreScopedClient` in `internal/mcp/store_client.go`.
 - **MCP type assertion**: Plugins must use interface assertion `srv.(toolAdder)` — not `srv.(*server.MCPServer)`.
@@ -123,7 +123,7 @@ Plugins can extend Admin Panel and Storefront UI by implementing `sdk.UIPlugin`:
 - **Panic recovery**: Plugin MCP registration is wrapped in `recover()` — a buggy plugin won't crash the server.
 - **UI tag name prefix**: Web Component tag names must start with `stoa-{pluginName}-`.
 - **UI URL validation**: Schema/component URLs must not contain `..` or absolute URLs (`http://`, `https://`).
-- **Shadow DOM isolation**: Web Components render in `mode: 'closed'` shadow roots.
+- **Light DOM with scoped CSS**: Web Components render in Light DOM (required by Stripe Payment Element). CSS is scoped via class prefix `.stoa-{pluginName}-{component}`.
 - **SRI verification**: Plugin scripts are loaded with `integrity` attribute for browser-side verification.
 - **Scoped plugin API client**: Frontend plugin client only allows `/api/v1/store/*`, `/api/v1/admin/*`, and `/plugins/*` paths.
 

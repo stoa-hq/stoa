@@ -456,14 +456,14 @@ Never expose internal errors to API consumers. Log the full error with `logger.E
 
 1. **SQL injection**: always parameterized queries, allowlisted sort columns
 2. **Auth on store routes**: `/api/v1/store/*` uses `OptionalAuth`; `/api/v1/admin/*` uses `Authenticate` + `RequireRole`
-3. **IDOR prevention**: store endpoints filter by `customer_id` from auth context
+3. **IDOR prevention**: store endpoints filter by `customer_id` from auth context, or by `guest_token` for guest orders
 4. **Error sanitization**: never leak DB errors, internal paths, or stack traces to API consumers
 5. **Body size limits**: use `io.LimitReader` for user-submitted bodies
 6. **CSRF**: Double Submit Cookie — exempt for Bearer/ApiKey auth
 7. **Webhook handlers**: verify signatures, use background context for goroutines, implement idempotency
 8. **Plugin isolation**: ScopedMCPServer (tool prefix), StoreScopedClient (path restriction), panic recovery
 9. **Context propagation**: always pass `ctx` through layers; use `context.Background()` with timeout for detached goroutines
-10. **Plugin UI extensions**: Tag name prefix `stoa-{pluginName}-`, URL path traversal prevention, closed Shadow DOM, SRI verification, scoped plugin API client, dynamic CSP
+10. **Plugin UI extensions**: Tag name prefix `stoa-{pluginName}-`, URL path traversal prevention, Light DOM with scoped CSS (no Shadow DOM — third-party services like Stripe need direct DOM access), SRI verification, scoped plugin API client, dynamic CSP (`script-src`, `frame-src`, `connect-src` from plugin `ExternalScripts`)
 
 ## Adding a New Domain
 

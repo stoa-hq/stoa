@@ -45,6 +45,7 @@ type Order struct {
 	PaymentMethodID *uuid.UUID             `json:"payment_method_id,omitempty"`
 	ShippingMethodID *uuid.UUID            `json:"shipping_method_id,omitempty"`
 	Notes           string                 `json:"notes,omitempty"`
+	GuestToken      string                 `json:"-"`
 	CustomFields    map[string]interface{} `json:"custom_fields,omitempty"`
 	CreatedAt       time.Time              `json:"created_at"`
 	UpdatedAt       time.Time              `json:"updated_at"`

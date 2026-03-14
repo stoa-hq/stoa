@@ -212,6 +212,12 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 
 	o := FromCheckoutRequest(&req, customerID)
 
+	// Generate a guest token for unauthenticated orders so that the
+	// browser session can prove ownership without a JWT.
+	if customerID == nil {
+		o.GuestToken = uuid.New().String()
+	}
+
 	// Look up the shipping method price and apply it to the order.
 	if req.ShippingMethodID != nil && h.shippingCostFn != nil {
 		if cost, err := h.shippingCostFn(r.Context(), *req.ShippingMethodID); err == nil {
