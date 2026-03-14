@@ -12,6 +12,7 @@ import (
 )
 
 // KnownPlugins maps short names to their full Go import paths.
+// Keep in sync with scripts/docker-plugins.sh resolve_plugin().
 var KnownPlugins = map[string]string{
 	"n8n":    "github.com/stoa-hq/stoa-plugins/n8n",
 	"stripe": "github.com/stoa-hq/stoa-plugins/stripe",

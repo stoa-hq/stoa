@@ -31,6 +31,10 @@ COPY . .
 COPY --from=frontend /build/internal/admin/build ./internal/admin/build
 COPY --from=frontend /build/internal/storefront/build ./internal/storefront/build
 
+# Install plugins if requested (e.g., PLUGINS=stripe,n8n)
+ARG PLUGINS=""
+RUN sh scripts/docker-plugins.sh "$PLUGINS"
+
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o stoa ./cmd/stoa
 
 FROM alpine:3.20

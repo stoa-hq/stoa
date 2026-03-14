@@ -1,0 +1,14 @@
+go.plugins.mod
+go.plugins.sum
+cmd/stoa/plugins_generated.go
+cmd/stoa-store-mcp/plugins_generated.go
+bin/
+node_modules/
+admin/.svelte-kit/
+storefront/.svelte-kit/
+coverage.out
+coverage.html
+uploads/
+.env
+*.env
+.git/
