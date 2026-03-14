@@ -21,6 +21,7 @@
 	let awaitingPayment = $state(false);
 	let orderId = $state('');
 	let orderNumber = $state('');
+	let guestToken = $state('');
 
 	const hasPaymentPlugin = $derived(
 		($pluginStore.extensions ?? []).some((e) => e.slot === 'storefront:checkout:payment')
@@ -175,6 +176,7 @@
 				// A payment plugin handles the payment flow — show its UI.
 				orderId = res.data.id;
 				orderNumber = res.data.order_number ?? '';
+				guestToken = res.data.guest_token ?? '';
 				awaitingPayment = true;
 			} else {
 				cartStore.clear();
@@ -323,7 +325,7 @@
 				{#if awaitingPayment}
 					<PluginSlot
 						slot="storefront:checkout:payment"
-						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR' }}
+						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR', guestToken }}
 						onEvent={handlePluginEvent}
 					/>
 				{/if}

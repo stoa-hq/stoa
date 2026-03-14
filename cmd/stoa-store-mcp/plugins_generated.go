@@ -3,4 +3,5 @@ package main
 
 import (
 	_ "github.com/stoa-hq/stoa-plugins/n8n"
+	_ "github.com/stoa-hq/stoa-plugins/stripe"
 )

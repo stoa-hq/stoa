@@ -226,23 +226,29 @@ func (r *PostgresRepository) Create(ctx context.Context, o *Order) error {
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
-			notes, custom_fields,
+			notes, guest_token, custom_fields,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9, $10,
 			$11, $12,
 			$13, $14,
-			$15, $16,
-			$17, $18
+			$15, $16, $17,
+			$18, $19
 		)`
+
+	// Store guest_token as NULL when empty.
+	var guestTokenVal *string
+	if o.GuestToken != "" {
+		guestTokenVal = &o.GuestToken
+	}
 
 	_, err = tx.Exec(ctx, insertOrder,
 		o.ID, o.OrderNumber, o.CustomerID, o.Status, o.Currency,
 		o.SubtotalNet, o.SubtotalGross, o.ShippingCost, o.TaxTotal, o.Total,
 		billingRaw, shippingRaw,
 		o.PaymentMethodID, o.ShippingMethodID,
-		o.Notes, customFieldsRaw,
+		o.Notes, guestTokenVal, customFieldsRaw,
 		o.CreatedAt, o.UpdatedAt,
 	)
 	if err != nil {

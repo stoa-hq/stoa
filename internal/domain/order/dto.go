@@ -75,6 +75,7 @@ type OrderResponse struct {
 	ID               uuid.UUID                    `json:"id"`
 	OrderNumber      string                       `json:"order_number"`
 	CustomerID       *uuid.UUID                   `json:"customer_id,omitempty"`
+	GuestToken       string                       `json:"guest_token,omitempty"`
 	Status           string                       `json:"status"`
 	Currency         string                       `json:"currency"`
 	SubtotalNet      int                          `json:"subtotal_net"`
@@ -104,6 +105,7 @@ func ToResponse(o *Order) OrderResponse {
 		ID:               o.ID,
 		OrderNumber:      o.OrderNumber,
 		CustomerID:       o.CustomerID,
+		GuestToken:       o.GuestToken,
 		Status:           o.Status,
 		Currency:         o.Currency,
 		SubtotalNet:      o.SubtotalNet,

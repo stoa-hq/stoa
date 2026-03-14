@@ -12,7 +12,7 @@
 	let { component, context = {}, onEvent }: Props = $props();
 
 	let containerEl: HTMLDivElement;
-	let shadowRoot: ShadowRoot;
+	let pluginEl: Element | null = null;
 
 	const client = createPluginClient();
 
@@ -23,14 +23,12 @@
 	}
 
 	onMount(async () => {
-		shadowRoot = containerEl.attachShadow({ mode: 'closed' });
-
 		// Load optional stylesheet
 		if (component.style_url) {
 			const link = document.createElement('link');
 			link.rel = 'stylesheet';
 			link.href = component.style_url;
-			shadowRoot.appendChild(link);
+			containerEl.appendChild(link);
 		}
 
 		// Load script with SRI verification
@@ -47,20 +45,19 @@
 			document.head.appendChild(script);
 		});
 
-		// Create web component instance
+		// Create web component instance — the component itself provides
+		// Shadow DOM isolation, so no outer shadow root is needed.
 		const el = document.createElement(component.tag_name);
 		(el as any).context = context;
 		(el as any).apiClient = client;
 		el.addEventListener('plugin-event', handlePluginEvent);
-		shadowRoot.appendChild(el);
+		containerEl.appendChild(el);
+		pluginEl = el;
 	});
 
 	onDestroy(() => {
-		if (shadowRoot) {
-			const el = shadowRoot.querySelector(component.tag_name);
-			if (el) {
-				el.removeEventListener('plugin-event', handlePluginEvent);
-			}
+		if (pluginEl) {
+			pluginEl.removeEventListener('plugin-event', handlePluginEvent);
 		}
 	});
 </script>

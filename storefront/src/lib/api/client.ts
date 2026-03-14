@@ -55,16 +55,56 @@ export function clearTokens() {
 	localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+// ── Token refresh ────────────────────────────────────────────────────────────
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+	const refreshToken = getRefreshToken();
+	if (!refreshToken) return false;
+
+	// Deduplicate concurrent refresh attempts.
+	if (refreshPromise) return refreshPromise;
+
+	refreshPromise = (async () => {
+		try {
+			const res = await fetch(`${API_BASE}/auth/refresh`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'same-origin',
+				body: JSON.stringify({ refresh_token: refreshToken })
+			});
+			if (!res.ok) {
+				clearTokens();
+				return false;
+			}
+			const data = await res.json();
+			if (data.data?.access_token && data.data?.refresh_token) {
+				setTokens(data.data.access_token, data.data.refresh_token);
+				return true;
+			}
+			clearTokens();
+			return false;
+		} catch {
+			return false;
+		} finally {
+			refreshPromise = null;
+		}
+	})();
+
+	return refreshPromise;
+}
+
 // ── Core request ─────────────────────────────────────────────────────────────
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-export async function request<T>(
+async function doFetch<T>(
 	method: string,
 	path: string,
 	body?: unknown,
 	opts: { auth?: boolean; formData?: FormData } = {}
-): Promise<ApiResponse<T>> {
+): Promise<Response> {
 	const headers: Record<string, string> = {};
 
 	const accessToken = getAccessToken();
@@ -79,12 +119,29 @@ export async function request<T>(
 		headers['Content-Type'] = 'application/json';
 	}
 
-	const res = await fetch(`${API_BASE}${path}`, {
+	return fetch(`${API_BASE}${path}`, {
 		method,
 		headers,
 		credentials: 'same-origin',
 		body: opts.formData ?? (body !== undefined ? JSON.stringify(body) : undefined)
 	});
+}
+
+export async function request<T>(
+	method: string,
+	path: string,
+	body?: unknown,
+	opts: { auth?: boolean; formData?: FormData } = {}
+): Promise<ApiResponse<T>> {
+	let res = await doFetch<T>(method, path, body, opts);
+
+	// On 401 with a refresh token available, try to refresh and retry once.
+	if (res.status === 401 && getRefreshToken()) {
+		const refreshed = await tryRefreshToken();
+		if (refreshed) {
+			res = await doFetch<T>(method, path, body, opts);
+		}
+	}
 
 	if (!res.ok && res.status !== 404) {
 		const data = await res.json().catch(() => ({}));
