@@ -10,10 +10,21 @@
 	import { fmt } from '$lib/i18n/formatters';
 	import PluginSlot from '$lib/components/PluginSlot.svelte';
 
+	import { pluginStore } from '$lib/stores/plugins';
+
 	let step = $state<'address' | 'shipping' | 'confirm'>('address');
 	let loading = $state(true);
 	let submitting = $state(false);
 	let error = $state('');
+
+	// Stripe / plugin payment flow state
+	let awaitingPayment = $state(false);
+	let orderId = $state('');
+	let orderNumber = $state('');
+
+	const hasPaymentPlugin = $derived(
+		($pluginStore.extensions ?? []).some((e) => e.slot === 'storefront:checkout:payment')
+	);
 
 	let shippingMethods = $state<ShippingMethod[]>([]);
 	let paymentMethods = $state<PaymentMethod[]>([]);
@@ -160,12 +171,29 @@
 				}))
 			});
 
-			cartStore.clear();
-			goto(`/checkout/success?order=${res.data?.order_number ?? ''}`);
+			if (hasPaymentPlugin && res.data?.id) {
+				// A payment plugin handles the payment flow — show its UI.
+				orderId = res.data.id;
+				orderNumber = res.data.order_number ?? '';
+				awaitingPayment = true;
+			} else {
+				cartStore.clear();
+				goto(`/checkout/success?order=${res.data?.order_number ?? ''}`);
+			}
 		} catch (e: unknown) {
 			error = (e as Error).message ?? $t('checkout.orderError');
 		} finally {
 			submitting = false;
+		}
+	}
+
+	function handlePluginEvent(e: CustomEvent) {
+		const detail = e.detail;
+		if (detail?.type === 'payment-success') {
+			cartStore.clear();
+			goto(`/checkout/success?order=${orderNumber}`);
+		} else if (detail?.type === 'payment-error') {
+			error = detail.message ?? $t('checkout.orderError');
 		}
 	}
 </script>
@@ -291,11 +319,14 @@
 					</div>
 				{/if}
 
-				<!-- Plugin UI extensions for payment -->
-				<PluginSlot
-					slot="storefront:checkout:payment"
-					context={{ paymentMethodId: selectedPayment, amount: total, currency: 'EUR' }}
-				/>
+				<!-- Plugin payment (shown after order creation) -->
+				{#if awaitingPayment}
+					<PluginSlot
+						slot="storefront:checkout:payment"
+						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR' }}
+						onEvent={handlePluginEvent}
+					/>
+				{/if}
 			</div>
 
 			<!-- Order summary -->
@@ -328,7 +359,7 @@
 
 					<button
 						onclick={placeOrder}
-						disabled={submitting || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip
+						disabled={submitting || awaitingPayment || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip
 							|| (!sameAsShipping && (!billingForm.first_name || !billingForm.last_name || !billingForm.street || !billingForm.city || !billingForm.zip))}
 						class="btn btn-primary btn-lg w-full mt-4"
 					>
