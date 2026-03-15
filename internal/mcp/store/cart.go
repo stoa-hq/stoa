@@ -51,9 +51,10 @@ func getCartHandler(client *stoamcp.StoaClient) server.ToolHandlerFunc {
 
 func addToCartTool() (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("store_add_to_cart",
-		mcp.WithDescription("Add a product variant to the shopping cart"),
+		mcp.WithDescription("Add a product to the shopping cart. Use product_id (required). For products with variants, also provide variant_id."),
 		mcp.WithString("cart_id", mcp.Description("Cart UUID"), mcp.Required()),
-		mcp.WithString("variant_id", mcp.Description("Product variant UUID to add"), mcp.Required()),
+		mcp.WithString("product_id", mcp.Description("Product UUID to add"), mcp.Required()),
+		mcp.WithString("variant_id", mcp.Description("Variant UUID (required for products with variants, omit for simple products)")),
 		mcp.WithNumber("quantity", mcp.Description("Quantity to add (default: 1)")),
 	)
 	return tool, nil
@@ -66,8 +67,16 @@ func addToCartHandler(client *stoamcp.StoaClient) server.ToolHandlerFunc {
 			return mcp.NewToolResultError("cart_id is required"), nil
 		}
 
+		productID := req.GetString("product_id", "")
+		if productID == "" {
+			return mcp.NewToolResultError("product_id is required"), nil
+		}
+
 		body := map[string]interface{}{
-			"variant_id": req.GetString("variant_id", ""),
+			"product_id": productID,
+		}
+		if variantID := req.GetString("variant_id", ""); variantID != "" {
+			body["variant_id"] = variantID
 		}
 		if q := req.GetInt("quantity", 0); q > 0 {
 			body["quantity"] = q

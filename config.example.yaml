@@ -41,3 +41,10 @@ security:
 
 payment:
   encryption_key: ""   # 32-byte key or 64-char hex (Env: STOA_PAYMENT_ENCRYPTION_KEY)
+
+# MCP Server Configuration (for stoa-store-mcp and stoa-admin-mcp binaries)
+# Configured via environment variables:
+#   STOA_MCP_API_URL   - Stoa API base URL (default: http://localhost:8080)
+#   STOA_MCP_API_KEY   - API key for authentication
+#   STOA_MCP_PORT      - SSE server port (default: 8090)
+#   STOA_MCP_BASE_URL  - Public base URL for SSE endpoint (default: http://localhost:{port})
