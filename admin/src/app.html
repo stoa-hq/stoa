@@ -1,10 +1,22 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Commerce Admin</title>
+		<title>Stoa Admin</title>
+		<script>
+			(function() {
+				var theme = localStorage.getItem('stoa_admin_theme');
+				if (theme === 'light') {
+					document.documentElement.classList.remove('dark');
+				} else if (theme === 'dark') {
+					document.documentElement.classList.add('dark');
+				} else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+					document.documentElement.classList.remove('dark');
+				}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

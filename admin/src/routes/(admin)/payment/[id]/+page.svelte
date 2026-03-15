@@ -81,7 +81,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/payment" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/payment" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -91,7 +91,7 @@
 {:else}
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">{$t('payment.editPayment')}</h1>
+      <h1 class="text-xl font-bold text-[var(--text)]">{$t('payment.editPayment')}</h1>
       <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>{$t('common.delete')}</button>
     </div>
 
@@ -101,8 +101,8 @@
         <input id="provider" class="input" type="text" bind:value={form.provider} required />
       </div>
 
-      <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('common.translations')}</h3>
+      <div class="border border-[var(--card-border)] rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('common.translations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}
@@ -117,7 +117,7 @@
 
       <div class="flex items-center gap-2">
         <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
+        <label for="active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
       </div>
 
       <div class="flex gap-3 pt-2">

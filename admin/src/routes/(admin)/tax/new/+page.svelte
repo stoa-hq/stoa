@@ -33,11 +33,11 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/tax" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/tax" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 <div class="card p-6 max-w-2xl">
-  <h1 class="text-xl font-bold text-gray-900 mb-6">{$t('tax.newTaxRule')}</h1>
+  <h1 class="text-xl font-bold text-[var(--text)] mb-6">{$t('tax.newTaxRule')}</h1>
 
   <form onsubmit={handleSubmit} class="space-y-4">
     <div>

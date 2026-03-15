@@ -5,6 +5,7 @@
   import { notifications } from '$lib/stores/notifications';
   import Modal from '$lib/components/Modal.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let items = $state<any[]>([]);
   let loading = $state(true);
@@ -87,13 +88,13 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('tags.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('tags.title')}</h1>
 </div>
 
 <!-- Inline Create Form -->
 <div class="card p-6 mb-6">
-  <h2 class="text-base font-semibold text-gray-900 mb-3">{$t('tags.newTag')}</h2>
-  <form onsubmit={handleCreate} class="flex gap-3 items-end">
+  <h2 class="text-base font-semibold text-[var(--text)] mb-3">{$t('tags.newTag')}</h2>
+  <form onsubmit={handleCreate} class="flex flex-col sm:flex-row gap-3 sm:items-end">
     <div class="flex-1">
       <label class="label" for="new-name">{$t('common.name')} *</label>
       <input id="new-name" class="input" type="text" bind:value={newTagForm.name} required placeholder={$t('tags.tagName')} />
@@ -109,32 +110,34 @@
 <!-- Tags Table -->
 <div class="card p-6">
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(5) as _}
+        <Skeleton height="h-10" />
+      {/each}
     </div>
   {:else}
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.slug')}</th>
-            <th class="px-4 py-3"></th>
+            <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('common.slug')}</th>
+            <th class="table-header"></th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-[var(--card-border)]">
           {#each items as item}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => openEdit(item)}>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{item.name}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{item.slug}</td>
-              <td class="px-4 py-3 text-right">
+            <tr class="table-row cursor-pointer" onclick={() => openEdit(item)}>
+              <td class="table-cell font-medium text-[var(--text)]">{item.name}</td>
+              <td class="table-cell text-[var(--text-muted)]">{item.slug}</td>
+              <td class="table-cell text-right">
                 <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="3" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('tags.noTags')}</td>
+              <td colspan="3" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('tags.noTags')}</td>
             </tr>
           {/if}
         </tbody>

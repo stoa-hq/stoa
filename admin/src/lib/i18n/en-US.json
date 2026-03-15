@@ -12,7 +12,8 @@
     "tax": "Taxes",
     "shipping": "Shipping",
     "payment": "Payments",
-    "audit": "Audit Log"
+    "audit": "Audit Log",
+    "collapse": "Collapse"
   },
   "common": {
     "save": "Save",
@@ -58,10 +59,11 @@
     "clickToSelectDeselect": "Click to select/deselect.",
     "noEntries": "No entries found.",
     "pleaseNameInLocale": "Please fill in the name for {locale}.",
-    "pleaseNameGerman": "Please provide at least the German name."
+    "pleaseNameGerman": "Please provide at least the German name.",
+    "theme": "Toggle theme"
   },
   "login": {
-    "title": "Commerce Admin",
+    "title": "Stoa Admin",
     "subtitle": "Please sign in",
     "email": "Email",
     "password": "Password",
@@ -225,7 +227,14 @@
     "shippingCost": "Shipping",
     "loadFailed": "Orders could not be loaded.",
     "loadOneFailed": "Order could not be loaded.",
-    "noOrders": "No orders found."
+    "noOrders": "No orders found.",
+    "searchPlaceholder": "Search order number...",
+    "transactions": "Payment Transactions",
+    "noTransactions": "No transactions available.",
+    "amount": "Amount",
+    "providerReference": "Provider Reference",
+    "guestSession": "Guest Session ID",
+    "copyGuestToken": "Copy session ID"
   },
   "discounts": {
     "title": "Discounts",

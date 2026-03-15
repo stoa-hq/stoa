@@ -42,11 +42,11 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/property-groups" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/property-groups" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 <div class="card p-6 max-w-lg">
-  <h1 class="text-xl font-bold text-gray-900 mb-6">{$t('propertyGroups.newGroup')}</h1>
+  <h1 class="text-xl font-bold text-[var(--text)] mb-6">{$t('propertyGroups.newGroup')}</h1>
 
   <form onsubmit={handleSubmit} class="space-y-4">
     <div>
@@ -54,8 +54,8 @@
       <input id="position" class="input" type="number" min="0" bind:value={position} />
     </div>
 
-    <div class="border border-gray-200 rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('propertyGroups.nameTranslations')}</h3>
+    <div class="border border-[var(--card-border)] rounded-lg p-4">
+      <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('propertyGroups.nameTranslations')}</h3>
       <TranslationsInput
         locales={AVAILABLE_LOCALES}
         localeLabels={LOCALE_LABELS}

@@ -35,5 +35,8 @@
     "svelte-i18n": {
       "esbuild": "^0.25.0"
     }
+  },
+  "dependencies": {
+    "lucide-svelte": "^0.577.0"
   }
 }

@@ -7,6 +7,8 @@
   import Pagination from '$lib/components/Pagination.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
   import ProductImportModal from '$lib/components/ProductImportModal.svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
   import { t, locale } from 'svelte-i18n';
   import { fmt } from '$lib/i18n/formatters';
   import { tr } from '$lib/i18n/entity';
@@ -48,13 +50,10 @@
     load();
   }
 
-  let searchTimeout: ReturnType<typeof setTimeout>;
-  function handleSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      currentPage = 1;
-      load();
-    }, 400);
+  function handleSearch(value: string) {
+    search = value;
+    currentPage = 1;
+    load();
   }
 
   function confirmDelete(id: string, e: MouseEvent) {
@@ -78,7 +77,7 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('products.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('products.title')}</h1>
   <div class="flex gap-2">
     <button class="btn btn-secondary" onclick={openImport}>{$t('common.import')}</button>
     <a href="{base}/products/new" class="btn btn-primary">{$t('common.new')}</a>
@@ -87,52 +86,48 @@
 
 <div class="card p-6">
   <div class="mb-4">
-    <input
-      class="input max-w-xs"
-      type="search"
-      placeholder={$t('common.search')}
-      bind:value={search}
-      oninput={handleSearch}
-    />
+    <SearchBar value={search} onSearch={handleSearch} />
   </div>
 
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(5) as _}
+        <Skeleton height="h-12" />
+      {/each}
     </div>
   {:else}
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div class="hidden sm:block overflow-x-auto">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.sku')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.priceGross')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('products.stock')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.createdAt')}</th>
-            <th class="px-4 py-3"></th>
+            <th class="table-header">{$t('products.sku')}</th>
+            <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('products.priceGross')}</th>
+            <th class="table-header">{$t('products.stock')}</th>
+            <th class="table-header">{$t('common.active')}</th>
+            <th class="table-header">{$t('common.createdAt')}</th>
+            <th class="table-header"></th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-[var(--card-border)]">
           {#each items as item}
             <tr
-              class="hover:bg-gray-50 cursor-pointer"
+              class="table-row cursor-pointer"
               onclick={() => goto(`${base}/products/${item.id}`)}
             >
-              <td class="px-4 py-3 text-sm text-gray-600">{item.sku}</td>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{tr(item.translations, 'name', $locale) || item.sku}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{$fmt.price(item.price_gross)}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{item.stock ?? 0}</td>
-              <td class="px-4 py-3 text-sm">
+              <td class="table-cell text-[var(--text-muted)] font-mono text-xs">{item.sku}</td>
+              <td class="table-cell font-medium text-[var(--text)]">{tr(item.translations, 'name', $locale) || item.sku}</td>
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{$fmt.price(item.price_gross)}</td>
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{item.stock ?? 0}</td>
+              <td class="table-cell">
                 {#if item.active}
                   <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
                   <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{$fmt.date(item.created_at)}</td>
-              <td class="px-4 py-3 text-right">
+              <td class="table-cell text-[var(--text-muted)]">{$fmt.date(item.created_at)}</td>
+              <td class="table-cell text-right">
                 <button
                   class="btn btn-danger btn-sm"
                   onclick={(e) => confirmDelete(item.id, e)}
@@ -144,11 +139,35 @@
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="7" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('products.noProductsFound')}</td>
+              <td colspan="7" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('products.noProductsFound')}</td>
             </tr>
           {/if}
         </tbody>
       </table>
+    </div>
+    <!-- Mobile Cards -->
+    <div class="sm:hidden space-y-3">
+      {#each items as item}
+        <div
+          class="p-3 rounded-lg bg-[var(--surface)] border border-[var(--card-border)] cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+          role="button" tabindex="0"
+          onclick={() => goto(`${base}/products/${item.id}`)}
+          onkeydown={(e) => e.key === 'Enter' && goto(`${base}/products/${item.id}`)}
+        >
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-medium text-sm text-[var(--text)]">{tr(item.translations, 'name', $locale) || item.sku}</span>
+            {#if item.active}
+              <span class="badge badge-green">{$t('common.active')}</span>
+            {:else}
+              <span class="badge badge-gray">{$t('common.inactive')}</span>
+            {/if}
+          </div>
+          <div class="flex items-center justify-between text-xs text-[var(--text-muted)]">
+            <span class="tabular-nums">{$fmt.price(item.price_gross)}</span>
+            <span>{$t('products.stock')}: {item.stock ?? 0}</span>
+          </div>
+        </div>
+      {/each}
     </div>
 
     {#if meta}

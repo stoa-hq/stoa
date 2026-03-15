@@ -8,6 +8,8 @@
   import { fmt } from '$lib/i18n/formatters';
   import Pagination from '$lib/components/Pagination.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let items = $state<any[]>([]);
   let meta = $state<any>(null);
@@ -16,11 +18,14 @@
   let loading = $state(true);
   let deleteId = $state<string | null>(null);
   let showConfirm = $state(false);
+  let search = $state('');
 
   async function load() {
     loading = true;
     try {
-      const res = await customersApi.list({ page: currentPage, limit });
+      const params: any = { page: currentPage, limit };
+      if (search) params.search = search;
+      const res = await customersApi.list(params);
       items = res.data ?? [];
       meta = res.meta ?? null;
     } catch (e) {
@@ -34,6 +39,12 @@
 
   function handlePageChange(p: number) {
     currentPage = p;
+    load();
+  }
+
+  function handleSearch(value: string) {
+    search = value;
+    currentPage = 1;
     load();
   }
 
@@ -58,53 +69,83 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('customers.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('customers.title')}</h1>
 </div>
 
 <div class="card p-6">
+  <div class="mb-4">
+    <SearchBar value={search} onSearch={handleSearch} />
+  </div>
+
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(5) as _}
+        <Skeleton height="h-12" />
+      {/each}
     </div>
   {:else}
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div class="hidden sm:block overflow-x-auto">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.email')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('customers.firstName')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('customers.lastName')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.createdAt')}</th>
-            <th class="px-4 py-3"></th>
+            <th class="table-header">{$t('common.email')}</th>
+            <th class="table-header">{$t('customers.firstName')}</th>
+            <th class="table-header">{$t('customers.lastName')}</th>
+            <th class="table-header">{$t('common.active')}</th>
+            <th class="table-header">{$t('common.createdAt')}</th>
+            <th class="table-header"></th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-[var(--card-border)]">
           {#each items as item}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => goto(`${base}/customers/${item.id}`)}>
-              <td class="px-4 py-3 text-sm text-gray-900">{item.email}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{item.first_name ?? '—'}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{item.last_name ?? '—'}</td>
-              <td class="px-4 py-3 text-sm">
+            <tr class="table-row cursor-pointer" onclick={() => goto(`${base}/customers/${item.id}`)}>
+              <td class="table-cell font-medium text-[var(--text)]">{item.email}</td>
+              <td class="table-cell text-[var(--text-muted)]">{item.first_name ?? '—'}</td>
+              <td class="table-cell text-[var(--text-muted)]">{item.last_name ?? '—'}</td>
+              <td class="table-cell">
                 {#if item.active}
                   <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
                   <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{$fmt.date(item.created_at)}</td>
-              <td class="px-4 py-3 text-right">
-                <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
+              <td class="table-cell text-[var(--text-muted)]">{$fmt.date(item.created_at)}</td>
+              <td class="table-cell text-right">
+                <button class="btn btn-danger btn-sm opacity-0 group-hover:opacity-100" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('customers.noCustomers')}</td>
+              <td colspan="6" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('customers.noCustomers')}</td>
             </tr>
           {/if}
         </tbody>
       </table>
+    </div>
+    <!-- Mobile Cards -->
+    <div class="sm:hidden space-y-3">
+      {#each items as item}
+        <div
+          class="p-3 rounded-lg bg-[var(--surface)] border border-[var(--card-border)] cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+          role="button" tabindex="0"
+          onclick={() => goto(`${base}/customers/${item.id}`)}
+          onkeydown={(e) => e.key === 'Enter' && goto(`${base}/customers/${item.id}`)}
+        >
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-medium text-sm text-[var(--text)]">{item.email}</span>
+            {#if item.active}
+              <span class="badge badge-green">{$t('common.active')}</span>
+            {:else}
+              <span class="badge badge-gray">{$t('common.inactive')}</span>
+            {/if}
+          </div>
+          <div class="flex items-center justify-between text-xs text-[var(--text-muted)]">
+            <span>{item.first_name ?? ''} {item.last_name ?? ''}</span>
+            <span>{$fmt.date(item.created_at)}</span>
+          </div>
+        </div>
+      {/each}
     </div>
 
     {#if meta}

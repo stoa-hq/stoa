@@ -171,7 +171,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/property-groups" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/property-groups" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -182,7 +182,7 @@
   <!-- Gruppe bearbeiten -->
   <div class="card p-6 max-w-lg mb-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">{$t('propertyGroups.editGroup')}</h1>
+      <h1 class="text-xl font-bold text-[var(--text)]">{$t('propertyGroups.editGroup')}</h1>
       <button class="btn btn-danger btn-sm" onclick={() => showDeleteGroupConfirm = true}>{$t('common.delete')}</button>
     </div>
 
@@ -192,8 +192,8 @@
         <input id="position" class="input" type="number" min="0" bind:value={position} />
       </div>
 
-      <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('propertyGroups.nameTranslations')}</h3>
+      <div class="border border-[var(--card-border)] rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('propertyGroups.nameTranslations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}
@@ -215,29 +215,29 @@
   <!-- Ausprägungen -->
   <div class="card p-6 max-w-lg">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">{$t('propertyGroups.options')}</h2>
+      <h2 class="text-lg font-semibold text-[var(--text)]">{$t('propertyGroups.options')}</h2>
       <button class="btn btn-secondary btn-sm" onclick={() => showAddOptionModal = true}>
         {$t('propertyGroups.addOption')}
       </button>
     </div>
 
     {#if options.length === 0}
-      <p class="text-sm text-gray-400">{$t('propertyGroups.noOptions')}</p>
+      <p class="text-sm text-[var(--text-muted)]">{$t('propertyGroups.noOptions')}</p>
     {:else}
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-[var(--card-border)]">
           <thead>
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.name')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('propertyGroups.color')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.position')}</th>
+              <th class="table-header">{$t('common.name')}</th>
+              <th class="table-header">{$t('propertyGroups.color')}</th>
+              <th class="table-header">{$t('common.position')}</th>
               <th class="px-4 py-2"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200">
+          <tbody class="divide-y divide-[var(--card-border)]">
             {#each options as o}
               <tr>
-                <td class="px-4 py-2 text-sm text-gray-700">{optionName(o)}</td>
+                <td class="px-4 py-2 text-sm text-[var(--text-muted)]">{optionName(o)}</td>
                 <td class="px-4 py-2 text-sm">
                   {#if o.color_hex}
                     <span class="inline-flex items-center gap-2">
@@ -245,13 +245,13 @@
                       {o.color_hex}
                     </span>
                   {:else}
-                    <span class="text-gray-400">—</span>
+                    <span class="text-[var(--text-muted)]">—</span>
                   {/if}
                 </td>
-                <td class="px-4 py-2 text-sm text-gray-500">{o.position}</td>
+                <td class="px-4 py-2 text-sm text-[var(--text-muted)]">{o.position}</td>
                 <td class="px-4 py-2 text-right flex gap-2 justify-end">
                   <button
-                    class="text-primary-600 hover:underline text-xs"
+                    class="text-primary-500 hover:text-primary-400 transition-colors text-xs"
                     onclick={() => openEditOption(o)}
                   >{$t('common.edit')}</button>
                   <button
@@ -289,8 +289,8 @@
 <!-- Ausprägung hinzufügen -->
 <Modal open={showAddOptionModal} title={$t('propertyGroups.addOptionTitle')} onClose={() => showAddOptionModal = false}>
   <form onsubmit={handleAddOption} class="space-y-4">
-    <div class="border border-gray-200 rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('propertyGroups.nameTranslations')}</h3>
+    <div class="border border-[var(--card-border)] rounded-lg p-4">
+      <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('propertyGroups.nameTranslations')}</h3>
       <TranslationsInput
         locales={AVAILABLE_LOCALES}
         localeLabels={LOCALE_LABELS}
@@ -323,8 +323,8 @@
 {#if editOption}
   <Modal open={true} title={$t('propertyGroups.editOption')} onClose={() => editOption = null}>
     <form onsubmit={handleUpdateOption} class="space-y-4">
-      <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('propertyGroups.nameTranslations')}</h3>
+      <div class="border border-[var(--card-border)] rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('propertyGroups.nameTranslations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}

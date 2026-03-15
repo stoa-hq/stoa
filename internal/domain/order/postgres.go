@@ -31,7 +31,7 @@ func NewPostgresRepository(db *pgxpool.Pool, logger zerolog.Logger) *PostgresRep
 func (r *PostgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 	const q = `
 		SELECT
-			id, order_number, customer_id, status, currency,
+			id, order_number, customer_id, guest_token, status, currency,
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
@@ -42,15 +42,19 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Order
 
 	o := &Order{}
 	var billingRaw, shippingRaw, customFieldsRaw []byte
+	var guestToken *string
 
 	err := r.db.QueryRow(ctx, q, id).Scan(
-		&o.ID, &o.OrderNumber, &o.CustomerID, &o.Status, &o.Currency,
+		&o.ID, &o.OrderNumber, &o.CustomerID, &guestToken, &o.Status, &o.Currency,
 		&o.SubtotalNet, &o.SubtotalGross, &o.ShippingCost, &o.TaxTotal, &o.Total,
 		&billingRaw, &shippingRaw,
 		&o.PaymentMethodID, &o.ShippingMethodID,
 		&o.Notes, &customFieldsRaw,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
+	if guestToken != nil {
+		o.GuestToken = *guestToken
+	}
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("order %s not found", id)
@@ -102,6 +106,11 @@ func (r *PostgresRepository) FindAll(ctx context.Context, filter OrderFilter) ([
 		args = append(args, *filter.CustomerID)
 		idx++
 	}
+	if filter.Search != "" {
+		where = append(where, fmt.Sprintf("order_number ILIKE $%d", idx))
+		args = append(args, "%"+filter.Search+"%")
+		idx++
+	}
 
 	whereClause := strings.Join(where, " AND ")
 
@@ -138,7 +147,7 @@ func (r *PostgresRepository) FindAll(ctx context.Context, filter OrderFilter) ([
 
 	listQ := fmt.Sprintf(`
 		SELECT
-			id, order_number, customer_id, status, currency,
+			id, order_number, customer_id, guest_token, status, currency,
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
@@ -173,7 +182,7 @@ func (r *PostgresRepository) FindAll(ctx context.Context, filter OrderFilter) ([
 func (r *PostgresRepository) FindByCustomerID(ctx context.Context, customerID uuid.UUID) ([]Order, error) {
 	const q = `
 		SELECT
-			id, order_number, customer_id, status, currency,
+			id, order_number, customer_id, guest_token, status, currency,
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
@@ -449,9 +458,10 @@ func (r *PostgresRepository) scanRows(rows pgx.Rows) ([]Order, error) {
 	for rows.Next() {
 		var o Order
 		var billingRaw, shippingRaw, customFieldsRaw []byte
+		var guestToken *string
 
 		if err := rows.Scan(
-			&o.ID, &o.OrderNumber, &o.CustomerID, &o.Status, &o.Currency,
+			&o.ID, &o.OrderNumber, &o.CustomerID, &guestToken, &o.Status, &o.Currency,
 			&o.SubtotalNet, &o.SubtotalGross, &o.ShippingCost, &o.TaxTotal, &o.Total,
 			&billingRaw, &shippingRaw,
 			&o.PaymentMethodID, &o.ShippingMethodID,
@@ -459,6 +469,9 @@ func (r *PostgresRepository) scanRows(rows pgx.Rows) ([]Order, error) {
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
+		}
+		if guestToken != nil {
+			o.GuestToken = *guestToken
 		}
 
 		if err := unmarshalJSONB(billingRaw, &o.BillingAddress); err != nil {

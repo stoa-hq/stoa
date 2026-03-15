@@ -328,7 +328,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/products" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/products" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -338,7 +338,7 @@
 {:else}
   <div class="card p-6 max-w-2xl mb-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">{$t('products.editProduct')}</h1>
+      <h1 class="text-xl font-bold text-[var(--text)]">{$t('products.editProduct')}</h1>
       <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>{$t('common.delete')}</button>
     </div>
 
@@ -348,8 +348,8 @@
         <input id="sku" class="input" type="text" bind:value={form.sku} required />
       </div>
 
-      <div class="border border-gray-200 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('common.translations')}</h3>
+      <div class="border border-[var(--card-border)] rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('common.translations')}</h3>
         <TranslationsInput
           locales={AVAILABLE_LOCALES}
           localeLabels={LOCALE_LABELS}
@@ -378,11 +378,11 @@
 
       {#if selectedTaxRule}
         <div class="flex gap-4">
-          <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+          <label class="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-muted)]">
             <input type="radio" bind:group={priceMode} value="gross" />
             {$t('products.grossInput')}
           </label>
-          <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+          <label class="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-muted)]">
             <input type="radio" bind:group={priceMode} value="net" />
             {$t('products.netInput')}
           </label>
@@ -398,7 +398,7 @@
       </div>
 
       {#if calculatedPrice !== null}
-        <p class="text-sm text-gray-500">
+        <p class="text-sm text-[var(--text-muted)]">
           {priceMode === 'gross' ? $t('products.netCalculated') : $t('products.grossCalculated')}:
           {$fmt.price(calculatedPrice)}
         </p>
@@ -412,9 +412,9 @@
       <div>
         <p class="label">{$t('products.categories')}</p>
         {#if allCategories.length === 0}
-          <p class="text-sm text-gray-400">{$t('products.noCategories')}</p>
+          <p class="text-sm text-[var(--text-muted)]">{$t('products.noCategories')}</p>
         {:else}
-          <div class="border border-gray-200 rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
+          <div class="border border-[var(--card-border)] rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
             {#each allCategories as cat}
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -423,7 +423,7 @@
                   checked={selectedCategoryIds.includes(cat.id)}
                   onchange={() => toggleCategory(cat.id)}
                 />
-                <span class="text-sm text-gray-700">{tr(cat.translations, 'name', $locale) || cat.id}</span>
+                <span class="text-sm text-[var(--text)]">{tr(cat.translations, 'name', $locale) || cat.id}</span>
               </label>
             {/each}
           </div>
@@ -433,9 +433,9 @@
       <div>
         <p class="label">{$t('products.tags')}</p>
         {#if allTags.length === 0}
-          <p class="text-sm text-gray-400">{$t('products.noTags')}</p>
+          <p class="text-sm text-[var(--text-muted)]">{$t('products.noTags')}</p>
         {:else}
-          <div class="border border-gray-200 rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
+          <div class="border border-[var(--card-border)] rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
             {#each allTags as tag}
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -444,7 +444,7 @@
                   checked={selectedTagIds.includes(tag.id)}
                   onchange={() => toggleTag(tag.id)}
                 />
-                <span class="text-sm text-gray-700">{tag.name}</span>
+                <span class="text-sm text-[var(--text)]">{tag.name}</span>
               </label>
             {/each}
           </div>
@@ -453,7 +453,7 @@
 
       <div class="flex items-center gap-2">
         <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
+        <label for="active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
       </div>
 
       <div class="flex gap-3 pt-2">
@@ -468,14 +468,14 @@
   <!-- Media -->
   <div class="card p-6 max-w-2xl mb-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">{$t('products.images')}</h2>
+      <h2 class="text-lg font-semibold text-[var(--text)]">{$t('products.images')}</h2>
       <button class="btn btn-secondary btn-sm" onclick={() => showMediaPicker = !showMediaPicker}>
         {showMediaPicker ? $t('products.closeSelection') : $t('products.addImage')}
       </button>
     </div>
 
     {#if productMediaIds.length === 0 && !showMediaPicker}
-      <p class="text-sm text-gray-400">{$t('products.noImages')}</p>
+      <p class="text-sm text-[var(--text-muted)]">{$t('products.noImages')}</p>
     {/if}
 
     {#if productMediaIds.length > 0}
@@ -483,7 +483,7 @@
         {#each productMediaIds as mid}
           {@const item = mediaById(mid)}
           <div class="relative group">
-            <div class="aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            <div class="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
               {#if item?.mime_type?.startsWith('image/') && item.url}
                 <img src={item.url} alt={item.filename} class="w-full h-full object-cover" />
               {:else}
@@ -497,7 +497,7 @@
               onclick={() => toggleMedia(mid)}
               title={$t('products.remove')}
             >&times;</button>
-            <p class="text-xs text-gray-500 truncate mt-1">{item?.filename ?? mid}</p>
+            <p class="text-xs text-[var(--text-muted)] truncate mt-1">{item?.filename ?? mid}</p>
           </div>
         {/each}
       </div>
@@ -505,16 +505,16 @@
 
     {#if showMediaPicker}
       {#if allMedia.length === 0}
-        <p class="text-sm text-gray-400">{$t('products.noMediaAvailable', { values: { link: '' } })}<a href="{base}/media" class="text-primary-600 underline">{$t('products.mediaLinkLabel')}</a></p>
+        <p class="text-sm text-[var(--text-muted)]">{$t('products.noMediaAvailable', { values: { link: '' } })}<a href="{base}/media" class="text-primary-500 underline">{$t('products.mediaLinkLabel')}</a></p>
       {:else}
-        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto border border-[var(--card-border)] rounded-lg p-3">
           {#each allMedia as item}
             <button
               onclick={() => toggleMedia(item.id)}
-              class="relative rounded-lg overflow-hidden border-2 transition-colors {productMediaIds.includes(item.id) ? 'border-primary-500' : 'border-gray-200 hover:border-gray-400'}"
+              class="relative rounded-lg overflow-hidden border-2 transition-colors {productMediaIds.includes(item.id) ? 'border-primary-500' : 'border-[var(--card-border)] hover:border-gray-400'}"
               title={item.filename}
             >
-              <div class="aspect-square bg-gray-100 flex items-center justify-center">
+              <div class="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                 {#if item.mime_type?.startsWith('image/') && item.url}
                   <img src={item.url} alt={item.filename} class="w-full h-full object-cover" />
                 {:else}
@@ -533,7 +533,7 @@
             </button>
           {/each}
         </div>
-        <p class="text-xs text-gray-400 mt-2">{$t('common.clickToSelectDeselect')}</p>
+        <p class="text-xs text-[var(--text-muted)] mt-2">{$t('common.clickToSelectDeselect')}</p>
       {/if}
     {/if}
   </div>
@@ -541,7 +541,7 @@
   <!-- Variants -->
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">{$t('products.variants')}</h2>
+      <h2 class="text-lg font-semibold text-[var(--text)]">{$t('products.variants')}</h2>
       <div class="flex gap-2">
         {#if allPropertyGroups.length > 0}
           <button class="btn btn-secondary btn-sm" onclick={() => showGenerateModal = true}>
@@ -555,27 +555,27 @@
     </div>
 
     {#if variants.length === 0}
-      <p class="text-sm text-gray-400">{$t('products.noVariants')}</p>
+      <p class="text-sm text-[var(--text-muted)]">{$t('products.noVariants')}</p>
     {:else}
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-[var(--card-border)]">
           <thead>
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.sku')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.properties')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.price')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('products.stock')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.active')}</th>
+              <th class="table-header">{$t('products.sku')}</th>
+              <th class="table-header">{$t('products.properties')}</th>
+              <th class="table-header">{$t('common.price')}</th>
+              <th class="table-header">{$t('products.stock')}</th>
+              <th class="table-header">{$t('common.active')}</th>
               <th class="px-4 py-2"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200">
+          <tbody class="divide-y divide-[var(--card-border)]">
             {#each variants as v}
               <tr>
-                <td class="px-4 py-2 text-sm text-gray-700">{v.sku || '—'}</td>
-                <td class="px-4 py-2 text-sm text-gray-500">{variantOptionsLabel(v)}</td>
-                <td class="px-4 py-2 text-sm text-gray-700">{$fmt.price(v.price_gross)}</td>
-                <td class="px-4 py-2 text-sm text-gray-700">{v.stock ?? 0}</td>
+                <td class="table-cell text-[var(--text)]">{v.sku || '—'}</td>
+                <td class="table-cell text-[var(--text-muted)]">{variantOptionsLabel(v)}</td>
+                <td class="table-cell text-[var(--text)]">{$fmt.price(v.price_gross)}</td>
+                <td class="table-cell text-[var(--text)]">{v.stock ?? 0}</td>
                 <td class="px-4 py-2 text-sm">
                   {#if v.active}
                     <span class="badge badge-green">{$t('common.active')}</span>
@@ -584,7 +584,7 @@
                   {/if}
                 </td>
                 <td class="px-4 py-2 text-right flex gap-2 justify-end">
-                  <button class="text-primary-600 hover:underline text-xs" onclick={() => openEditVariant(v)}>
+                  <button class="text-primary-500 hover:text-primary-400 transition-colors text-xs" onclick={() => openEditVariant(v)}>
                     {$t('common.edit')}
                   </button>
                   <button class="text-red-600 hover:underline text-xs" onclick={() => deleteVariantId = v.id}>
@@ -621,11 +621,11 @@
   <form onsubmit={handleVariantSubmit} class="space-y-4">
     {#if allPropertyGroups.length > 0}
       <div>
-        <p class="text-sm font-medium text-gray-700 mb-2">{$t('products.properties')}</p>
+        <p class="text-sm font-medium text-[var(--text-muted)] mb-2">{$t('products.properties')}</p>
         {#each allPropertyGroups as g}
           {@const gName = tr(g.translations, 'name', $locale) || g.id}
           <div class="mb-2">
-            <label class="text-xs text-gray-500 uppercase" for="add-variant-{g.id}">{gName}</label>
+            <label class="text-xs text-[var(--text-muted)] uppercase" for="add-variant-{g.id}">{gName}</label>
             <select id="add-variant-{g.id}" class="input mt-1" bind:value={addVariantOptions[g.id]}>
               <option value="">{$t('products.noSelection')}</option>
               {#each g.options ?? [] as o}
@@ -651,7 +651,7 @@
     </div>
     <div class="flex items-center gap-2">
       <input id="v-active" type="checkbox" bind:checked={variantForm.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-      <label for="v-active" class="text-sm text-gray-700">{$t('common.active')}</label>
+      <label for="v-active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
     </div>
     <div class="flex gap-3 pt-2">
       <button type="submit" class="btn btn-primary" disabled={variantSubmitting}>
@@ -668,11 +668,11 @@
     <form onsubmit={handleEditVariantSubmit} class="space-y-4">
       {#if allPropertyGroups.length > 0}
         <div>
-          <p class="text-sm font-medium text-gray-700 mb-2">{$t('products.properties')}</p>
+          <p class="text-sm font-medium text-[var(--text-muted)] mb-2">{$t('products.properties')}</p>
           {#each allPropertyGroups as g}
             {@const gName = tr(g.translations, 'name', $locale) || g.id}
             <div class="mb-2">
-              <label class="text-xs text-gray-500 uppercase" for="edit-variant-{g.id}">{gName}</label>
+              <label class="text-xs text-[var(--text-muted)] uppercase" for="edit-variant-{g.id}">{gName}</label>
               <select id="edit-variant-{g.id}" class="input mt-1" bind:value={editVariantOptions[g.id]}>
                 <option value="">{$t('products.noSelection')}</option>
                 {#each g.options ?? [] as o}
@@ -698,7 +698,7 @@
       </div>
       <div class="flex items-center gap-2">
         <input id="edit-v-active" type="checkbox" bind:checked={editVariantForm.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="edit-v-active" class="text-sm text-gray-700">{$t('common.active')}</label>
+        <label for="edit-v-active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
       </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={editVariantSubmitting}>
@@ -713,16 +713,16 @@
 <!-- Alle Kombinationen generieren -->
 <Modal open={showGenerateModal} title={$t('products.generateCombinations')} onClose={() => showGenerateModal = false}>
   <form onsubmit={handleGenerateVariants} class="space-y-4">
-    <p class="text-sm text-gray-500">{$t('products.generateDescription')}</p>
+    <p class="text-sm text-[var(--text-muted)]">{$t('products.generateDescription')}</p>
     {#each allPropertyGroups as g}
       {#if (g.options?.length ?? 0) > 0}
         {@const gName = tr(g.translations, 'name', $locale) || g.id}
         <div>
-          <p class="text-sm font-medium text-gray-700 mb-2">{gName}</p>
+          <p class="text-sm font-medium text-[var(--text-muted)] mb-2">{gName}</p>
           <div class="flex flex-wrap gap-2">
             {#each g.options ?? [] as o}
               {@const oName = tr(o.translations, 'name', $locale) || o.id}
-              <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700 border border-gray-200 rounded px-2 py-1">
+              <label class="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-muted)] border border-[var(--card-border)] rounded px-2 py-1">
                 <input
                   type="checkbox"
                   class="h-4 w-4 rounded border-gray-300 text-primary-600"

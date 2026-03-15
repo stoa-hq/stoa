@@ -23,7 +23,7 @@
 </script>
 
 <Modal open={open} title={title ?? $t('common.confirm')} onClose={onCancel}>
-	<p class="text-gray-700">{message}</p>
+	<p class="text-[var(--text-muted)]">{message}</p>
 	{#snippet footer()}
 		<button class="btn btn-secondary" onclick={onCancel}>{$t('common.cancel')}</button>
 		<button

@@ -5,6 +5,7 @@
   import { notifications } from '$lib/stores/notifications';
   import { fmt } from '$lib/i18n/formatters';
   import Pagination from '$lib/components/Pagination.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let items = $state<any[]>([]);
   let meta = $state<any>(null);
@@ -40,43 +41,45 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('audit.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('audit.title')}</h1>
 </div>
 
 <div class="card p-6">
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(5) as _}
+        <Skeleton height="h-10" />
+      {/each}
     </div>
   {:else}
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.timestamp')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.user')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.action')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.entity')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('audit.entityId')}</th>
+            <th class="table-header">{$t('audit.timestamp')}</th>
+            <th class="table-header">{$t('audit.user')}</th>
+            <th class="table-header">{$t('audit.action')}</th>
+            <th class="table-header">{$t('audit.entity')}</th>
+            <th class="table-header">{$t('audit.entityId')}</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-[var(--card-border)]">
           {#each items as entry}
-            <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{$fmt.dateTime(entry.created_at)}</td>
-              <td class="px-4 py-3 text-sm font-mono text-gray-700">{formatUser(entry)}</td>
-              <td class="px-4 py-3 text-sm">
+            <tr class="table-row">
+              <td class="table-cell text-[var(--text-muted)] whitespace-nowrap">{$fmt.dateTime(entry.created_at)}</td>
+              <td class="table-cell font-mono text-xs text-[var(--text-muted)]">{formatUser(entry)}</td>
+              <td class="table-cell">
                 <span class="badge badge-blue">{entry.action}</span>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-700">{entry.entity_type ?? '—'}</td>
-              <td class="px-4 py-3 text-sm font-mono text-gray-500">
+              <td class="table-cell text-[var(--text-muted)]">{entry.entity_type ?? '—'}</td>
+              <td class="table-cell font-mono text-xs text-[var(--text-muted)]">
                 {entry.entity_id ? String(entry.entity_id).substring(0, 12) + '...' : '—'}
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="5" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('audit.noEntries')}</td>
+              <td colspan="5" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('audit.noEntries')}</td>
             </tr>
           {/if}
         </tbody>

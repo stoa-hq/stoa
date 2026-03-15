@@ -8,6 +8,7 @@
   import { notifications } from '$lib/stores/notifications';
   import { fmt } from '$lib/i18n/formatters';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let items = $state<any[]>([]);
   let loading = $state(true);
@@ -49,46 +50,48 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('shipping.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('shipping.title')}</h1>
   <a href="{base}/shipping/new" class="btn btn-primary">{$t('common.new')}</a>
 </div>
 
 <div class="card p-6">
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(3) as _}
+        <Skeleton height="h-12" />
+      {/each}
     </div>
   {:else}
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.price')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
-            <th class="px-4 py-3"></th>
+            <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('common.price')}</th>
+            <th class="table-header">{$t('common.active')}</th>
+            <th class="table-header"></th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="divide-y divide-[var(--card-border)]">
           {#each items as item}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => goto(`${base}/shipping/${item.id}`)}>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{tr(item.translations, 'name', $locale) || item.id}</td>
-              <td class="px-4 py-3 text-sm text-gray-700">{$fmt.price(item.price_gross)}</td>
-              <td class="px-4 py-3 text-sm">
+            <tr class="table-row cursor-pointer" onclick={() => goto(`${base}/shipping/${item.id}`)}>
+              <td class="table-cell font-medium text-[var(--text)]">{tr(item.translations, 'name', $locale) || item.id}</td>
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{$fmt.price(item.price_gross)}</td>
+              <td class="table-cell">
                 {#if item.active}
                   <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
                   <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-right">
+              <td class="table-cell text-right">
                 <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
           {#if items.length === 0}
             <tr>
-              <td colspan="4" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('shipping.noShippingMethods')}</td>
+              <td colspan="4" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('shipping.noShippingMethods')}</td>
             </tr>
           {/if}
         </tbody>

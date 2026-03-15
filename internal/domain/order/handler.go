@@ -312,6 +312,7 @@ func (h *Handler) parseListFilter(r *http.Request) (OrderFilter, int, int) {
 		Page:   page,
 		Limit:  limit,
 		Status: q.Get("status"),
+		Search: q.Get("search"),
 		Sort:   q.Get("sort"),
 		Order:  q.Get("order"),
 	}

@@ -40,6 +40,29 @@ func (h *handler) RegisterAdminRoutes(r chi.Router) {
 	})
 }
 
+// ListTransactionsByOrder returns all payment transactions for a given order.
+func (h *handler) ListTransactionsByOrder(w http.ResponseWriter, r *http.Request) {
+	orderID, err := uuid.Parse(chi.URLParam(r, "orderID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_id", "orderID must be a valid UUID")
+		return
+	}
+
+	txns, err := h.transactionSvc.GetTransactionsByOrderID(r.Context(), orderID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to load transactions")
+		return
+	}
+	if txns == nil {
+		txns = []PaymentTransaction{}
+	}
+
+	writeJSON(w, http.StatusOK, apiResponse{
+		Data: txns,
+		Meta: &apiMeta{Total: len(txns), Page: 1, Limit: len(txns), Pages: 1},
+	})
+}
+
 // RegisterStoreRoutes mounts store-facing (active-only) payment method routes on r.
 func (h *handler) RegisterStoreRoutes(r chi.Router) {
 	r.Route("/payment-methods", func(r chi.Router) {

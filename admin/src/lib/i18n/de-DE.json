@@ -12,7 +12,8 @@
     "tax": "Steuern",
     "shipping": "Versand",
     "payment": "Zahlungen",
-    "audit": "Audit-Log"
+    "audit": "Audit-Log",
+    "collapse": "Einklappen"
   },
   "common": {
     "save": "Speichern",
@@ -58,10 +59,11 @@
     "clickToSelectDeselect": "Klicken zum Auswählen/Abwählen.",
     "noEntries": "Keine Einträge gefunden.",
     "pleaseNameInLocale": "Bitte Name auf {locale} ausfüllen.",
-    "pleaseNameGerman": "Bitte mindestens den deutschen Namen angeben."
+    "pleaseNameGerman": "Bitte mindestens den deutschen Namen angeben.",
+    "theme": "Farbschema wechseln"
   },
   "login": {
-    "title": "Commerce Admin",
+    "title": "Stoa Admin",
     "subtitle": "Melden Sie sich an",
     "email": "E-Mail",
     "password": "Passwort",
@@ -225,7 +227,14 @@
     "shippingCost": "Versand",
     "loadFailed": "Bestellungen konnten nicht geladen werden.",
     "loadOneFailed": "Bestellung konnte nicht geladen werden.",
-    "noOrders": "Keine Bestellungen gefunden."
+    "noOrders": "Keine Bestellungen gefunden.",
+    "searchPlaceholder": "Bestellnummer suchen...",
+    "transactions": "Zahlungstransaktionen",
+    "noTransactions": "Keine Transaktionen vorhanden.",
+    "amount": "Betrag",
+    "providerReference": "Provider-Referenz",
+    "guestSession": "Gast-Session-ID",
+    "copyGuestToken": "Session-ID kopieren"
   },
   "discounts": {
     "title": "Rabatte",

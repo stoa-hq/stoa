@@ -28,7 +28,7 @@
 			>{n.message}</p>
 			<button
 				onclick={() => notifications.remove(n.id)}
-				class="text-gray-400 hover:text-gray-600"
+				class="text-[var(--text-muted)] hover:text-[var(--text)]"
 			>×</button>
 		</div>
 	{/each}

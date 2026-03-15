@@ -277,6 +277,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		taxH.RegisterAdminRoutes(r)
 		shippingH.RegisterAdminRoutes(r)
 		paymentH.RegisterAdminRoutes(r)
+		r.Get("/orders/{orderID}/transactions", paymentH.ListTransactionsByOrder)
 		discountH.RegisterAdminRoutes(r)
 		tagH.RegisterAdminRoutes(r)
 		auditH.RegisterAdminRoutes(r)

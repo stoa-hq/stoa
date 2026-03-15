@@ -56,7 +56,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/customers" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/customers" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -65,7 +65,7 @@
   </div>
 {:else}
   <div class="card p-6 max-w-2xl mb-6">
-    <h1 class="text-xl font-bold text-gray-900 mb-6">{$t('customers.editCustomer')}</h1>
+    <h1 class="text-xl font-bold text-[var(--text)] mb-6">{$t('customers.editCustomer')}</h1>
 
     <form onsubmit={handleSubmit} class="space-y-4">
       <div>
@@ -82,7 +82,7 @@
       </div>
       <div class="flex items-center gap-2">
         <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-        <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
+        <label for="active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
       </div>
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={submitting}>
@@ -95,34 +95,34 @@
 
   <!-- Orders -->
   <div class="card p-6 max-w-2xl">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">{$t('customers.orders')}</h2>
+    <h2 class="text-lg font-semibold text-[var(--text)] mb-4">{$t('customers.orders')}</h2>
     {#if orders.length === 0}
-      <p class="text-sm text-gray-400">{$t('customers.noOrders')}</p>
+      <p class="text-sm text-[var(--text-muted)]">{$t('customers.noOrders')}</p>
     {:else}
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-[var(--card-border)]">
           <thead>
             <tr>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.orderNumber')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.status')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('orders.total')}</th>
-              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.createdAt')}</th>
+              <th class="table-header">{$t('orders.orderNumber')}</th>
+              <th class="table-header">{$t('common.status')}</th>
+              <th class="table-header">{$t('orders.total')}</th>
+              <th class="table-header">{$t('common.createdAt')}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200">
+          <tbody class="divide-y divide-[var(--card-border)]">
             {#each orders as order}
               {@const badgeClass = orderStatusBadge(order.status)}
               <tr>
-                <td class="px-4 py-2 text-sm text-gray-900">
-                  <a href="{base}/orders/{order.id}" class="text-primary-600 hover:underline">
+                <td class="px-4 py-2 text-sm text-[var(--text)]">
+                  <a href="{base}/orders/{order.id}" class="text-primary-500 hover:text-primary-400 transition-colors">
                     #{order.order_number ?? order.id}
                   </a>
                 </td>
                 <td class="px-4 py-2 text-sm">
                   <span class="badge {badgeClass}">{order.status}</span>
                 </td>
-                <td class="px-4 py-2 text-sm text-gray-700">{$fmt.price(order.total)}</td>
-                <td class="px-4 py-2 text-sm text-gray-500">{$fmt.dateTime(order.created_at)}</td>
+                <td class="px-4 py-2 text-sm text-[var(--text-muted)]">{$fmt.price(order.total)}</td>
+                <td class="px-4 py-2 text-sm text-[var(--text-muted)]">{$fmt.dateTime(order.created_at)}</td>
               </tr>
             {/each}
           </tbody>

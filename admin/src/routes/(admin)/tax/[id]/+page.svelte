@@ -66,7 +66,7 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/tax" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/tax" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 {#if loading}
@@ -76,7 +76,7 @@
 {:else}
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-900">{$t('tax.editTaxRule')}</h1>
+      <h1 class="text-xl font-bold text-[var(--text)]">{$t('tax.editTaxRule')}</h1>
       <button class="btn btn-danger btn-sm" onclick={() => showDeleteConfirm = true}>{$t('common.delete')}</button>
     </div>
 
