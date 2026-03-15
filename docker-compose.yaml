@@ -31,6 +31,40 @@ services:
     volumes:
       - uploads:/app/uploads
 
+  stoa-store-mcp:
+    build:
+      context: .
+      args:
+        PLUGINS: "${STOA_PLUGINS:-}"
+    ports:
+      - "8090:8090"
+    environment:
+      STOA_MCP_API_URL: "http://stoa:8080"
+      STOA_MCP_API_KEY: "${STOA_MCP_API_KEY:-}"
+      STOA_MCP_PORT: "8090"
+    depends_on:
+      stoa:
+        condition: service_started
+    entrypoint: ["./stoa-store-mcp"]
+    command: []
+
+  stoa-admin-mcp:
+    build:
+      context: .
+      args:
+        PLUGINS: "${STOA_PLUGINS:-}"
+    ports:
+      - "8091:8091"
+    environment:
+      STOA_MCP_API_URL: "http://stoa:8080"
+      STOA_MCP_API_KEY: "${STOA_MCP_API_KEY:-}"
+      STOA_MCP_PORT: "8091"
+    depends_on:
+      stoa:
+        condition: service_started
+    entrypoint: ["./stoa-admin-mcp"]
+    command: []
+
 volumes:
   pgdata:
   uploads:
