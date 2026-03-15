@@ -13,6 +13,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
 // ShippingCostFn resolves the gross shipping cost for a given shipping method ID.
@@ -22,6 +24,11 @@ type ShippingCostFn func(ctx context.Context, id uuid.UUID) (int, error)
 // ProductTaxRateFn resolves the integer basis-point tax rate for a given product ID.
 // Returns an error if the product has no tax rule or the lookup fails.
 type ProductTaxRateFn func(ctx context.Context, productID uuid.UUID) (int, error)
+
+// PaymentMethodCheckFn checks whether the given payment method ID is valid.
+// It returns whether any active payment methods are configured, whether the
+// specific ID (if non-nil) references a valid active method, and any error.
+type PaymentMethodCheckFn func(ctx context.Context, id *uuid.UUID) (hasActiveMethods bool, methodIsValid bool, err error)
 
 func calcNetFromGross(gross, rate int) int {
 	return int(math.Round(float64(gross) * 10000 / float64(10000+rate)))
@@ -56,23 +63,26 @@ type apiError struct {
 
 // Handler handles HTTP requests for the order domain.
 type Handler struct {
-	service           *Service
-	shippingCostFn    ShippingCostFn
-	productTaxRateFn  ProductTaxRateFn
-	validator         *validator.Validate
-	logger            zerolog.Logger
+	service              *Service
+	shippingCostFn       ShippingCostFn
+	productTaxRateFn     ProductTaxRateFn
+	paymentMethodCheckFn PaymentMethodCheckFn
+	validator            *validator.Validate
+	logger               zerolog.Logger
 }
 
 // NewHandler creates a new order Handler.
 // shippingCostFn may be nil; if non-nil it is called during checkout to apply shipping costs.
 // productTaxRateFn may be nil; if non-nil it is used to look up tax rates per product during checkout.
-func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, validate *validator.Validate, logger zerolog.Logger) *Handler {
+// paymentMethodCheckFn may be nil; if non-nil it validates payment method selection during checkout.
+func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, paymentMethodCheckFn PaymentMethodCheckFn, validate *validator.Validate, logger zerolog.Logger) *Handler {
 	return &Handler{
-		service:          service,
-		shippingCostFn:   shippingCostFn,
-		productTaxRateFn: productTaxRateFn,
-		validator:        validate,
-		logger:           logger,
+		service:              service,
+		shippingCostFn:       shippingCostFn,
+		productTaxRateFn:     productTaxRateFn,
+		paymentMethodCheckFn: paymentMethodCheckFn,
+		validator:            validate,
+		logger:               logger,
 	}
 }
 
@@ -206,6 +216,25 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate payment method selection against active payment methods.
+	if h.paymentMethodCheckFn != nil {
+		hasActive, methodValid, err := h.paymentMethodCheckFn(r.Context(), req.PaymentMethodID)
+		if err != nil {
+			h.serverError(w, r, err)
+			return
+		}
+		if hasActive && req.PaymentMethodID == nil {
+			h.writeError(w, http.StatusUnprocessableEntity, "payment_method_required",
+				"a payment method must be selected", "payment_method_id")
+			return
+		}
+		if req.PaymentMethodID != nil && !methodValid {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_payment_method",
+				"the selected payment method is not available", "payment_method_id")
+			return
+		}
+	}
+
 	// Attach the authenticated customer when present; guest checkout is
 	// supported, so a missing customer ID is not an error.
 	customerID := h.optionalCustomerID(r)
@@ -248,9 +277,20 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Dispatch checkout before-hook — plugins can reject the checkout.
+	if err := h.service.DispatchHook(r.Context(), sdk.HookBeforeCheckout, o); err != nil {
+		h.writeError(w, http.StatusUnprocessableEntity, "checkout_rejected", err.Error(), "")
+		return
+	}
+
 	if err := h.service.Create(r.Context(), o); err != nil {
 		h.serverError(w, r, err)
 		return
+	}
+
+	// Dispatch checkout after-hook — non-fatal, log errors.
+	if err := h.service.DispatchHook(r.Context(), sdk.HookAfterCheckout, o); err != nil {
+		h.logger.Warn().Err(err).Str("order_id", o.ID.String()).Msg("after_checkout hook returned error")
 	}
 
 	h.writeJSON(w, http.StatusCreated, apiResponse{Data: ToResponse(o)})

@@ -137,6 +137,14 @@ func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, toStatus, comm
 	return nil
 }
 
+// DispatchHook dispatches a named hook event through the hook registry.
+func (s *Service) DispatchHook(ctx context.Context, event string, entity interface{}) error {
+	return s.hooks.Dispatch(ctx, &sdk.HookEvent{
+		Name:   event,
+		Entity: entity,
+	})
+}
+
 // -------------------------------------------------------------------
 // Business logic helpers
 // -------------------------------------------------------------------

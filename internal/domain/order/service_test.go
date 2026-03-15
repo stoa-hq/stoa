@@ -274,6 +274,31 @@ func TestService_List_PassesSearchFilter(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// DispatchHook
+// ---------------------------------------------------------------------------
+
+func TestService_DispatchHook_PropagatesError(t *testing.T) {
+	hooks := sdk.NewHookRegistry()
+	hookErr := errors.New("hook failed")
+	hooks.On(sdk.HookBeforeCheckout, func(_ context.Context, _ *sdk.HookEvent) error {
+		return hookErr
+	})
+	svc := NewService(&mockOrderRepo{}, hooks, zerolog.Nop())
+
+	err := svc.DispatchHook(context.Background(), sdk.HookBeforeCheckout, &Order{})
+	if !errors.Is(err, hookErr) {
+		t.Errorf("expected hookErr, got %v", err)
+	}
+}
+
+func TestService_DispatchHook_NoHandlers_NoError(t *testing.T) {
+	svc := newTestOrderService(&mockOrderRepo{})
+	if err := svc.DispatchHook(context.Background(), sdk.HookBeforeCheckout, &Order{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestService_GenerateOrderNumber_Unique(t *testing.T) {
 	svc := newTestOrderService(&mockOrderRepo{})
 	seen := make(map[string]struct{})
