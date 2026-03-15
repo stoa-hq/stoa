@@ -113,15 +113,17 @@ func (s *Server) setupMiddleware() {
 		time.Minute,
 	))
 
-	// 7. CSRF – Double Submit Cookie (exempt when Authorization header is present)
-	r.Use(CSRF(s.cfg.Security.CSRF.Secure))
+	// 7. CSRF – Double Submit Cookie (exempt when Authorization header is present).
+	// Plugin webhook paths are exempt because they authenticate via provider
+	// signatures (e.g. Stripe HMAC), not cookies or CSRF tokens.
+	r.Use(CSRF(s.cfg.Security.CSRF.Secure, "/plugins/"))
 
 	// Content-Type enforcement for mutations
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
 				ct := r.Header.Get("Content-Type")
-				if r.ContentLength > 0 && ct != "" && ct != "application/json" && !strings.HasPrefix(ct, "multipart/form-data") {
+				if r.ContentLength > 0 && ct != "" && !strings.HasPrefix(ct, "application/json") && !strings.HasPrefix(ct, "multipart/form-data") {
 					writeJSON(w, http.StatusUnsupportedMediaType, APIResponse{
 						Errors: []APIError{{Code: "unsupported_media_type", Detail: "Content-Type must be application/json or multipart/form-data"}},
 					})

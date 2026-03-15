@@ -10,7 +10,7 @@
   import Modal from '$lib/components/Modal.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import PluginSlot from '$lib/components/PluginSlot.svelte';
-  import { ArrowLeft, CreditCard, Copy, Check } from 'lucide-svelte';
+  import { ArrowLeft, CreditCard, Copy, Check, ExternalLink } from 'lucide-svelte';
 
   let id = $derived($page.params.id as string);
   let loading = $state(true);
@@ -26,6 +26,23 @@
   });
 
   let guestTokenCopied = $state(false);
+  let stripeDashboardBase = $state<string | null>(null);
+
+  async function fetchStripeDashboardBase() {
+    try {
+      const token = localStorage.getItem('stoa_access_token');
+      const res = await fetch('/plugins/stripe/health', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const pk = data.publishable_key ?? '';
+      const prefix = 'https://dashboard.stripe.com';
+      stripeDashboardBase = pk.startsWith('pk_test_') ? `${prefix}/test/payments/` : `${prefix}/payments/`;
+    } catch {
+      // Stripe plugin not installed — graceful degradation
+    }
+  }
 
   async function copyGuestToken() {
     if (!order?.guest_token) return;
@@ -88,6 +105,8 @@
     } finally {
       txLoading = false;
     }
+
+    fetchStripeDashboardBase();
   });
 
   async function handleStatusSubmit(e: SubmitEvent) {
@@ -290,7 +309,22 @@
                   <span class="badge {txStatusBadge(tx.status)}">{tx.status}</span>
                 </td>
                 <td class="table-cell text-[var(--text)] tabular-nums font-medium">{$fmt.price(tx.amount)}</td>
-                <td class="table-cell text-[var(--text-muted)] font-mono text-xs">{tx.provider_reference || '—'}</td>
+                <td class="table-cell text-[var(--text-muted)] font-mono text-xs">
+                  {#if tx.provider_reference && stripeDashboardBase && tx.provider_reference.startsWith('pi_')}
+                    <a
+                      href="{stripeDashboardBase}{tx.provider_reference}"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1 text-primary-500 hover:text-primary-400 transition-colors"
+                      title={$t('orders.viewInStripe')}
+                    >
+                      {tx.provider_reference}
+                      <ExternalLink class="w-3 h-3" />
+                    </a>
+                  {:else}
+                    {tx.provider_reference || '—'}
+                  {/if}
+                </td>
                 <td class="table-cell text-[var(--text-muted)]">{$fmt.dateTime(tx.created_at)}</td>
               </tr>
             {/each}

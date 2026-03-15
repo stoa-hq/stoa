@@ -234,7 +234,8 @@
     "amount": "Amount",
     "providerReference": "Provider Reference",
     "guestSession": "Guest Session ID",
-    "copyGuestToken": "Copy session ID"
+    "copyGuestToken": "Copy session ID",
+    "viewInStripe": "View in Stripe Dashboard"
   },
   "discounts": {
     "title": "Discounts",

@@ -234,7 +234,8 @@
     "amount": "Betrag",
     "providerReference": "Provider-Referenz",
     "guestSession": "Gast-Session-ID",
-    "copyGuestToken": "Session-ID kopieren"
+    "copyGuestToken": "Session-ID kopieren",
+    "viewInStripe": "Im Stripe Dashboard anzeigen"
   },
   "discounts": {
     "title": "Rabatte",

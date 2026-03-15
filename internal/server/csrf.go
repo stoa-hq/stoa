@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -17,13 +18,16 @@ const (
 // Requests carrying an Authorization header (Bearer / ApiKey) are exempt because
 // CSRF attacks cannot inject custom request headers cross-origin.
 //
+// Paths matching exemptPrefixes are skipped entirely. This is intended for
+// plugin webhook endpoints that authenticate via provider signatures (e.g. Stripe HMAC).
+//
 // For cookie-authenticated requests the middleware:
 //   - Sets a csrf_token cookie on first visit (readable by JavaScript, SameSite=Strict).
 //   - Validates that state-changing methods (POST, PUT, PATCH, DELETE) include the
 //     matching token in the X-CSRF-Token request header.
 //
 // secure controls whether the cookie carries the Secure flag (set true behind HTTPS).
-func CSRF(secure bool) func(http.Handler) http.Handler {
+func CSRF(secure bool, exemptPrefixes ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Bearer / ApiKey requests are immune to CSRF by design:
@@ -31,6 +35,15 @@ func CSRF(secure bool) func(http.Handler) http.Handler {
 			if r.Header.Get("Authorization") != "" {
 				next.ServeHTTP(w, r)
 				return
+			}
+
+			// Exempt paths (plugin webhooks) that authenticate via
+			// provider-specific signatures rather than CSRF tokens.
+			for _, prefix := range exemptPrefixes {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
 			cookieToken := ensureCSRFCookie(w, r, secure)
