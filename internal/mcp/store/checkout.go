@@ -54,6 +54,7 @@ func checkoutTool() (mcp.Tool, server.ToolHandlerFunc) {
 		mcp.WithObject("shipping_address", mcp.Description("Shipping address object with: first_name, last_name, street, city, zip, country"), mcp.Required()),
 		mcp.WithObject("billing_address", mcp.Description("Billing address object (same fields as shipping_address). If omitted, shipping address is used.")),
 		mcp.WithString("email", mcp.Description("Guest email address (required for guest checkout)")),
+		mcp.WithString("payment_reference", mcp.Description("Payment reference (e.g. Stripe PaymentIntent ID). Required when the selected payment method has a provider.")),
 	)
 	return tool, nil
 }
@@ -171,6 +172,9 @@ func checkoutHandler(client *stoamcp.StoaClient) server.ToolHandlerFunc {
 
 		if email := req.GetString("email", ""); email != "" {
 			body["email"] = email
+		}
+		if paymentRef := req.GetString("payment_reference", ""); paymentRef != "" {
+			body["payment_reference"] = paymentRef
 		}
 
 		// 4. Submit checkout

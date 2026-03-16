@@ -30,12 +30,17 @@ func newTestHandler(repo OrderRepository, paymentCheckFn PaymentMethodCheckFn, h
 }
 
 func checkoutBody(t *testing.T, pmID *uuid.UUID) *bytes.Buffer {
+	return checkoutBodyWithRef(t, pmID, "")
+}
+
+func checkoutBodyWithRef(t *testing.T, pmID *uuid.UUID, paymentRef string) *bytes.Buffer {
 	t.Helper()
 	req := CheckoutRequest{
-		Currency:        "EUR",
-		BillingAddress:  map[string]interface{}{"city": "Berlin"},
-		ShippingAddress: map[string]interface{}{"city": "Berlin"},
-		PaymentMethodID: pmID,
+		Currency:         "EUR",
+		BillingAddress:   map[string]interface{}{"city": "Berlin"},
+		ShippingAddress:  map[string]interface{}{"city": "Berlin"},
+		PaymentMethodID:  pmID,
+		PaymentReference: paymentRef,
 		Items: []CheckoutItemRequest{
 			{
 				SKU:            "TEST-001",
@@ -70,8 +75,8 @@ func doCheckout(h *Handler, body *bytes.Buffer) *httptest.ResponseRecorder {
 
 func TestStoreCheckout_NoActivePaymentMethods_OK(t *testing.T) {
 	repo := &mockOrderRepo{}
-	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, error) {
-		return false, false, nil // no active methods
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, string, error) {
+		return false, false, "", nil // no active methods
 	})
 	h := newTestHandler(repo, checkFn, nil)
 
@@ -83,8 +88,8 @@ func TestStoreCheckout_NoActivePaymentMethods_OK(t *testing.T) {
 
 func TestStoreCheckout_ActiveMethods_NoID_422(t *testing.T) {
 	repo := &mockOrderRepo{}
-	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, error) {
-		return true, false, nil // active methods exist, no ID given
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, string, error) {
+		return true, false, "", nil // active methods exist, no ID given
 	})
 	h := newTestHandler(repo, checkFn, nil)
 
@@ -102,8 +107,8 @@ func TestStoreCheckout_ActiveMethods_NoID_422(t *testing.T) {
 
 func TestStoreCheckout_ActiveMethods_InvalidID_422(t *testing.T) {
 	repo := &mockOrderRepo{}
-	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, error) {
-		return true, false, nil // active methods exist, ID is invalid
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, string, error) {
+		return true, false, "", nil // active methods exist, ID is invalid
 	})
 	h := newTestHandler(repo, checkFn, nil)
 
@@ -123,8 +128,8 @@ func TestStoreCheckout_ActiveMethods_InvalidID_422(t *testing.T) {
 func TestStoreCheckout_ActiveMethods_ValidID_OK(t *testing.T) {
 	repo := &mockOrderRepo{}
 	validID := uuid.New()
-	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, error) {
-		return true, id != nil && *id == validID, nil
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		return true, id != nil && *id == validID, "", nil // no provider → no payment_reference required
 	})
 	h := newTestHandler(repo, checkFn, nil)
 
@@ -153,6 +158,82 @@ func TestStoreCheckout_BeforeHookRejects_422(t *testing.T) {
 	h := newTestHandler(repo, nil, hooks)
 
 	rr := doCheckout(h, checkoutBody(t, nil))
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp apiResponse
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if len(resp.Errors) == 0 || resp.Errors[0].Code != "checkout_rejected" {
+		t.Errorf("expected checkout_rejected error, got %+v", resp.Errors)
+	}
+}
+
+func TestStoreCheckout_ProviderMethod_NoReference_422(t *testing.T) {
+	repo := &mockOrderRepo{}
+	validID := uuid.New()
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		return true, id != nil && *id == validID, "stripe", nil
+	})
+	h := newTestHandler(repo, checkFn, nil)
+
+	rr := doCheckout(h, checkoutBody(t, &validID)) // no payment_reference
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp apiResponse
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if len(resp.Errors) == 0 || resp.Errors[0].Code != "payment_reference_required" {
+		t.Errorf("expected payment_reference_required error, got %+v", resp.Errors)
+	}
+}
+
+func TestStoreCheckout_ProviderMethod_WithReference_OK(t *testing.T) {
+	repo := &mockOrderRepo{}
+	validID := uuid.New()
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		return true, id != nil && *id == validID, "stripe", nil
+	})
+	h := newTestHandler(repo, checkFn, nil)
+
+	rr := doCheckout(h, checkoutBodyWithRef(t, &validID, "pi_test_123"))
+	if rr.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestStoreCheckout_ManualMethod_NoReference_OK(t *testing.T) {
+	repo := &mockOrderRepo{}
+	validID := uuid.New()
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		return true, id != nil && *id == validID, "", nil // no provider
+	})
+	h := newTestHandler(repo, checkFn, nil)
+
+	rr := doCheckout(h, checkoutBody(t, &validID)) // no payment_reference
+	if rr.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestStoreCheckout_BeforeHookRejectsReference_422(t *testing.T) {
+	repo := &mockOrderRepo{}
+	validID := uuid.New()
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		return true, id != nil && *id == validID, "stripe", nil
+	})
+	hooks := sdk.NewHookRegistry()
+	hooks.On(sdk.HookBeforeCheckout, func(_ context.Context, event *sdk.HookEvent) error {
+		ref, _ := event.Metadata["payment_reference"].(string)
+		if ref == "pi_invalid" {
+			return errors.New("invalid payment reference")
+		}
+		return nil
+	})
+	h := newTestHandler(repo, checkFn, hooks)
+
+	rr := doCheckout(h, checkoutBodyWithRef(t, &validID, "pi_invalid"))
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422, got %d: %s", rr.Code, rr.Body.String())
 	}

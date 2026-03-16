@@ -35,25 +35,28 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Order
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
-			notes, custom_fields,
+			notes, payment_reference, custom_fields,
 			created_at, updated_at
 		FROM orders
 		WHERE id = $1`
 
 	o := &Order{}
 	var billingRaw, shippingRaw, customFieldsRaw []byte
-	var guestToken *string
+	var guestToken, paymentRef *string
 
 	err := r.db.QueryRow(ctx, q, id).Scan(
 		&o.ID, &o.OrderNumber, &o.CustomerID, &guestToken, &o.Status, &o.Currency,
 		&o.SubtotalNet, &o.SubtotalGross, &o.ShippingCost, &o.TaxTotal, &o.Total,
 		&billingRaw, &shippingRaw,
 		&o.PaymentMethodID, &o.ShippingMethodID,
-		&o.Notes, &customFieldsRaw,
+		&o.Notes, &paymentRef, &customFieldsRaw,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
 	if guestToken != nil {
 		o.GuestToken = *guestToken
+	}
+	if paymentRef != nil {
+		o.PaymentReference = *paymentRef
 	}
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -151,7 +154,7 @@ func (r *PostgresRepository) FindAll(ctx context.Context, filter OrderFilter) ([
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
-			notes, custom_fields,
+			notes, payment_reference, custom_fields,
 			created_at, updated_at
 		FROM orders
 		WHERE %s
@@ -186,7 +189,7 @@ func (r *PostgresRepository) FindByCustomerID(ctx context.Context, customerID uu
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
-			notes, custom_fields,
+			notes, payment_reference, custom_fields,
 			created_at, updated_at
 		FROM orders
 		WHERE customer_id = $1
@@ -235,21 +238,25 @@ func (r *PostgresRepository) Create(ctx context.Context, o *Order) error {
 			subtotal_net, subtotal_gross, shipping_cost, tax_total, total,
 			billing_address, shipping_address,
 			payment_method_id, shipping_method_id,
-			notes, guest_token, custom_fields,
+			notes, payment_reference, guest_token, custom_fields,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9, $10,
 			$11, $12,
 			$13, $14,
-			$15, $16, $17,
-			$18, $19
+			$15, $16, $17, $18,
+			$19, $20
 		)`
 
-	// Store guest_token as NULL when empty.
+	// Store guest_token and payment_reference as NULL when empty.
 	var guestTokenVal *string
 	if o.GuestToken != "" {
 		guestTokenVal = &o.GuestToken
+	}
+	var paymentRefVal *string
+	if o.PaymentReference != "" {
+		paymentRefVal = &o.PaymentReference
 	}
 
 	_, err = tx.Exec(ctx, insertOrder,
@@ -257,7 +264,7 @@ func (r *PostgresRepository) Create(ctx context.Context, o *Order) error {
 		o.SubtotalNet, o.SubtotalGross, o.ShippingCost, o.TaxTotal, o.Total,
 		billingRaw, shippingRaw,
 		o.PaymentMethodID, o.ShippingMethodID,
-		o.Notes, guestTokenVal, customFieldsRaw,
+		o.Notes, paymentRefVal, guestTokenVal, customFieldsRaw,
 		o.CreatedAt, o.UpdatedAt,
 	)
 	if err != nil {
@@ -458,20 +465,23 @@ func (r *PostgresRepository) scanRows(rows pgx.Rows) ([]Order, error) {
 	for rows.Next() {
 		var o Order
 		var billingRaw, shippingRaw, customFieldsRaw []byte
-		var guestToken *string
+		var guestToken, paymentRef *string
 
 		if err := rows.Scan(
 			&o.ID, &o.OrderNumber, &o.CustomerID, &guestToken, &o.Status, &o.Currency,
 			&o.SubtotalNet, &o.SubtotalGross, &o.ShippingCost, &o.TaxTotal, &o.Total,
 			&billingRaw, &shippingRaw,
 			&o.PaymentMethodID, &o.ShippingMethodID,
-			&o.Notes, &customFieldsRaw,
+			&o.Notes, &paymentRef, &customFieldsRaw,
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scanning order row: %w", err)
 		}
 		if guestToken != nil {
 			o.GuestToken = *guestToken
+		}
+		if paymentRef != nil {
+			o.PaymentReference = *paymentRef
 		}
 
 		if err := unmarshalJSONB(billingRaw, &o.BillingAddress); err != nil {

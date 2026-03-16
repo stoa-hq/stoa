@@ -27,8 +27,9 @@ type ProductTaxRateFn func(ctx context.Context, productID uuid.UUID) (int, error
 
 // PaymentMethodCheckFn checks whether the given payment method ID is valid.
 // It returns whether any active payment methods are configured, whether the
-// specific ID (if non-nil) references a valid active method, and any error.
-type PaymentMethodCheckFn func(ctx context.Context, id *uuid.UUID) (hasActiveMethods bool, methodIsValid bool, err error)
+// specific ID (if non-nil) references a valid active method, the provider
+// name (e.g. "stripe") of the selected method, and any error.
+type PaymentMethodCheckFn func(ctx context.Context, id *uuid.UUID) (hasActiveMethods bool, methodIsValid bool, provider string, err error)
 
 func calcNetFromGross(gross, rate int) int {
 	return int(math.Round(float64(gross) * 10000 / float64(10000+rate)))
@@ -217,8 +218,9 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate payment method selection against active payment methods.
+	var provider string
 	if h.paymentMethodCheckFn != nil {
-		hasActive, methodValid, err := h.paymentMethodCheckFn(r.Context(), req.PaymentMethodID)
+		hasActive, methodValid, prov, err := h.paymentMethodCheckFn(r.Context(), req.PaymentMethodID)
 		if err != nil {
 			h.serverError(w, r, err)
 			return
@@ -233,6 +235,14 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 				"the selected payment method is not available", "payment_method_id")
 			return
 		}
+		provider = prov
+	}
+
+	// Provider-based payment methods require a payment reference (e.g. Stripe PaymentIntent ID).
+	if provider != "" && req.PaymentReference == "" {
+		h.writeError(w, http.StatusUnprocessableEntity, "payment_reference_required",
+			"payment_reference is required for provider-based payment methods", "payment_reference")
+		return
 	}
 
 	// Attach the authenticated customer when present; guest checkout is
@@ -277,8 +287,12 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Dispatch checkout before-hook — plugins can reject the checkout.
-	if err := h.service.DispatchHook(r.Context(), sdk.HookBeforeCheckout, o); err != nil {
+	// Dispatch checkout before-hook — plugins can validate the payment reference.
+	hookMeta := map[string]interface{}{
+		"provider":          provider,
+		"payment_reference": req.PaymentReference,
+	}
+	if err := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookBeforeCheckout, o, hookMeta); err != nil {
 		h.writeError(w, http.StatusUnprocessableEntity, "checkout_rejected", err.Error(), "")
 		return
 	}
@@ -289,7 +303,7 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Dispatch checkout after-hook — non-fatal, log errors.
-	if err := h.service.DispatchHook(r.Context(), sdk.HookAfterCheckout, o); err != nil {
+	if err := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookAfterCheckout, o, hookMeta); err != nil {
 		h.logger.Warn().Err(err).Str("order_id", o.ID.String()).Msg("after_checkout hook returned error")
 	}
 

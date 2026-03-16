@@ -14,6 +14,15 @@ import (
 	"github.com/stoa-hq/stoa/internal/mcp/admin"
 )
 
+func useStdio() bool {
+	for _, arg := range os.Args[1:] {
+		if arg == "--stdio" {
+			return true
+		}
+	}
+	return os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
+}
+
 func main() {
 	cfg := stoamcp.LoadConfig()
 	client := stoamcp.NewStoaClient(cfg)
@@ -41,6 +50,14 @@ Requires an API key with appropriate admin permissions.`),
 	)
 
 	admin.RegisterTools(s, client)
+
+	if useStdio() {
+		stdio := server.NewStdioServer(s)
+		if err := stdio.Listen(context.Background(), os.Stdin, os.Stdout); err != nil {
+			log.Fatalf("stdio server error: %v", err)
+		}
+		return
+	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	sseServer := server.NewSSEServer(s,
