@@ -5,9 +5,21 @@
   import { propertyGroupsApi, type PropertyGroup } from '$lib/api/property-groups';
   import { notifications } from '$lib/stores/notifications';
   import { tr } from '$lib/i18n/entity';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let groups = $state<PropertyGroup[]>([]);
   let loading = $state(true);
+  let search = $state('');
+
+  const filtered = $derived(
+    search
+      ? groups.filter(g => {
+          const name = tr(g.translations, 'name', $locale) || '';
+          return name.toLowerCase().includes(search.toLowerCase());
+        })
+      : groups
+  );
 
   onMount(async () => {
     try {
@@ -26,41 +38,53 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-xl font-bold text-gray-900">{$t('propertyGroups.title')}</h1>
+  <h1 class="text-xl font-bold text-[var(--text)]">{$t('propertyGroups.title')}</h1>
   <a href="{base}/property-groups/new" class="btn btn-primary btn-sm">{$t('propertyGroups.newGroupButton')}</a>
 </div>
 
 {#if loading}
-  <div class="flex items-center justify-center h-32">
-    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+  <div class="card p-6 space-y-3">
+    {#each Array(3) as _}
+      <Skeleton height="h-12" />
+    {/each}
   </div>
 {:else if groups.length === 0}
-  <div class="card p-6 text-center text-gray-400">
+  <div class="card p-6 text-center text-[var(--text-muted)]">
     {$t('propertyGroups.noGroups')}
   </div>
 {:else}
-  <div class="card overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.name')}</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{$t('common.position')}</th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{$t('propertyGroups.optionCount')}</th>
-          <th class="px-6 py-3"></th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200">
-        {#each groups as g}
-          <tr class="hover:bg-gray-50">
-            <td class="px-6 py-3 text-sm font-medium text-gray-900">{groupName(g)}</td>
-            <td class="px-6 py-3 text-sm text-gray-500">{g.position}</td>
-            <td class="px-6 py-3 text-sm text-gray-500">{g.options?.length ?? 0}</td>
-            <td class="px-6 py-3 text-right">
-              <a href="{base}/property-groups/{g.id}" class="text-primary-600 hover:underline text-sm">{$t('common.edit')}</a>
-            </td>
+  <div class="card p-6">
+    <div class="mb-4">
+      <SearchBar value={search} onSearch={(v) => search = v} debounce={200} />
+    </div>
+    <div class="overflow-hidden">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
+        <thead>
+          <tr>
+            <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('common.position')}</th>
+            <th class="table-header">{$t('propertyGroups.optionCount')}</th>
+            <th class="table-header"></th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="divide-y divide-[var(--card-border)]">
+          {#each filtered as g}
+            <tr class="table-row">
+              <td class="table-cell font-medium text-[var(--text)]">{groupName(g)}</td>
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{g.position}</td>
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{g.options?.length ?? 0}</td>
+              <td class="table-cell text-right">
+                <a href="{base}/property-groups/{g.id}" class="text-primary-500 hover:text-primary-400 hover:underline text-sm">{$t('common.edit')}</a>
+              </td>
+            </tr>
+          {/each}
+          {#if filtered.length === 0}
+            <tr>
+              <td colspan="4" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('propertyGroups.noGroups')}</td>
+            </tr>
+          {/if}
+        </tbody>
+      </table>
+    </div>
   </div>
 {/if}

@@ -62,6 +62,7 @@ export interface Product {
 	variants?: ProductVariant[];
 	categories?: string[];
 	tags?: string[];
+	media?: string[];
 }
 
 export interface ProductListResponse {
@@ -180,6 +181,7 @@ export interface Order {
 	id: string;
 	order_number: string;
 	customer_id?: string;
+	guest_token?: string;
 	status: string;
 	currency: string;
 	subtotal_net: number;
@@ -204,6 +206,19 @@ export interface OrderItem {
 	quantity: number;
 	unit_price_gross: number;
 	total_gross: number;
+}
+
+// ── Payment Transaction ──────────────────────────────────────────────────────
+
+export interface PaymentTransaction {
+	id: string;
+	order_id: string;
+	payment_method_id: string;
+	status: string;
+	currency: string;
+	amount: number;
+	provider_reference: string;
+	created_at: string;
 }
 
 // ── Media ─────────────────────────────────────────────────────────────────────
@@ -244,6 +259,7 @@ export interface ShippingMethod {
 	active: boolean;
 	price_net: number;
 	price_gross: number;
+	tax_rule_id?: string;
 	translations: ShippingMethodTranslation[];
 	created_at: string;
 	updated_at: string;

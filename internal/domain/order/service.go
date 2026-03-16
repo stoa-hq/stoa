@@ -137,6 +137,23 @@ func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, toStatus, comm
 	return nil
 }
 
+// DispatchHook dispatches a named hook event through the hook registry.
+func (s *Service) DispatchHook(ctx context.Context, event string, entity interface{}) error {
+	return s.hooks.Dispatch(ctx, &sdk.HookEvent{
+		Name:   event,
+		Entity: entity,
+	})
+}
+
+// DispatchHookWithMetadata dispatches a hook event with additional metadata.
+func (s *Service) DispatchHookWithMetadata(ctx context.Context, event string, entity interface{}, metadata map[string]interface{}) error {
+	return s.hooks.Dispatch(ctx, &sdk.HookEvent{
+		Name:     event,
+		Entity:   entity,
+		Metadata: metadata,
+	})
+}
+
 // -------------------------------------------------------------------
 // Business logic helpers
 // -------------------------------------------------------------------

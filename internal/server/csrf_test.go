@@ -172,6 +172,30 @@ func TestCSRF_APIKeyExemptsCSRFCheck(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Path exemption
+// ---------------------------------------------------------------------------
+
+func TestCSRF_ExemptPrefixSkipsCheck(t *testing.T) {
+	mw := CSRF(false, "/plugins/")(http.HandlerFunc(okHandler))
+	r := httptest.NewRequest(http.MethodPost, "/plugins/stripe/webhook", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("POST to exempt path: got %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestCSRF_NonExemptPathStillChecked(t *testing.T) {
+	mw := CSRF(false, "/plugins/")(http.HandlerFunc(okHandler))
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/store/cart", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("POST to non-exempt path: got %d, want %d", w.Code, http.StatusForbidden)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Error response format
 // ---------------------------------------------------------------------------
 

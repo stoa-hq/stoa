@@ -241,6 +241,64 @@ func TestService_GenerateOrderNumber_Format(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// List — Search filter
+// ---------------------------------------------------------------------------
+
+func TestService_List_PassesSearchFilter(t *testing.T) {
+	var capturedFilter OrderFilter
+	repo := &mockOrderRepo{
+		findAll: func(_ context.Context, f OrderFilter) ([]Order, int, error) {
+			capturedFilter = f
+			return []Order{{OrderNumber: "ORD-20260315-12345"}}, 1, nil
+		},
+	}
+	svc := newTestOrderService(repo)
+	filter := OrderFilter{
+		Page:   1,
+		Limit:  25,
+		Search: "12345",
+	}
+	orders, total, err := svc.List(context.Background(), filter)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("expected total=1, got %d", total)
+	}
+	if len(orders) != 1 {
+		t.Errorf("expected 1 order, got %d", len(orders))
+	}
+	if capturedFilter.Search != "12345" {
+		t.Errorf("expected search=%q, got %q", "12345", capturedFilter.Search)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DispatchHook
+// ---------------------------------------------------------------------------
+
+func TestService_DispatchHook_PropagatesError(t *testing.T) {
+	hooks := sdk.NewHookRegistry()
+	hookErr := errors.New("hook failed")
+	hooks.On(sdk.HookBeforeCheckout, func(_ context.Context, _ *sdk.HookEvent) error {
+		return hookErr
+	})
+	svc := NewService(&mockOrderRepo{}, hooks, zerolog.Nop())
+
+	err := svc.DispatchHook(context.Background(), sdk.HookBeforeCheckout, &Order{})
+	if !errors.Is(err, hookErr) {
+		t.Errorf("expected hookErr, got %v", err)
+	}
+}
+
+func TestService_DispatchHook_NoHandlers_NoError(t *testing.T) {
+	svc := newTestOrderService(&mockOrderRepo{})
+	if err := svc.DispatchHook(context.Background(), sdk.HookBeforeCheckout, &Order{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestService_GenerateOrderNumber_Unique(t *testing.T) {
 	svc := newTestOrderService(&mockOrderRepo{})
 	seen := make(map[string]struct{})

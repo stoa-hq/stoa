@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from 'svelte-i18n';
+	import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 
 	interface Props {
 		currentPage: number;
@@ -16,7 +17,7 @@
 			class="btn btn-secondary btn-sm"
 			disabled={currentPage <= 1}
 			onclick={() => onPageChange(currentPage - 1)}
-		>‹ {$t('pagination.previous')}</button>
+		><ChevronLeft class="w-3.5 h-3.5" /> {$t('pagination.previous')}</button>
 		{#each Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
 			if (totalPages <= 7) return i + 1;
 			if (currentPage <= 4) return i + 1;
@@ -34,7 +35,7 @@
 			class="btn btn-secondary btn-sm"
 			disabled={currentPage >= totalPages}
 			onclick={() => onPageChange(currentPage + 1)}
-		>{$t('pagination.next')} ›</button>
+		>{$t('pagination.next')} <ChevronRight class="w-3.5 h-3.5" /></button>
 	</div>
 </div>
 {/if}

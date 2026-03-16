@@ -17,6 +17,8 @@ internal/admin/build
 internal/storefront/build
 CLAUDE.local.md
 .claude/settings.local.json
+stoa-admin-mcp
+stoa-store-mcp
 
 # User-specific plugin installation (managed by `stoa plugin install`)
 go.plugins.mod

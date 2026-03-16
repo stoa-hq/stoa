@@ -5,6 +5,8 @@
   import { notifications } from '$lib/stores/notifications';
   import { formatBytes } from '$lib/utils';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
+  import { Upload, FileText, X } from 'lucide-svelte';
 
   let items = $state<any[]>([]);
   let loading = $state(true);
@@ -83,12 +85,12 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('media.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('media.title')}</h1>
 </div>
 
 <!-- Upload Area -->
 <div
-  class="card p-6 mb-6 border-2 border-dashed transition-colors {dragOver ? 'border-primary-400 bg-primary-50' : 'border-gray-300'}"
+  class="card p-6 mb-6 border-2 border-dashed transition-colors {dragOver ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/10' : 'border-[var(--card-border)]'}"
   ondragover={(e) => { e.preventDefault(); dragOver = true; }}
   ondragleave={() => dragOver = false}
   ondrop={handleDrop}
@@ -98,14 +100,12 @@
   onkeydown={(e) => e.key === 'Enter' && fileInput.click()}
 >
   <div class="text-center">
-    <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-    </svg>
-    <p class="text-sm text-gray-600">
+    <Upload class="mx-auto h-10 w-10 text-[var(--text-muted)] mb-2" />
+    <p class="text-sm text-[var(--text-muted)]">
       {#if uploading}
         {$t('media.uploading')}
       {:else}
-        {$t('media.dropOrClick', { values: { click: '' } }).replace('{click}', '')}<span class="text-primary-600 font-medium">{$t('media.clickToSelect')}</span>
+        {$t('media.dropOrClick', { values: { click: '' } }).replace('{click}', '')}<span class="text-primary-500 font-medium">{$t('media.clickToSelect')}</span>
       {/if}
     </p>
   </div>
@@ -121,36 +121,34 @@
 <!-- Media Grid -->
 <div class="card p-6">
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {#each Array(6) as _}
+        <div class="skeleton aspect-square rounded-lg"></div>
+      {/each}
     </div>
   {:else if items.length === 0}
-    <p class="text-center text-gray-400 text-sm py-8">{$t('media.noMedia')}</p>
+    <p class="text-center text-[var(--text-muted)] text-sm py-8">{$t('media.noMedia')}</p>
   {:else}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {#each items as item}
         <div class="group relative">
-          <div class="aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+          <div class="aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             {#if isImage(item)}
               <img src={item.url} alt={item.filename} class="w-full h-full object-cover" />
             {:else}
-              <svg class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <FileText class="h-10 w-10 text-[var(--text-muted)]" />
             {/if}
           </div>
           <div class="mt-1">
-            <p class="text-xs text-gray-700 truncate" title={item.filename}>{item.filename}</p>
-            <p class="text-xs text-gray-400">{formatBytes(item.size)}</p>
+            <p class="text-xs text-[var(--text)] truncate" title={item.filename}>{item.filename}</p>
+            <p class="text-xs text-[var(--text-muted)]">{formatBytes(item.size)}</p>
           </div>
           <button
-            class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-danger btn-sm !p-1"
+            class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-red-600 text-white hover:bg-red-700"
             onclick={() => confirmDelete(item.id)}
             title={$t('common.delete')}
           >
-            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X class="h-3 w-3" />
           </button>
         </div>
       {/each}

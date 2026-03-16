@@ -174,16 +174,16 @@
 
 		<!-- Panel -->
 		<div
-			class="relative z-50 bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col"
+			class="relative z-50 bg-[var(--card)] rounded-xl shadow-2xl w-full max-w-2xl flex flex-col"
 			style="max-height: 90vh;"
 			transition:scale={{ duration: 150, start: 0.97 }}
 		>
 			<!-- Header -->
-			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-				<h2 class="text-lg font-semibold text-gray-900">{title}</h2>
+			<div class="flex items-center justify-between px-6 py-4 border-b border-[var(--card-border)] shrink-0">
+				<h2 class="text-lg font-semibold text-[var(--text)]">{title}</h2>
 				<button
 					onclick={handleClose}
-					class="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+					class="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800"
 					aria-label={$t('common.close')}
 				>×</button>
 			</div>
@@ -197,14 +197,14 @@
 							<div class="absolute inset-0 rounded-full border-4 border-gray-100"></div>
 							<div class="absolute inset-0 rounded-full border-4 border-t-primary-600 animate-spin"></div>
 						</div>
-						<p class="text-sm text-gray-500 font-medium">{$t('products.importProducts')}</p>
+						<p class="text-sm text-[var(--text-muted)] font-medium">{$t('products.importProducts')}</p>
 					</div>
 
 				{:else if phase === 'result' && result}
 					<!-- Result state -->
 					<div class="p-6 space-y-5">
 						<!-- Summary bar -->
-						<div class="rounded-lg overflow-hidden border border-gray-200">
+						<div class="rounded-lg overflow-hidden border border-[var(--card-border)]">
 							<div
 								class="px-5 py-4 flex items-center gap-4"
 								style="background: {result.failed === 0 ? '#f0fdf4' : '#fff7ed'};"
@@ -224,7 +224,7 @@
 									{/if}
 								</div>
 								<div>
-									<p class="font-semibold text-gray-900">
+									<p class="font-semibold text-[var(--text)]">
 										{$t('products.importSucceeded', { values: { succeeded: result.succeeded, total: result.total } })}
 									</p>
 									{#if result.failed > 0}
@@ -234,7 +234,7 @@
 							</div>
 
 							<!-- Progress bar -->
-							<div class="h-1.5 bg-gray-100">
+							<div class="h-1.5 bg-gray-100 dark:bg-gray-800">
 								<div
 									class="h-full transition-all duration-700 ease-out"
 									style="width: {result.total > 0 ? (result.succeeded / result.total) * 100 : 0}%; background: #16a34a;"
@@ -245,7 +245,7 @@
 						<!-- Failed items -->
 						{#if result.failed > 0}
 							<div class="space-y-2">
-								<p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">{$t('products.importErrorDetails')}</p>
+								<p class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">{$t('products.importErrorDetails')}</p>
 								{#each result.results.filter(r => !r.success) as row}
 									<div class="border border-red-100 rounded-lg overflow-hidden">
 										<button
@@ -268,7 +268,7 @@
 											</svg>
 										</button>
 										{#if expanded[row.index]}
-											<ul class="px-4 py-3 space-y-1 bg-white" transition:fade={{ duration: 100 }}>
+											<ul class="px-4 py-3 space-y-1 bg-[var(--card)]" transition:fade={{ duration: 100 }}>
 												{#each row.errors ?? [] as err}
 													<li class="text-xs text-red-700 flex gap-2">
 														<span class="text-red-400 shrink-0">–</span>
@@ -287,13 +287,13 @@
 					<!-- Idle state: tabs -->
 					<div>
 						<!-- Tab bar -->
-						<div class="flex border-b border-gray-200 px-6">
+						<div class="flex border-b border-[var(--card-border)] px-6">
 							{#each (['csv', 'json'] as const) as tab}
 								<button
 									class="px-4 py-3 text-sm font-medium transition-colors relative"
 									class:text-primary-600={activeTab === tab}
-									class:text-gray-500={activeTab !== tab}
-									class:hover:text-gray-700={activeTab !== tab}
+									class:text-[var(--text-muted)]={activeTab !== tab}
+									class:hover:text-[var(--text)]={activeTab !== tab}
 									onclick={() => { activeTab = tab; errorMsg = ''; }}
 								>
 									{tab === 'csv' ? $t('products.csvImport') : $t('products.jsonImport')}
@@ -308,7 +308,7 @@
 						<div class="p-6">
 							{#if activeTab === 'csv'}
 								<div class="space-y-4">
-									<p class="text-sm text-gray-600">
+									<p class="text-sm text-[var(--text-muted)]">
 										{$t('products.csvDescription')}
 									</p>
 
@@ -331,7 +331,7 @@
 										class:bg-primary-50={dragOver}
 										class:border-gray-300={!dragOver}
 										class:bg-gray-50={!dragOver && !csvFile}
-										class:bg-white={!dragOver && !!csvFile}
+										class:bg-[var(--card)]={!dragOver && !!csvFile}
 										ondragover={onDragOver}
 										ondragleave={onDragLeave}
 										ondrop={onDrop}
@@ -356,16 +356,16 @@
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
 													</svg>
 												</div>
-												<p class="font-medium text-gray-900 text-sm">{csvFile.name}</p>
-												<p class="text-xs text-gray-400 mt-1">{(csvFile.size / 1024).toFixed(1)} KB · {$t('products.csvClickToChange')}</p>
+												<p class="font-medium text-[var(--text)] text-sm">{csvFile.name}</p>
+												<p class="text-xs text-[var(--text-muted)] mt-1">{(csvFile.size / 1024).toFixed(1)} KB · {$t('products.csvClickToChange')}</p>
 											{:else}
-												<div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3 transition-colors" class:bg-primary-100={dragOver}>
+												<div class="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3 transition-colors" class:bg-primary-100={dragOver}>
 													<svg class="w-6 h-6 transition-colors" class:text-primary-500={dragOver} class:text-gray-400={!dragOver} fill="none" stroke="currentColor" viewBox="0 0 24 24">
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
 													</svg>
 												</div>
-												<p class="font-medium text-gray-700 text-sm">{$t('products.csvDropHere')}</p>
-												<p class="text-xs text-gray-400 mt-1">{$t('products.csvOrClick')}</p>
+												<p class="font-medium text-[var(--text-muted)] text-sm">{$t('products.csvDropHere')}</p>
+												<p class="text-xs text-[var(--text-muted)] mt-1">{$t('products.csvOrClick')}</p>
 											{/if}
 										</div>
 									</div>
@@ -384,7 +384,7 @@
 							{:else}
 								<!-- JSON tab -->
 								<div class="space-y-4">
-									<p class="text-sm text-gray-600">
+									<p class="text-sm text-[var(--text-muted)]">
 										{@html $t('products.jsonDescription', { values: { schema: '<code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">CreateProductRequest</code>', variants: '<code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">variants</code>' } })}
 									</p>
 
@@ -420,7 +420,7 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 shrink-0">
+			<div class="px-6 py-4 border-t border-[var(--card-border)] flex justify-end gap-3 shrink-0">
 				{#if phase === 'result'}
 					<button class="btn btn-secondary" onclick={reset}>{$t('common.furtherImport')}</button>
 					<button class="btn btn-primary" onclick={handleClose}>{$t('common.close')}</button>

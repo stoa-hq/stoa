@@ -30,11 +30,11 @@
 	}
 </script>
 
-<div class="min-h-screen flex items-center justify-center bg-gray-100">
-	<div class="card w-full max-w-sm p-8">
+<div class="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+	<div class="w-full max-w-sm p-8 bg-[var(--surface)] dark:bg-[#1A1A2E]/90 dark:backdrop-blur-xl rounded-xl shadow-xl border border-[var(--card-border)]">
 		<div class="text-center mb-8">
-			<h1 class="text-2xl font-bold text-gray-900">{$t('login.title')}</h1>
-			<p class="text-sm text-gray-500 mt-1">{$t('login.subtitle')}</p>
+			<h1 class="text-2xl font-bold text-[var(--text)]">{$t('login.title')}</h1>
+			<p class="text-sm text-[var(--text-muted)] mt-1">{$t('login.subtitle')}</p>
 		</div>
 
 		<form onsubmit={handleSubmit} class="space-y-4">

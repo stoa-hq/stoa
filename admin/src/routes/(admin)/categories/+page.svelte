@@ -7,11 +7,23 @@
   import { tr } from '$lib/i18n/entity';
   import { notifications } from '$lib/stores/notifications';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import Skeleton from '$lib/components/Skeleton.svelte';
 
   let items = $state<any[]>([]);
   let loading = $state(true);
   let deleteId = $state<string | null>(null);
   let showConfirm = $state(false);
+  let search = $state('');
+
+  const filtered = $derived(
+    search
+      ? items.filter(i => {
+          const name = tr(i.translations, 'name', $locale) || '';
+          return name.toLowerCase().includes(search.toLowerCase());
+        })
+      : items
+  );
 
   async function load() {
     loading = true;
@@ -54,50 +66,56 @@
 </script>
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-gray-900">{$t('categories.title')}</h1>
+  <h1 class="text-2xl font-bold text-[var(--text)]">{$t('categories.title')}</h1>
   <a href="{base}/categories/new" class="btn btn-primary">{$t('common.new')}</a>
 </div>
 
 <div class="card p-6">
+  <div class="mb-4">
+    <SearchBar value={search} onSearch={(v) => search = v} debounce={200} />
+  </div>
+
   {#if loading}
-    <div class="flex items-center justify-center h-32">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <div class="space-y-3">
+      {#each Array(5) as _}
+        <Skeleton height="h-12" />
+      {/each}
     </div>
   {:else}
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
         <thead>
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.name')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.slug')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('categories.parent')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.active')}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{$t('common.position')}</th>
-            <th class="px-4 py-3"></th>
+            <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('common.slug')}</th>
+            <th class="table-header">{$t('categories.parent')}</th>
+            <th class="table-header">{$t('common.active')}</th>
+            <th class="table-header">{$t('common.position')}</th>
+            <th class="table-header"></th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          {#each items as item}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick={() => goto(`${base}/categories/${item.id}`)}>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900">{tr(item.translations, 'name', $locale) || item.id}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{tr(item.translations, 'slug', $locale)}</td>
-              <td class="px-4 py-3 text-sm text-gray-500">{getParentName(item.parent_id)}</td>
-              <td class="px-4 py-3 text-sm">
+        <tbody class="divide-y divide-[var(--card-border)]">
+          {#each filtered as item}
+            <tr class="table-row cursor-pointer" onclick={() => goto(`${base}/categories/${item.id}`)}>
+              <td class="table-cell font-medium text-[var(--text)]">{tr(item.translations, 'name', $locale) || item.id}</td>
+              <td class="table-cell text-[var(--text-muted)]">{tr(item.translations, 'slug', $locale)}</td>
+              <td class="table-cell text-[var(--text-muted)]">{getParentName(item.parent_id)}</td>
+              <td class="table-cell">
                 {#if item.active}
                   <span class="badge badge-green">{$t('common.active')}</span>
                 {:else}
                   <span class="badge badge-gray">{$t('common.inactive')}</span>
                 {/if}
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500">{item.position ?? 0}</td>
-              <td class="px-4 py-3 text-right">
+              <td class="table-cell text-[var(--text-muted)] tabular-nums">{item.position ?? 0}</td>
+              <td class="table-cell text-right">
                 <button class="btn btn-danger btn-sm" onclick={(e) => confirmDelete(item.id, e)}>{$t('common.delete')}</button>
               </td>
             </tr>
           {/each}
-          {#if items.length === 0}
+          {#if filtered.length === 0}
             <tr>
-              <td colspan="6" class="px-4 py-6 text-center text-gray-400 text-sm">{$t('categories.noCategories')}</td>
+              <td colspan="6" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('categories.noCategories')}</td>
             </tr>
           {/if}
         </tbody>

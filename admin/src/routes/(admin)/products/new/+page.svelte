@@ -80,11 +80,11 @@
 </script>
 
 <div class="mb-6">
-  <a href="{base}/products" class="text-sm text-primary-600 hover:underline">&larr; {$t('common.back')}</a>
+  <a href="{base}/products" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">&larr; {$t('common.back')}</a>
 </div>
 
 <div class="card p-6 max-w-2xl">
-  <h1 class="text-xl font-bold text-gray-900 mb-6">{$t('products.newProduct')}</h1>
+  <h1 class="text-xl font-bold text-[var(--text)] mb-6">{$t('products.newProduct')}</h1>
 
   <form onsubmit={handleSubmit} class="space-y-4">
     <div>
@@ -92,8 +92,8 @@
       <input id="sku" class="input" type="text" bind:value={form.sku} />
     </div>
 
-    <div class="border border-gray-200 rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">{$t('common.translations')}</h3>
+    <div class="border border-[var(--card-border)] rounded-lg p-4">
+      <h3 class="text-sm font-semibold text-[var(--text-muted)] mb-3">{$t('common.translations')}</h3>
       <TranslationsInput
         locales={AVAILABLE_LOCALES}
         localeLabels={LOCALE_LABELS}
@@ -123,11 +123,11 @@
     <!-- Preiseingabe-Modus (nur wenn Steuerregel gewählt) -->
     {#if selectedTaxRule}
       <div class="flex gap-4">
-        <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+        <label class="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-muted)]">
           <input type="radio" bind:group={priceMode} value="gross" />
           {$t('products.grossInput')}
         </label>
-        <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+        <label class="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-muted)]">
           <input type="radio" bind:group={priceMode} value="net" />
           {$t('products.netInput')}
         </label>
@@ -145,7 +145,7 @@
 
     <!-- Berechneter Gegenpreis (readonly) -->
     {#if calculatedPrice !== null}
-      <p class="text-sm text-gray-500">
+      <p class="text-sm text-[var(--text-muted)]">
         {priceMode === 'gross' ? $t('products.netCalculated') : $t('products.grossCalculated')}:
         {$fmt.price(calculatedPrice)}
       </p>
@@ -163,7 +163,7 @@
 
     <div class="flex items-center gap-2">
       <input id="active" type="checkbox" bind:checked={form.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
-      <label for="active" class="text-sm text-gray-700">{$t('common.active')}</label>
+      <label for="active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
     </div>
 
     <div class="flex gap-3 pt-2">

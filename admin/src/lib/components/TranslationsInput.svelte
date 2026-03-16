@@ -46,7 +46,7 @@
 
 <div>
   <!-- Locale Tabs -->
-  <div class="flex border-b border-gray-200 mb-4">
+  <div class="flex border-b border-[var(--card-border)] mb-4">
     {#each locales as locale, i}
       {@const isActive = activeLocale === locale}
       {@const isPrimary = locale === primaryLocale}
@@ -54,7 +54,7 @@
         type="button"
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors {isActive
           ? 'border-primary-600 text-primary-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+          : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)] hover:border-gray-300'}"
         onclick={() => (activeLocaleIndex = i)}
       >
         {localeLabels[locale] ?? locale}

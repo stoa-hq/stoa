@@ -237,7 +237,23 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		}
 		return tr.Rate, nil
 	})
-	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, validate, log)
+	paymentMethodCheckFn := order.PaymentMethodCheckFn(func(ctx context.Context, id *uuid.UUID) (bool, bool, string, error) {
+		active := true
+		methods, _, err := pmethodSvc.List(ctx, payment.PaymentMethodFilter{Page: 1, Limit: 1, Active: &active})
+		if err != nil {
+			return false, false, "", err
+		}
+		hasActive := len(methods) > 0
+		if id == nil {
+			return hasActive, false, "", nil
+		}
+		m, err := pmethodSvc.GetByID(ctx, *id)
+		if err != nil {
+			return hasActive, false, "", nil
+		}
+		return hasActive, m.Active, m.Provider, nil
+	})
+	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, paymentMethodCheckFn, validate, log)
 	cartH     := cart.NewHandler(cartSvc, log)
 	taxH      := tax.NewHandler(taxSvc, log)
 	shippingH := shipping.NewHandler(shippingSvc, log)
@@ -277,6 +293,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		taxH.RegisterAdminRoutes(r)
 		shippingH.RegisterAdminRoutes(r)
 		paymentH.RegisterAdminRoutes(r)
+		r.Get("/orders/{orderID}/transactions", paymentH.ListTransactionsByOrder)
 		discountH.RegisterAdminRoutes(r)
 		tagH.RegisterAdminRoutes(r)
 		auditH.RegisterAdminRoutes(r)

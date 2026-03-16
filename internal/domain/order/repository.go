@@ -12,6 +12,7 @@ type OrderFilter struct {
 	Limit      int
 	Status     string
 	CustomerID *uuid.UUID
+	Search     string
 	Sort       string
 	Order      string // "asc" or "desc"
 }
