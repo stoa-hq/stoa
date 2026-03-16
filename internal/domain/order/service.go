@@ -12,17 +12,36 @@ import (
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
+// stockDeductor is a narrow interface for deducting/restoring stock at order time.
+// Implemented by warehouse.Service.
+type stockDeductor interface {
+	DeductStock(ctx context.Context, items []StockDeductionItem) error
+	RestoreStock(ctx context.Context, orderID uuid.UUID) error
+}
+
+// StockDeductionItem describes a single line item for stock deduction.
+// The warehouse package has its own identical type; the adapter in app.go bridges them.
+type StockDeductionItem struct {
+	ProductID uuid.UUID
+	VariantID *uuid.UUID
+	Quantity  int
+	OrderID   uuid.UUID
+}
+
 // Service implements business logic for the order domain.
 type Service struct {
 	repo   OrderRepository
+	stock  stockDeductor
 	hooks  *sdk.HookRegistry
 	logger zerolog.Logger
 }
 
 // NewService creates a new order Service.
-func NewService(repo OrderRepository, hooks *sdk.HookRegistry, logger zerolog.Logger) *Service {
+// stock may be nil; when nil, stock deduction is skipped.
+func NewService(repo OrderRepository, stock stockDeductor, hooks *sdk.HookRegistry, logger zerolog.Logger) *Service {
 	return &Service{
 		repo:   repo,
+		stock:  stock,
 		hooks:  hooks,
 		logger: logger,
 	}
@@ -83,6 +102,29 @@ func (s *Service) Create(ctx context.Context, o *Order) error {
 		return fmt.Errorf("creating order: %w", err)
 	}
 
+	// Deduct stock for order items.
+	if s.stock != nil && len(o.Items) > 0 {
+		items := make([]StockDeductionItem, 0, len(o.Items))
+		for _, item := range o.Items {
+			if item.ProductID == nil {
+				continue
+			}
+			items = append(items, StockDeductionItem{
+				ProductID: *item.ProductID,
+				VariantID: item.VariantID,
+				Quantity:  item.Quantity,
+				OrderID:   o.ID,
+			})
+		}
+		if len(items) > 0 {
+			if err := s.stock.DeductStock(ctx, items); err != nil {
+				// Mark order as cancelled on stock failure.
+				_ = s.repo.UpdateStatus(ctx, o.ID, o.Status, StatusCancelled, "insufficient stock")
+				return fmt.Errorf("deducting stock: %w", err)
+			}
+		}
+	}
+
 	if err := s.hooks.Dispatch(ctx, &sdk.HookEvent{
 		Name:   sdk.HookAfterOrderCreate,
 		Entity: o,
@@ -122,6 +164,13 @@ func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, toStatus, comm
 
 	if err := s.repo.UpdateStatus(ctx, id, existing.Status, toStatus, comment); err != nil {
 		return fmt.Errorf("updating order status: %w", err)
+	}
+
+	// Restore stock when order is cancelled or refunded.
+	if s.stock != nil && (toStatus == StatusCancelled || toStatus == StatusRefunded) {
+		if err := s.stock.RestoreStock(ctx, id); err != nil {
+			s.logger.Error().Err(err).Str("order_id", id.String()).Msg("failed to restore stock")
+		}
 	}
 
 	existing.Status = toStatus

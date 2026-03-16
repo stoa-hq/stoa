@@ -66,8 +66,28 @@ func (m *mockOrderRepo) UpdateStatus(ctx context.Context, id uuid.UUID, from, to
 // Helper
 // ---------------------------------------------------------------------------
 
+// mockStockDeductor is a mock implementation of the stockDeductor interface.
+type mockStockDeductor struct {
+	deductStock  func(ctx context.Context, items []StockDeductionItem) error
+	restoreStock func(ctx context.Context, orderID uuid.UUID) error
+}
+
+func (m *mockStockDeductor) DeductStock(ctx context.Context, items []StockDeductionItem) error {
+	if m.deductStock != nil {
+		return m.deductStock(ctx, items)
+	}
+	return nil
+}
+
+func (m *mockStockDeductor) RestoreStock(ctx context.Context, orderID uuid.UUID) error {
+	if m.restoreStock != nil {
+		return m.restoreStock(ctx, orderID)
+	}
+	return nil
+}
+
 func newTestOrderService(repo OrderRepository) *Service {
-	return NewService(repo, sdk.NewHookRegistry(), zerolog.Nop())
+	return NewService(repo, nil, sdk.NewHookRegistry(), zerolog.Nop())
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +189,7 @@ func TestService_Create_BeforeHookCancels(t *testing.T) {
 	hooks.On(sdk.HookBeforeOrderCreate, func(_ context.Context, _ *sdk.HookEvent) error {
 		return hookErr
 	})
-	svc := NewService(&mockOrderRepo{}, hooks, zerolog.Nop())
+	svc := NewService(&mockOrderRepo{}, nil, hooks, zerolog.Nop())
 	err := svc.Create(context.Background(), &Order{})
 	if !errors.Is(err, hookErr) {
 		t.Errorf("expected hookErr, got %v", err)
@@ -284,7 +304,7 @@ func TestService_DispatchHook_PropagatesError(t *testing.T) {
 	hooks.On(sdk.HookBeforeCheckout, func(_ context.Context, _ *sdk.HookEvent) error {
 		return hookErr
 	})
-	svc := NewService(&mockOrderRepo{}, hooks, zerolog.Nop())
+	svc := NewService(&mockOrderRepo{}, nil, hooks, zerolog.Nop())
 
 	err := svc.DispatchHook(context.Background(), sdk.HookBeforeCheckout, &Order{})
 	if !errors.Is(err, hookErr) {
@@ -308,5 +328,166 @@ func TestService_GenerateOrderNumber_Unique(t *testing.T) {
 			t.Errorf("duplicate order number: %q", n)
 		}
 		seen[n] = struct{}{}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Stock Deduction on Create
+// ---------------------------------------------------------------------------
+
+func TestService_Create_DeductsStock(t *testing.T) {
+	pid := uuid.New()
+	var capturedItems []StockDeductionItem
+	stock := &mockStockDeductor{
+		deductStock: func(_ context.Context, items []StockDeductionItem) error {
+			capturedItems = items
+			return nil
+		},
+	}
+	repo := &mockOrderRepo{}
+	svc := NewService(repo, stock, sdk.NewHookRegistry(), zerolog.Nop())
+
+	o := &Order{
+		Items: []OrderItem{
+			{ProductID: &pid, Quantity: 3},
+		},
+	}
+	if err := svc.Create(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(capturedItems) != 1 {
+		t.Fatalf("expected 1 deduction item, got %d", len(capturedItems))
+	}
+	if capturedItems[0].ProductID != pid {
+		t.Errorf("product_id: got %s, want %s", capturedItems[0].ProductID, pid)
+	}
+	if capturedItems[0].Quantity != 3 {
+		t.Errorf("quantity: got %d, want 3", capturedItems[0].Quantity)
+	}
+}
+
+func TestService_Create_StockFailure_CancelsOrder(t *testing.T) {
+	pid := uuid.New()
+	var cancelledID uuid.UUID
+	var cancelledTo string
+	stock := &mockStockDeductor{
+		deductStock: func(_ context.Context, _ []StockDeductionItem) error {
+			return errors.New("insufficient stock")
+		},
+	}
+	repo := &mockOrderRepo{
+		updateStatus: func(_ context.Context, id uuid.UUID, _, to, _ string) error {
+			cancelledID = id
+			cancelledTo = to
+			return nil
+		},
+	}
+	svc := NewService(repo, stock, sdk.NewHookRegistry(), zerolog.Nop())
+
+	o := &Order{
+		Items: []OrderItem{
+			{ProductID: &pid, Quantity: 1},
+		},
+	}
+	err := svc.Create(context.Background(), o)
+	if err == nil {
+		t.Fatal("expected error on stock failure")
+	}
+	if cancelledID == uuid.Nil {
+		t.Error("expected order to be cancelled")
+	}
+	if cancelledTo != StatusCancelled {
+		t.Errorf("expected status %q, got %q", StatusCancelled, cancelledTo)
+	}
+}
+
+func TestService_Create_NilStock_Skips(t *testing.T) {
+	pid := uuid.New()
+	repo := &mockOrderRepo{}
+	svc := NewService(repo, nil, sdk.NewHookRegistry(), zerolog.Nop())
+
+	o := &Order{
+		Items: []OrderItem{
+			{ProductID: &pid, Quantity: 1},
+		},
+	}
+	if err := svc.Create(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Stock Restoration on Cancel/Refund
+// ---------------------------------------------------------------------------
+
+func TestService_UpdateStatus_Cancelled_RestoresStock(t *testing.T) {
+	id := uuid.New()
+	var restoredOrderID uuid.UUID
+	stock := &mockStockDeductor{
+		restoreStock: func(_ context.Context, orderID uuid.UUID) error {
+			restoredOrderID = orderID
+			return nil
+		},
+	}
+	repo := &mockOrderRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Order, error) {
+			return &Order{ID: id, Status: StatusPending}, nil
+		},
+	}
+	svc := NewService(repo, stock, sdk.NewHookRegistry(), zerolog.Nop())
+
+	if err := svc.UpdateStatus(context.Background(), id, StatusCancelled, "test cancel"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if restoredOrderID != id {
+		t.Errorf("expected restore for order %s, got %s", id, restoredOrderID)
+	}
+}
+
+func TestService_UpdateStatus_Refunded_RestoresStock(t *testing.T) {
+	id := uuid.New()
+	var restored bool
+	stock := &mockStockDeductor{
+		restoreStock: func(_ context.Context, _ uuid.UUID) error {
+			restored = true
+			return nil
+		},
+	}
+	repo := &mockOrderRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Order, error) {
+			return &Order{ID: id, Status: StatusDelivered}, nil
+		},
+	}
+	svc := NewService(repo, stock, sdk.NewHookRegistry(), zerolog.Nop())
+
+	if err := svc.UpdateStatus(context.Background(), id, StatusRefunded, "refund"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !restored {
+		t.Error("expected stock to be restored on refund")
+	}
+}
+
+func TestService_UpdateStatus_Confirmed_NoRestore(t *testing.T) {
+	id := uuid.New()
+	var restored bool
+	stock := &mockStockDeductor{
+		restoreStock: func(_ context.Context, _ uuid.UUID) error {
+			restored = true
+			return nil
+		},
+	}
+	repo := &mockOrderRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Order, error) {
+			return &Order{ID: id, Status: StatusPending}, nil
+		},
+	}
+	svc := NewService(repo, stock, sdk.NewHookRegistry(), zerolog.Nop())
+
+	if err := svc.UpdateStatus(context.Background(), id, StatusConfirmed, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if restored {
+		t.Error("stock should not be restored on confirm transition")
 	}
 }

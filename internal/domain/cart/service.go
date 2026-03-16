@@ -105,9 +105,19 @@ func (s *CartService) AddItem(ctx context.Context, cartID, productID uuid.UUID, 
 		return nil, fmt.Errorf("cart service: hook %s: %w", sdk.HookBeforeCartAdd, err)
 	}
 
-	// Stock validation.
+	// Stock validation – include any quantity already in the cart so that
+	// customers cannot bypass the limit by adding items incrementally.
 	if s.stock != nil {
-		available, err := s.stock.StockAvailable(ctx, productID, variantID, quantity)
+		existingQty := 0
+		if cart, err := s.repo.FindByID(ctx, cartID); err == nil {
+			for _, existing := range cart.Items {
+				if existing.ProductID == productID && uuidPtrEqual(existing.VariantID, variantID) {
+					existingQty = existing.Quantity
+					break
+				}
+			}
+		}
+		available, err := s.stock.StockAvailable(ctx, productID, variantID, existingQty+quantity)
 		if err != nil {
 			return nil, fmt.Errorf("cart service: stock check: %w", err)
 		}
@@ -143,6 +153,21 @@ func (s *CartService) AddItem(ctx context.Context, cartID, productID uuid.UUID, 
 func (s *CartService) UpdateItemQuantity(ctx context.Context, itemID uuid.UUID, quantity int) error {
 	if quantity <= 0 {
 		return fmt.Errorf("cart service: update item: quantity must be greater than zero")
+	}
+
+	// Stock validation against the new absolute quantity.
+	if s.stock != nil {
+		item, err := s.repo.FindItemByID(ctx, itemID)
+		if err != nil {
+			return fmt.Errorf("cart service: update item fetch: %w", err)
+		}
+		available, err := s.stock.StockAvailable(ctx, item.ProductID, item.VariantID, quantity)
+		if err != nil {
+			return fmt.Errorf("cart service: update item stock check: %w", err)
+		}
+		if !available {
+			return ErrInsufficientStock
+		}
 	}
 
 	payload := map[string]interface{}{
@@ -211,3 +236,14 @@ func (s *CartService) RemoveItem(ctx context.Context, itemID uuid.UUID) error {
 
 // Additional domain errors.
 var ErrInsufficientStock = errors.New("insufficient stock")
+
+// uuidPtrEqual compares two nullable UUID pointers for equality.
+func uuidPtrEqual(a, b *uuid.UUID) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}

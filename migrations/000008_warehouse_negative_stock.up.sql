@@ -1,0 +1,1 @@
+ALTER TABLE warehouses ADD COLUMN allow_negative_stock BOOLEAN NOT NULL DEFAULT FALSE;

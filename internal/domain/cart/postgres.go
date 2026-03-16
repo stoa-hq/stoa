@@ -192,6 +192,33 @@ func (r *postgresRepository) RemoveItem(ctx context.Context, itemID uuid.UUID) e
 	return nil
 }
 
+// FindItemByID retrieves a single cart item by its primary key.
+func (r *postgresRepository) FindItemByID(ctx context.Context, itemID uuid.UUID) (*CartItem, error) {
+	const q = `
+		SELECT id, cart_id, product_id, variant_id, quantity, custom_fields
+		FROM cart_items
+		WHERE id = $1`
+
+	var item CartItem
+	var customFieldsRaw []byte
+	err := r.db.QueryRow(ctx, q, itemID).Scan(
+		&item.ID, &item.CartID, &item.ProductID, &item.VariantID,
+		&item.Quantity, &customFieldsRaw,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrItemNotFound
+		}
+		return nil, fmt.Errorf("cart: FindItemByID: %w", err)
+	}
+	if customFieldsRaw != nil {
+		if err := json.Unmarshal(customFieldsRaw, &item.CustomFields); err != nil {
+			return nil, fmt.Errorf("cart: FindItemByID unmarshal custom_fields: %w", err)
+		}
+	}
+	return &item, nil
+}
+
 // CleanExpired removes all carts whose expires_at timestamp has passed.
 func (r *postgresRepository) CleanExpired(ctx context.Context) error {
 	const q = `DELETE FROM carts WHERE expires_at IS NOT NULL AND expires_at <= now()`

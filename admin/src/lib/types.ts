@@ -323,6 +323,51 @@ export interface AuditLog {
 	created_at: string;
 }
 
+// ── Warehouse ─────────────────────────────────────────────────────────────────
+
+export interface Warehouse {
+	id: string;
+	name: string;
+	code: string;
+	active: boolean;
+	allow_negative_stock: boolean;
+	priority: number;
+	address_line1: string;
+	address_line2: string;
+	city: string;
+	state: string;
+	postal_code: string;
+	country: string;
+	custom_fields?: Record<string, unknown>;
+	metadata?: Record<string, unknown>;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface WarehouseStock {
+	id: string;
+	warehouse_id: string;
+	product_id: string;
+	variant_id?: string;
+	quantity: number;
+	warehouse_name?: string;
+	warehouse_code?: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface StockMovement {
+	id: string;
+	warehouse_id: string;
+	product_id: string;
+	variant_id?: string;
+	order_id?: string;
+	movement_type: string;
+	quantity: number;
+	reference: string;
+	created_at: string;
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface PaginationParams {

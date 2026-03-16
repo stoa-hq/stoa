@@ -7,12 +7,12 @@ import (
 
 // Hook names follow the pattern: entity.before_action / entity.after_action
 const (
-	HookBeforeProductCreate  = "product.before_create"
-	HookAfterProductCreate   = "product.after_create"
-	HookBeforeProductUpdate  = "product.before_update"
-	HookAfterProductUpdate   = "product.after_update"
-	HookBeforeProductDelete  = "product.before_delete"
-	HookAfterProductDelete   = "product.after_delete"
+	HookBeforeProductCreate = "product.before_create"
+	HookAfterProductCreate  = "product.after_create"
+	HookBeforeProductUpdate = "product.before_update"
+	HookAfterProductUpdate  = "product.after_update"
+	HookBeforeProductDelete = "product.before_delete"
+	HookAfterProductDelete  = "product.after_delete"
 
 	HookBeforeCategoryCreate = "category.before_create"
 	HookAfterCategoryCreate  = "category.after_create"
@@ -21,17 +21,17 @@ const (
 	HookBeforeCategoryDelete = "category.before_delete"
 	HookAfterCategoryDelete  = "category.after_delete"
 
-	HookBeforeOrderCreate    = "order.before_create"
-	HookAfterOrderCreate     = "order.after_create"
-	HookBeforeOrderUpdate    = "order.before_update"
-	HookAfterOrderUpdate     = "order.after_update"
+	HookBeforeOrderCreate = "order.before_create"
+	HookAfterOrderCreate  = "order.after_create"
+	HookBeforeOrderUpdate = "order.before_update"
+	HookAfterOrderUpdate  = "order.after_update"
 
-	HookBeforeCartAdd        = "cart.before_add_item"
-	HookAfterCartAdd         = "cart.after_add_item"
-	HookBeforeCartUpdate     = "cart.before_update_item"
-	HookAfterCartUpdate      = "cart.after_update_item"
-	HookBeforeCartRemove     = "cart.before_remove_item"
-	HookAfterCartRemove      = "cart.after_remove_item"
+	HookBeforeCartAdd    = "cart.before_add_item"
+	HookAfterCartAdd     = "cart.after_add_item"
+	HookBeforeCartUpdate = "cart.before_update_item"
+	HookAfterCartUpdate  = "cart.after_update_item"
+	HookBeforeCartRemove = "cart.before_remove_item"
+	HookAfterCartRemove  = "cart.after_remove_item"
 
 	HookBeforeCustomerCreate = "customer.before_create"
 	HookAfterCustomerCreate  = "customer.after_create"
@@ -41,13 +41,9 @@ const (
 	HookAfterPaymentComplete = "payment.after_complete"
 	HookAfterPaymentFailed   = "payment.after_failed"
 
-<<<<<<< Updated upstream
-	HookBeforeCheckout       = "checkout.before"
-	HookAfterCheckout        = "checkout.after"
-=======
-	HookBeforeCheckout        = "checkout.before"
-	HookAfterCheckout         = "checkout.after"
-	HookAfterCheckoutFailed   = "checkout.after_failed"
+	HookBeforeCheckout      = "checkout.before"
+	HookAfterCheckout       = "checkout.after"
+	HookAfterCheckoutFailed = "checkout.after_failed"
 
 	HookBeforeWarehouseCreate = "warehouse.before_create"
 	HookAfterWarehouseCreate  = "warehouse.after_create"
@@ -58,7 +54,6 @@ const (
 	HookBeforeStockUpdate     = "warehouse.before_stock_update"
 	HookAfterStockUpdate      = "warehouse.after_stock_update"
 	HookAfterStockDeduct      = "warehouse.after_stock_deduct"
->>>>>>> Stashed changes
 )
 
 // HookHandler is the function signature for hook handlers.

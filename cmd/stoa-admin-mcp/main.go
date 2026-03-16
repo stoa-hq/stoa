@@ -43,6 +43,7 @@ Available operations:
 - Tags: manage product tags
 - Media: list and delete uploaded files
 - Shipping/Tax/Payment: view configuration
+- Warehouses: CRUD operations, stock management per warehouse/product
 - Audit log: review all changes
 
 Prices are in cents (1999 = 19.99 EUR). Tax rates are in basis points (1900 = 19%).

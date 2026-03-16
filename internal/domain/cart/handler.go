@@ -152,6 +152,8 @@ func (h *Handler) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ErrItemNotFound):
 			h.writeError(w, http.StatusNotFound, "not_found", "cart item not found")
+		case errors.Is(err, ErrInsufficientStock):
+			h.writeError(w, http.StatusUnprocessableEntity, "insufficient_stock", "requested quantity exceeds available stock")
 		default:
 			h.logger.Error().Err(err).Str("item_id", itemID.String()).Msg("cart handler: update item")
 			h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to update cart item")

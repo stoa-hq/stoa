@@ -31,6 +31,7 @@ import (
 	"github.com/stoa-hq/stoa/internal/domain/discount"
 	domainmedia "github.com/stoa-hq/stoa/internal/domain/media"
 	"github.com/stoa-hq/stoa/internal/domain/order"
+	"github.com/stoa-hq/stoa/internal/domain/warehouse"
 	"github.com/stoa-hq/stoa/internal/domain/payment"
 	"github.com/stoa-hq/stoa/internal/domain/product"
 	"github.com/stoa-hq/stoa/internal/domain/shipping"
@@ -151,6 +152,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	tagRepo      := tag.NewPostgresRepository(pool, log)
 	auditRepo    := audit.NewPostgresRepository(pool, log)
 	mediaRepo    := domainmedia.NewPostgresRepository(pool, log)
+	warehouseRepo := warehouse.NewPostgresRepository(pool, log)
 
 	// ── Media storage backend ──────────────────────────────────────────────────
 
@@ -179,10 +181,11 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 	// ── Services ──────────────────────────────────────────────────────────────
 
+	warehouseSvc := warehouse.NewService(warehouseRepo, hooks, log)
 	categorySvc := category.NewService(categoryRepo, hooks, log)
 	customerSvc := customer.NewCustomerService(customerRepo, hooks, log)
-	orderSvc    := order.NewService(orderRepo, hooks, log)
-	cartSvc     := cart.NewCartService(cartRepo, productRepo, hooks, log)
+	orderSvc    := order.NewService(orderRepo, &orderStockAdapter{ws: warehouseSvc}, hooks, log)
+	cartSvc     := cart.NewCartService(cartRepo, warehouseSvc, hooks, log)
 	taxSvc      := tax.NewService(taxRepo, hooks, log)
 	pmethodSvc  := payment.NewMethodService(pmethodRepo, hooks, log)
 	ptxSvc      := payment.NewTransactionService(ptxRepo, hooks, log)
@@ -262,6 +265,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	tagH      := tag.NewHandler(tagSvc, log)
 	auditH    := audit.NewHandler(auditSvc, log)
 	mediaH    := domainmedia.NewHandler(mediaSvc, log)
+	warehouseH := warehouse.NewHandler(warehouseSvc, validate, log)
 	settingsH := settings.NewHandler(cfg, log)
 
 	// ── Routes ────────────────────────────────────────────────────────────────
@@ -298,6 +302,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		tagH.RegisterAdminRoutes(r)
 		auditH.RegisterAdminRoutes(r)
 		mediaH.RegisterAdminRoutes(r)
+		warehouseH.RegisterAdminRoutes(r)
 		settingsH.RegisterAdminRoutes(r)
 		r.Get("/plugin-manifest", manifestH.AdminManifest)
 	})
@@ -460,4 +465,27 @@ func (a *App) migratePaymentEncryption(cfg *config.Config) error {
 		return nil
 	}
 	return migrator.MigrateEncryption(context.Background())
+}
+
+// orderStockAdapter bridges warehouse.Service to order.stockDeductor by converting
+// between the two StockDeductionItem types (avoiding circular imports).
+type orderStockAdapter struct {
+	ws *warehouse.Service
+}
+
+func (a *orderStockAdapter) DeductStock(ctx context.Context, items []order.StockDeductionItem) error {
+	whItems := make([]warehouse.StockDeductionItem, len(items))
+	for i, it := range items {
+		whItems[i] = warehouse.StockDeductionItem{
+			ProductID: it.ProductID,
+			VariantID: it.VariantID,
+			Quantity:  it.Quantity,
+			OrderID:   it.OrderID,
+		}
+	}
+	return a.ws.DeductStock(ctx, whItems)
+}
+
+func (a *orderStockAdapter) RestoreStock(ctx context.Context, orderID uuid.UUID) error {
+	return a.ws.RestoreStock(ctx, orderID)
 }

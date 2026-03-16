@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/stoa-hq/stoa/internal/domain/warehouse"
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
@@ -25,8 +26,16 @@ func newTestHandler(repo OrderRepository, paymentCheckFn PaymentMethodCheckFn, h
 	if hooks == nil {
 		hooks = sdk.NewHookRegistry()
 	}
-	svc := NewService(repo, hooks, zerolog.Nop())
+	svc := NewService(repo, nil, hooks, zerolog.Nop())
 	return NewHandler(svc, nil, nil, paymentCheckFn, validator.New(), zerolog.Nop())
+}
+
+func newTestHandlerWithStock(repo OrderRepository, stock stockDeductor, hooks *sdk.HookRegistry) *Handler {
+	if hooks == nil {
+		hooks = sdk.NewHookRegistry()
+	}
+	svc := NewService(repo, stock, hooks, zerolog.Nop())
+	return NewHandler(svc, nil, nil, nil, validator.New(), zerolog.Nop())
 }
 
 func checkoutBody(t *testing.T, pmID *uuid.UUID) *bytes.Buffer {
@@ -266,4 +275,52 @@ func TestStoreCheckout_AfterHookError_OrderStillCreated(t *testing.T) {
 	if !created {
 		t.Error("expected order to be created despite after-hook error")
 	}
+}
+
+func TestStoreCheckout_InsufficientStock_422(t *testing.T) {
+	repo := &mockOrderRepo{}
+	stock := &mockStockDeductor{
+		deductStock: func(_ context.Context, _ []StockDeductionItem) error {
+			return warehouse.ErrInsufficientStock
+		},
+	}
+	h := newTestHandlerWithStock(repo, stock, nil)
+
+	body := checkoutBodyWithProductID(t)
+	rr := doCheckout(h, body)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp apiResponse
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if len(resp.Errors) == 0 || resp.Errors[0].Code != "insufficient_stock" {
+		t.Errorf("expected insufficient_stock error, got %+v", resp.Errors)
+	}
+}
+
+func checkoutBodyWithProductID(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	pid := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items: []CheckoutItemRequest{
+			{
+				SKU:            "TEST-001",
+				Name:           "Test Item",
+				Quantity:       5,
+				UnitPriceNet:   1000,
+				UnitPriceGross: 1190,
+				TaxRate:        1900,
+				ProductID:      &pid,
+			},
+		},
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal checkout request: %v", err)
+	}
+	return bytes.NewBuffer(body)
 }
