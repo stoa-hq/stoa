@@ -19,12 +19,22 @@
 
 	// Stripe / plugin payment flow state
 	let awaitingPayment = $state(false);
+	let awaitingProviderPayment = $state(false);
 	let orderId = $state('');
 	let orderNumber = $state('');
 	let guestToken = $state('');
+	let paymentReference = $state('');
 
 	const hasPaymentPlugin = $derived(
 		($pluginStore.extensions ?? []).some((e) => e.slot === 'storefront:checkout:payment')
+	);
+
+	const selectedPaymentMethod = $derived(
+		paymentMethods.find((m) => m.id === selectedPayment)
+	);
+
+	const hasProvider = $derived(
+		selectedPaymentMethod?.provider ? selectedPaymentMethod.provider !== '' : false
 	);
 
 	let shippingMethods = $state<ShippingMethod[]>([]);
@@ -130,50 +140,75 @@
 		}
 	});
 
+	function buildAddresses() {
+		const shippingAddress = {
+			first_name: form.first_name,
+			last_name: form.last_name,
+			street: form.street,
+			city: form.city,
+			zip: form.zip,
+			country_code: form.country_code,
+			email: form.email
+		};
+
+		const billingAddress = sameAsShipping ? shippingAddress : {
+			first_name: billingForm.first_name,
+			last_name: billingForm.last_name,
+			street: billingForm.street,
+			city: billingForm.city,
+			zip: billingForm.zip,
+			country_code: billingForm.country_code,
+			email: billingForm.email
+		};
+
+		return { shippingAddress, billingAddress };
+	}
+
+	async function submitCheckout(ref?: string) {
+		const { shippingAddress, billingAddress } = buildAddresses();
+
+		const payload: Record<string, unknown> = {
+			currency: 'EUR',
+			billing_address: billingAddress,
+			shipping_address: shippingAddress,
+			shipping_method_id: selectedShipping || undefined,
+			payment_method_id: selectedPayment || undefined,
+			items: lineItems.map((i) => ({
+				product_id: i.product_id,
+				variant_id: i.variant_id,
+				sku: i.sku,
+				name: i.name,
+				quantity: i.quantity,
+				unit_price_net: i.price_net,
+				unit_price_gross: i.price_gross,
+				tax_rate: 0
+			}))
+		};
+
+		if (ref) {
+			payload.payment_reference = ref;
+		}
+
+		const res = await ordersApi.checkout(payload);
+		return res;
+	}
+
 	async function placeOrder() {
 		submitting = true;
 		error = '';
 		try {
-			const shippingAddress = {
-				first_name: form.first_name,
-				last_name: form.last_name,
-				street: form.street,
-				city: form.city,
-				zip: form.zip,
-				country_code: form.country_code,
-				email: form.email
-			};
+			// Provider-based payment (e.g. Stripe): show payment UI before creating order.
+			if (hasPaymentPlugin && hasProvider) {
+				awaitingProviderPayment = true;
+				submitting = false;
+				return;
+			}
 
-			const billingAddress = sameAsShipping ? shippingAddress : {
-				first_name: billingForm.first_name,
-				last_name: billingForm.last_name,
-				street: billingForm.street,
-				city: billingForm.city,
-				zip: billingForm.zip,
-				country_code: billingForm.country_code,
-				email: billingForm.email
-			};
+			// Manual payment method or no plugin: create order directly.
+			const res = await submitCheckout();
 
-			const res = await ordersApi.checkout({
-				currency: 'EUR',
-				billing_address: billingAddress,
-				shipping_address: shippingAddress,
-				shipping_method_id: selectedShipping || undefined,
-				payment_method_id: selectedPayment || undefined,
-				items: lineItems.map((i) => ({
-					product_id: i.product_id,
-					variant_id: i.variant_id,
-					sku: i.sku,
-					name: i.name,
-					quantity: i.quantity,
-					unit_price_net: i.price_net,
-					unit_price_gross: i.price_gross,
-					tax_rate: 0
-				}))
-			});
-
-			if (hasPaymentPlugin && res.data?.id) {
-				// A payment plugin handles the payment flow — show its UI.
+			if (hasPaymentPlugin && !hasProvider && res.data?.id) {
+				// Legacy flow: plugin payment after order creation (non-provider plugins).
 				orderId = res.data.id;
 				orderNumber = res.data.order_number ?? '';
 				guestToken = res.data.guest_token ?? '';
@@ -189,11 +224,29 @@
 		}
 	}
 
-	function handlePluginEvent(e: CustomEvent) {
+	async function handlePluginEvent(e: CustomEvent) {
 		const detail = e.detail;
 		if (detail?.type === 'payment-success') {
-			cartStore.clear();
-			goto(`/checkout/success?order=${orderNumber}`);
+			if (awaitingProviderPayment && detail.paymentIntentId) {
+				// Pay-first flow: payment succeeded → now create the order with reference.
+				paymentReference = detail.paymentIntentId;
+				awaitingProviderPayment = false;
+				submitting = true;
+				error = '';
+				try {
+					const res = await submitCheckout(paymentReference);
+					cartStore.clear();
+					goto(`/checkout/success?order=${res.data?.order_number ?? ''}`);
+				} catch (e: unknown) {
+					error = (e as Error).message ?? $t('checkout.orderError');
+				} finally {
+					submitting = false;
+				}
+			} else {
+				// Legacy flow: order already created, payment confirmed via webhook.
+				cartStore.clear();
+				goto(`/checkout/success?order=${orderNumber}`);
+			}
 		} else if (detail?.type === 'payment-error') {
 			error = detail.message ?? $t('checkout.orderError');
 		}
@@ -321,7 +374,16 @@
 					</div>
 				{/if}
 
-				<!-- Plugin payment (shown after order creation) -->
+				<!-- Plugin payment: pre-order (pay first, then create order) -->
+				{#if awaitingProviderPayment}
+					<PluginSlot
+						slot="storefront:checkout:payment"
+						context={{ amount: total, currency: 'EUR', paymentMethodId: selectedPayment }}
+						onEvent={handlePluginEvent}
+					/>
+				{/if}
+
+				<!-- Plugin payment: legacy post-order flow -->
 				{#if awaitingPayment}
 					<PluginSlot
 						slot="storefront:checkout:payment"
@@ -361,7 +423,7 @@
 
 					<button
 						onclick={placeOrder}
-						disabled={submitting || awaitingPayment || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip
+						disabled={submitting || awaitingPayment || awaitingProviderPayment || !form.first_name || !form.last_name || !form.street || !form.city || !form.zip
 							|| (!sameAsShipping && (!billingForm.first_name || !billingForm.last_name || !billingForm.street || !billingForm.city || !billingForm.zip))}
 						class="btn btn-primary btn-lg w-full mt-4"
 					>

@@ -1,0 +1,1 @@
+Use the stoa-research skill to search the Stoa codebase and documentation for implementation details, code references, and architecture information. Use when you need to find how something is implemented, where code is used, or understand how components connect.

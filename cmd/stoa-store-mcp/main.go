@@ -29,6 +29,15 @@ func safeRegisterPluginTools(mp sdk.MCPStorePlugin, s *server.MCPServer, client 
 	return nil
 }
 
+func useStdio() bool {
+	for _, arg := range os.Args[1:] {
+		if arg == "--stdio" {
+			return true
+		}
+	}
+	return os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
+}
+
 func main() {
 	cfg := stoamcp.LoadConfig()
 	client := stoamcp.NewStoaClient(cfg)
@@ -65,6 +74,14 @@ Prices are in cents (e.g. 1999 = 19.99 EUR). Tax rates are in basis points (1900
 			}
 			log.Printf("registered store MCP tools from plugin: %s", p.Name())
 		}
+	}
+
+	if useStdio() {
+		stdio := server.NewStdioServer(s)
+		if err := stdio.Listen(context.Background(), os.Stdin, os.Stdout); err != nil {
+			log.Fatalf("stdio server error: %v", err)
+		}
+		return
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

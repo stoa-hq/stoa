@@ -18,6 +18,7 @@ type CheckoutRequest struct {
 	PaymentMethodID  *uuid.UUID             `json:"payment_method_id"`
 	ShippingMethodID *uuid.UUID             `json:"shipping_method_id"`
 	Notes            string                 `json:"notes,omitempty"   validate:"omitempty,max=1000"`
+	PaymentReference string                 `json:"payment_reference,omitempty" validate:"omitempty,max=255"`
 	Items            []CheckoutItemRequest  `json:"items"             validate:"required,min=1,dive"`
 	CustomFields     map[string]interface{} `json:"custom_fields,omitempty"`
 }
@@ -88,6 +89,7 @@ type OrderResponse struct {
 	PaymentMethodID  *uuid.UUID                   `json:"payment_method_id,omitempty"`
 	ShippingMethodID *uuid.UUID                   `json:"shipping_method_id,omitempty"`
 	Notes            string                       `json:"notes,omitempty"`
+	PaymentReference string                       `json:"payment_reference,omitempty"`
 	CustomFields     map[string]interface{}       `json:"custom_fields,omitempty"`
 	CreatedAt        time.Time                    `json:"created_at"`
 	UpdatedAt        time.Time                    `json:"updated_at"`
@@ -118,6 +120,7 @@ func ToResponse(o *Order) OrderResponse {
 		PaymentMethodID:  o.PaymentMethodID,
 		ShippingMethodID: o.ShippingMethodID,
 		Notes:            o.Notes,
+		PaymentReference: o.PaymentReference,
 		CustomFields:     o.CustomFields,
 		CreatedAt:        o.CreatedAt,
 		UpdatedAt:        o.UpdatedAt,
@@ -168,6 +171,7 @@ func FromCheckoutRequest(req *CheckoutRequest, customerID *uuid.UUID) *Order {
 		PaymentMethodID:  req.PaymentMethodID,
 		ShippingMethodID: req.ShippingMethodID,
 		Notes:            req.Notes,
+		PaymentReference: req.PaymentReference,
 		CustomFields:     req.CustomFields,
 	}
 

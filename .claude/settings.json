@@ -19,6 +19,10 @@
     "stoa-docs": {
       "description": "Document a new feature or change in the stoa-docs VitePress repo. Use when creating or updating documentation for any Stoa feature, plugin, API endpoint, or domain.",
       "path": ".claude/skills/stoa-docs.md"
+    },
+    "stoa-research": {
+      "description": "Search Stoa codebase and documentation using jcodemunch and jdocmunch. Use when you need to find implementation details, code references, architecture info, or understand how components work.",
+      "path": ".claude/skills/stoa-research.md"
     }
   }
 }

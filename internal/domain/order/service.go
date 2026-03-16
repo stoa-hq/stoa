@@ -145,6 +145,15 @@ func (s *Service) DispatchHook(ctx context.Context, event string, entity interfa
 	})
 }
 
+// DispatchHookWithMetadata dispatches a hook event with additional metadata.
+func (s *Service) DispatchHookWithMetadata(ctx context.Context, event string, entity interface{}, metadata map[string]interface{}) error {
+	return s.hooks.Dispatch(ctx, &sdk.HookEvent{
+		Name:     event,
+		Entity:   entity,
+		Metadata: metadata,
+	})
+}
+
 // -------------------------------------------------------------------
 // Business logic helpers
 // -------------------------------------------------------------------
