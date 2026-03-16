@@ -245,6 +245,39 @@ func TestService_UpdateStatus_Success(t *testing.T) {
 	}
 }
 
+func TestService_UpdateStatus_PaymentReferenceInChanges(t *testing.T) {
+	id := uuid.New()
+	payRef := "pi_test_abc123"
+
+	var afterChanges map[string]interface{}
+	hooks := sdk.NewHookRegistry()
+	hooks.On(sdk.HookAfterOrderUpdate, func(_ context.Context, event *sdk.HookEvent) error {
+		afterChanges = event.Changes
+		return nil
+	})
+
+	repo := &mockOrderRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Order, error) {
+			return &Order{ID: id, Status: StatusPending, PaymentReference: payRef}, nil
+		},
+		updateStatus: func(_ context.Context, _ uuid.UUID, _, _, _ string) error {
+			return nil
+		},
+	}
+	svc := NewService(repo, nil, hooks, zerolog.Nop())
+	if err := svc.UpdateStatus(context.Background(), id, StatusConfirmed, "pay done"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := afterChanges["payment_reference"].(string)
+	if !ok {
+		t.Fatal("payment_reference not present in after_update changes")
+	}
+	if got != payRef {
+		t.Errorf("payment_reference: got %q, want %q", got, payRef)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // GenerateOrderNumber
 // ---------------------------------------------------------------------------

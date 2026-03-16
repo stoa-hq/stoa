@@ -149,9 +149,10 @@ func (s *Service) UpdateStatus(ctx context.Context, id uuid.UUID, toStatus, comm
 	}
 
 	changes := map[string]interface{}{
-		"from_status": existing.Status,
-		"to_status":   toStatus,
-		"comment":     comment,
+		"from_status":       existing.Status,
+		"to_status":         toStatus,
+		"comment":           comment,
+		"payment_reference": existing.PaymentReference,
 	}
 
 	if err := s.hooks.Dispatch(ctx, &sdk.HookEvent{
