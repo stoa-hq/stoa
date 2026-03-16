@@ -298,6 +298,18 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.Create(r.Context(), o); err != nil {
+<<<<<<< Updated upstream
+=======
+		if errors.Is(err, warehouse.ErrInsufficientStock) {
+			// Dispatch non-fatal: Plugins können Zahlung rückerstatten.
+			if hookErr := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookAfterCheckoutFailed, o, hookMeta); hookErr != nil {
+				h.logger.Warn().Err(hookErr).Str("order_id", o.ID.String()).Msg("after_checkout_failed hook returned error")
+			}
+			h.writeError(w, http.StatusUnprocessableEntity, "insufficient_stock",
+				"one or more items are out of stock", "")
+			return
+		}
+>>>>>>> Stashed changes
 		h.serverError(w, r, err)
 		return
 	}
