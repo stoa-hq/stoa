@@ -66,6 +66,16 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 
 	// Audit (1)
 	register(adminListAuditLog)
+
+	// Warehouses (8)
+	register(adminListWarehouses)
+	register(adminGetWarehouse)
+	register(adminCreateWarehouse)
+	register(adminUpdateWarehouse)
+	register(adminDeleteWarehouse)
+	register(adminGetWarehouseStock)
+	register(adminSetWarehouseStock)
+	register(adminGetProductStock)
 }
 
 // buildQueryParams builds a URL query string from request arguments.

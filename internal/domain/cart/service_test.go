@@ -16,11 +16,12 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockCartRepo struct {
-	create     func(ctx context.Context, c *Cart) error
-	findByID   func(ctx context.Context, id uuid.UUID) (*Cart, error)
-	addItem    func(ctx context.Context, item *CartItem) error
-	updateItem func(ctx context.Context, itemID uuid.UUID, quantity int) error
-	removeItem func(ctx context.Context, itemID uuid.UUID) error
+	create         func(ctx context.Context, c *Cart) error
+	findByID       func(ctx context.Context, id uuid.UUID) (*Cart, error)
+	findItemByID   func(ctx context.Context, itemID uuid.UUID) (*CartItem, error)
+	addItem        func(ctx context.Context, item *CartItem) error
+	updateItem     func(ctx context.Context, itemID uuid.UUID, quantity int) error
+	removeItem     func(ctx context.Context, itemID uuid.UUID) error
 }
 
 func (m *mockCartRepo) Create(ctx context.Context, c *Cart) error {
@@ -61,6 +62,12 @@ func (m *mockCartRepo) RemoveItem(ctx context.Context, itemID uuid.UUID) error {
 	return nil
 }
 func (m *mockCartRepo) CleanExpired(_ context.Context) error { return nil }
+func (m *mockCartRepo) FindItemByID(ctx context.Context, itemID uuid.UUID) (*CartItem, error) {
+	if m.findItemByID != nil {
+		return m.findItemByID(ctx, itemID)
+	}
+	return nil, ErrItemNotFound
+}
 
 // ---------------------------------------------------------------------------
 // Mock stockChecker
@@ -245,6 +252,83 @@ func TestCartService_UpdateItem_Success(t *testing.T) {
 	if updatedQty != 5 {
 		t.Errorf("quantity sent to repo: got %d, want 5", updatedQty)
 	}
+}
+
+func TestCartService_AddItem_ExistingQuantityIncluded(t *testing.T) {
+	// Cart already has 3 units of the product; adding 2 more should trigger
+	// a stock check for 5 (not just 2).
+	productID := uuid.New()
+	cartID := uuid.New()
+	repo := &mockCartRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Cart, error) {
+			return &Cart{
+				ID: cartID,
+				Items: []CartItem{
+					{ProductID: productID, Quantity: 3},
+				},
+			}, nil
+		},
+		addItem: func(_ context.Context, _ *CartItem) error { return nil },
+	}
+	stockFn := &capturingStock{available: true}
+
+	svc := NewCartService(repo, stockFn, sdk.NewHookRegistry(), zerolog.Nop())
+	_, err := svc.AddItem(context.Background(), cartID, productID, nil, 2, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stockFn.capturedQty != 5 {
+		t.Errorf("expected stock check with qty=5 (existing=3 + new=2), got %d", stockFn.capturedQty)
+	}
+}
+
+func TestCartService_AddItem_ExistingQuantityBlocksAdd(t *testing.T) {
+	// Cart already has 8 units; adding 5 more would be 13 which is unavailable.
+	productID := uuid.New()
+	cartID := uuid.New()
+	repo := &mockCartRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Cart, error) {
+			return &Cart{
+				ID:    cartID,
+				Items: []CartItem{{ProductID: productID, Quantity: 8}},
+			}, nil
+		},
+	}
+	stockFn := &capturingStock{available: false}
+	svc := NewCartService(repo, stockFn, sdk.NewHookRegistry(), zerolog.Nop())
+	_, err := svc.AddItem(context.Background(), cartID, productID, nil, 5, nil)
+	if !errors.Is(err, ErrInsufficientStock) {
+		t.Errorf("expected ErrInsufficientStock, got %v", err)
+	}
+	if stockFn.capturedQty != 13 {
+		t.Errorf("expected stock check qty=13, got %d", stockFn.capturedQty)
+	}
+}
+
+func TestCartService_UpdateItem_InsufficientStock(t *testing.T) {
+	itemID := uuid.New()
+	productID := uuid.New()
+	repo := &mockCartRepo{
+		findItemByID: func(_ context.Context, _ uuid.UUID) (*CartItem, error) {
+			return &CartItem{ID: itemID, ProductID: productID}, nil
+		},
+	}
+	svc := NewCartService(repo, &mockStock{available: false}, sdk.NewHookRegistry(), zerolog.Nop())
+	err := svc.UpdateItemQuantity(context.Background(), itemID, 10)
+	if !errors.Is(err, ErrInsufficientStock) {
+		t.Errorf("expected ErrInsufficientStock, got %v", err)
+	}
+}
+
+// capturingStock captures the quantity passed to StockAvailable.
+type capturingStock struct {
+	capturedQty int
+	available   bool
+}
+
+func (c *capturingStock) StockAvailable(_ context.Context, _ uuid.UUID, _ *uuid.UUID, qty int) (bool, error) {
+	c.capturedQty = qty
+	return c.available, nil
 }
 
 // ---------------------------------------------------------------------------

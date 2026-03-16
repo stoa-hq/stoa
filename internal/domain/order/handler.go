@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/stoa-hq/stoa/internal/domain/warehouse"
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
@@ -298,6 +299,11 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.Create(r.Context(), o); err != nil {
+		if errors.Is(err, warehouse.ErrInsufficientStock) {
+			h.writeError(w, http.StatusUnprocessableEntity, "insufficient_stock",
+				"one or more items are out of stock", "")
+			return
+		}
 		h.serverError(w, r, err)
 		return
 	}

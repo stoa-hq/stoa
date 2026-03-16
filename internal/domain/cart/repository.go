@@ -34,4 +34,7 @@ type CartRepository interface {
 
 	// CleanExpired removes all carts whose expiry timestamp is in the past.
 	CleanExpired(ctx context.Context) error
+
+	// FindItemByID retrieves a single cart line item by its primary key.
+	FindItemByID(ctx context.Context, itemID uuid.UUID) (*CartItem, error)
 }

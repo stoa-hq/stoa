@@ -4,6 +4,7 @@
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import { productsApi } from '$lib/api/products';
+  import { warehousesApi } from '$lib/api/warehouses';
   import { categoriesApi } from '$lib/api/categories';
   import { tagsApi } from '$lib/api/tags';
   import { mediaApi } from '$lib/api/media';
@@ -37,7 +38,6 @@
 
   let form = $state({
     sku: '',
-    stock: 0,
     active: true,
   });
 
@@ -78,6 +78,12 @@
   let productMediaIds = $state<string[]>([]);
   let showMediaPicker = $state(false);
 
+  // Warehouse stock
+  let warehouseStock = $state<any[]>([]);
+  let editingWarehouseStock = $state(false);
+  let warehouseStockEdits = $state<Record<string, number>>({});
+  let savingWarehouseStock = $state(false);
+
   let allTaxRules = $state<any[]>([]);
   let selectedTaxRuleId = $state('');
   let priceMode = $state<'gross' | 'net'>('gross');
@@ -105,7 +111,6 @@
       const product = res.data;
       form = {
         sku: product.sku ?? '',
-        stock: product.stock ?? 0,
         active: product.active ?? true,
       };
       translations = translationsFromArray(product.translations, FIELDS);
@@ -119,6 +124,11 @@
       allTaxRules = (taxRes as any).data ?? [];
       selectedTaxRuleId = product.tax_rule_id ?? '';
       allPropertyGroups = pgRes.data ?? [];
+      // Load warehouse stock (non-fatal).
+      try {
+        const whRes = await warehousesApi.getProductStock(id);
+        warehouseStock = whRes.data ?? [];
+      } catch { /* non-fatal */ }
       if (product.price_net > 0 && product.price_gross === 0) {
         priceMode = 'net';
         enteredPrice = product.price_net;
@@ -163,7 +173,6 @@
         price_gross: priceMode === 'gross' ? Number(enteredPrice) : 0,
         price_net: priceMode === 'net' ? Number(enteredPrice) : 0,
         tax_rule_id: selectedTaxRuleId || null,
-        stock: Number(form.stock),
         category_ids: selectedCategoryIds,
         tag_ids: selectedTagIds,
         translations: translationsToArray(translations),
@@ -325,6 +334,49 @@
       generateSelections = { ...generateSelections, [groupId]: [...current, optId] };
     }
   }
+
+  function startEditWarehouseStock() {
+    editingWarehouseStock = true;
+    warehouseStockEdits = {};
+    for (const s of warehouseStock) {
+      warehouseStockEdits[s.id] = s.quantity;
+    }
+  }
+
+  function cancelEditWarehouseStock() {
+    editingWarehouseStock = false;
+    warehouseStockEdits = {};
+  }
+
+  async function saveWarehouseStock() {
+    savingWarehouseStock = true;
+    try {
+      // Group changes by warehouse_id
+      const byWarehouse: Record<string, any[]> = {};
+      for (const s of warehouseStock) {
+        if (warehouseStockEdits[s.id] !== undefined && warehouseStockEdits[s.id] !== s.quantity) {
+          if (!byWarehouse[s.warehouse_id]) byWarehouse[s.warehouse_id] = [];
+          byWarehouse[s.warehouse_id].push({
+            product_id: s.product_id,
+            variant_id: s.variant_id ?? undefined,
+            quantity: warehouseStockEdits[s.id],
+            reference: 'admin-product-edit',
+          });
+        }
+      }
+      for (const [whId, items] of Object.entries(byWarehouse)) {
+        await warehousesApi.setStock(whId, items);
+      }
+      const whRes = await warehousesApi.getProductStock(id);
+      warehouseStock = whRes.data ?? [];
+      editingWarehouseStock = false;
+      notifications.success($t('warehouses.stockSaved'));
+    } catch {
+      notifications.error($t('common.saveFailed'));
+    } finally {
+      savingWarehouseStock = false;
+    }
+  }
 </script>
 
 <div class="mb-6">
@@ -403,11 +455,6 @@
           {$fmt.price(calculatedPrice)}
         </p>
       {/if}
-
-      <div>
-        <label class="label" for="stock">{$t('products.lagerbestand')}</label>
-        <input id="stock" class="input" type="number" min="0" bind:value={form.stock} />
-      </div>
 
       <div>
         <p class="label">{$t('products.categories')}</p>
@@ -708,6 +755,54 @@
       </div>
     </form>
   </Modal>
+{/if}
+
+<!-- Warehouse Stock -->
+{#if warehouseStock.length > 0}
+  <div class="card p-6 max-w-2xl mt-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-[var(--text)]">{$t('warehouses.stockOverview')}</h2>
+      {#if !editingWarehouseStock}
+        <button class="btn btn-secondary btn-sm" onclick={startEditWarehouseStock}>{$t('common.edit')}</button>
+      {/if}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-[var(--card-border)]">
+        <thead>
+          <tr>
+            <th class="table-header">{$t('warehouses.title')}</th>
+            <th class="table-header">{$t('warehouses.code')}</th>
+            <th class="table-header">{$t('warehouses.variantSku')}</th>
+            <th class="table-header">{$t('warehouses.quantity')}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[var(--card-border)]">
+          {#each warehouseStock as stock}
+            <tr class="table-row">
+              <td class="table-cell text-[var(--text)]">{stock.warehouse_name || stock.warehouse_id.slice(0, 8)}</td>
+              <td class="table-cell font-mono text-sm text-[var(--text-muted)]">{stock.warehouse_code || '—'}</td>
+              <td class="table-cell font-mono text-sm text-[var(--text-muted)]">{stock.variant_sku || '—'}</td>
+              <td class="table-cell tabular-nums">
+                {#if editingWarehouseStock}
+                  <input type="number" min="0" class="input w-24" bind:value={warehouseStockEdits[stock.id]} />
+                {:else}
+                  {stock.quantity}
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    {#if editingWarehouseStock}
+      <div class="flex gap-3 mt-4">
+        <button class="btn btn-primary btn-sm" onclick={saveWarehouseStock} disabled={savingWarehouseStock}>
+          {savingWarehouseStock ? $t('common.saving') : $t('common.save')}
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick={cancelEditWarehouseStock}>{$t('common.cancel')}</button>
+      </div>
+    {/if}
+  </div>
 {/if}
 
 <!-- Alle Kombinationen generieren -->

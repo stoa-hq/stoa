@@ -43,6 +43,16 @@ const (
 
 	HookBeforeCheckout       = "checkout.before"
 	HookAfterCheckout        = "checkout.after"
+
+	HookBeforeWarehouseCreate = "warehouse.before_create"
+	HookAfterWarehouseCreate  = "warehouse.after_create"
+	HookBeforeWarehouseUpdate = "warehouse.before_update"
+	HookAfterWarehouseUpdate  = "warehouse.after_update"
+	HookBeforeWarehouseDelete = "warehouse.before_delete"
+	HookAfterWarehouseDelete  = "warehouse.after_delete"
+	HookBeforeStockUpdate     = "warehouse.before_stock_update"
+	HookAfterStockUpdate      = "warehouse.after_stock_update"
+	HookAfterStockDeduct      = "warehouse.after_stock_deduct"
 )
 
 // HookHandler is the function signature for hook handlers.
