@@ -74,9 +74,15 @@ type I18nConfig struct {
 }
 
 type SecurityConfig struct {
-	RateLimit  RateLimitConfig `mapstructure:"rate_limit"`
-	BcryptCost int             `mapstructure:"bcrypt_cost"`
-	CSRF       CSRFConfig      `mapstructure:"csrf"`
+	RateLimit  RateLimitConfig  `mapstructure:"rate_limit"`
+	BcryptCost int              `mapstructure:"bcrypt_cost"`
+	CSRF       CSRFConfig       `mapstructure:"csrf"`
+	BruteForce BruteForceConfig `mapstructure:"brute_force"`
+}
+
+type BruteForceConfig struct {
+	MaxAttempts  int           `mapstructure:"max_attempts"`
+	LockDuration time.Duration `mapstructure:"lock_duration"`
 }
 
 type CSRFConfig struct {
@@ -119,6 +125,8 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("security.rate_limit.requests_per_minute", 300)
 	v.SetDefault("security.rate_limit.burst", 50)
 	v.SetDefault("security.bcrypt_cost", 12)
+	v.SetDefault("security.brute_force.max_attempts", 5)
+	v.SetDefault("security.brute_force.lock_duration", "60m")
 
 	// Config file
 	if path != "" {

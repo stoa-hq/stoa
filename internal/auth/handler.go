@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ type Handler struct {
 	pool          *pgxpool.Pool
 	jwtManager    *JWTManager
 	apiKeyManager *APIKeyManager
+	bruteForce    *BruteForceTracker
 	logger        zerolog.Logger
 }
 
@@ -46,8 +48,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, logger zerolog.Logger) *Handler {
-	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, logger: logger}
+func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, bruteForce *BruteForceTracker, logger zerolog.Logger) *Handler {
+	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, bruteForce: bruteForce, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
@@ -72,6 +74,14 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if locked, retryAfter := h.bruteForce.IsLocked(req.Email); locked {
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())))
+		writeJSON(w, http.StatusTooManyRequests, map[string]interface{}{
+			"errors": []map[string]string{{"code": "account_locked", "detail": "too many failed login attempts, please try again later"}},
+		})
+		return
+	}
+
 	// Look up admin user
 	var user AdminUser
 	err := h.pool.QueryRow(r.Context(),
@@ -85,6 +95,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 			 FROM customers WHERE email = $1`, req.Email).
 			Scan(&user.ID, &user.Email, &user.PasswordHash, &user.FirstName, &user.LastName, &user.Active)
 		if err != nil {
+			h.bruteForce.RecordFailure(req.Email)
 			writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 				"errors": []map[string]string{{"code": "invalid_credentials", "detail": "invalid email or password"}},
 			})
@@ -102,11 +113,14 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	match, err := VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !match {
+		h.bruteForce.RecordFailure(req.Email)
 		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 			"errors": []map[string]string{{"code": "invalid_credentials", "detail": "invalid email or password"}},
 		})
 		return
 	}
+
+	h.bruteForce.RecordSuccess(req.Email)
 
 	userType := "admin"
 	if user.Role == string(RoleCustomer) {
