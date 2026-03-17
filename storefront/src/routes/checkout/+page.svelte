@@ -378,7 +378,7 @@
 				{#if awaitingProviderPayment}
 					<PluginSlot
 						slot="storefront:checkout:payment"
-						context={{ amount: total, currency: 'EUR', paymentMethodId: selectedPayment }}
+						context={{ amount: total, currency: 'EUR', paymentMethodId: selectedPayment, email: (sameAsShipping ? form.email : billingForm.email) || form.email, billingDetails: buildAddresses().billingAddress }}
 						onEvent={handlePluginEvent}
 					/>
 				{/if}
@@ -387,7 +387,7 @@
 				{#if awaitingPayment}
 					<PluginSlot
 						slot="storefront:checkout:payment"
-						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR', guestToken }}
+						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR', guestToken, email: (sameAsShipping ? form.email : billingForm.email) || form.email, billingDetails: buildAddresses().billingAddress }}
 						onEvent={handlePluginEvent}
 					/>
 				{/if}
