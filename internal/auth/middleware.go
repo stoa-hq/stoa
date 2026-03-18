@@ -21,12 +21,14 @@ const (
 type Middleware struct {
 	jwtManager    *JWTManager
 	apiKeyManager *APIKeyManager
+	blacklist     *TokenBlacklist
 }
 
-func NewMiddleware(jwtManager *JWTManager, apiKeyManager *APIKeyManager) *Middleware {
+func NewMiddleware(jwtManager *JWTManager, apiKeyManager *APIKeyManager, blacklist *TokenBlacklist) *Middleware {
 	return &Middleware{
 		jwtManager:    jwtManager,
 		apiKeyManager: apiKeyManager,
+		blacklist:     blacklist,
 	}
 }
 
@@ -57,6 +59,10 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			}
 			if claims.Type != AccessToken {
 				writeAuthError(w, http.StatusUnauthorized, "invalid token type")
+				return
+			}
+			if m.blacklist != nil && m.blacklist.IsBlacklisted(claims.ID) {
+				writeAuthError(w, http.StatusUnauthorized, "token has been revoked")
 				return
 			}
 			ctx = context.WithValue(r.Context(), ctxKeyUserID, claims.UserID)
@@ -149,6 +155,11 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 			claims, err := m.jwtManager.ValidateToken(parts[1])
 			if err != nil || claims.Type != AccessToken {
 				// Token present but invalid/expired – continue as anonymous.
+				next.ServeHTTP(w, r)
+				return
+			}
+			if m.blacklist != nil && m.blacklist.IsBlacklisted(claims.ID) {
+				// Blacklisted token – continue as anonymous.
 				next.ServeHTTP(w, r)
 				return
 			}

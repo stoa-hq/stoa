@@ -153,7 +153,7 @@ func TestHandleRefresh_HTTPEndpoint_RejectsAccessToken(t *testing.T) {
 	bruteForce := NewBruteForceTracker(5, 15*time.Minute)
 	store := NewRefreshTokenStore(nil) // won't be reached
 
-	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, logger)
+	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, NewTokenBlacklist(), logger)
 
 	// Generate an access token (not refresh).
 	accessTok, _ := jwtMgr.GenerateAccessToken(uuid.New(), "test@example.com", "admin", "admin")
@@ -176,7 +176,7 @@ func TestHandleRefresh_HTTPEndpoint_RejectsExpiredToken(t *testing.T) {
 	bruteForce := NewBruteForceTracker(5, 15*time.Minute)
 	store := NewRefreshTokenStore(nil) // won't be reached
 
-	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, logger)
+	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, NewTokenBlacklist(), logger)
 
 	expiredTok, _ := jwtMgr.GenerateRefreshToken(uuid.New(), "test@example.com", "admin", "admin")
 

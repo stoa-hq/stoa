@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -20,6 +21,7 @@ type Handler struct {
 	apiKeyManager *APIKeyManager
 	bruteForce    *BruteForceTracker
 	tokenStore    *RefreshTokenStore
+	blacklist     *TokenBlacklist
 	logger        zerolog.Logger
 }
 
@@ -50,8 +52,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, bruteForce *BruteForceTracker, tokenStore *RefreshTokenStore, logger zerolog.Logger) *Handler {
-	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, bruteForce: bruteForce, tokenStore: tokenStore, logger: logger}
+func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, bruteForce *BruteForceTracker, tokenStore *RefreshTokenStore, blacklist *TokenBlacklist, logger zerolog.Logger) *Handler {
+	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, bruteForce: bruteForce, tokenStore: tokenStore, blacklist: blacklist, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
@@ -370,6 +372,16 @@ func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// Blacklist the current access token so it cannot be reused.
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+			if claims, err := h.jwtManager.ValidateToken(parts[1]); err == nil && claims.Type == AccessToken {
+				h.blacklist.Add(claims.ID, claims.ExpiresAt.Time)
+			}
+		}
+	}
+
 	// Accept an optional refresh_token in the body to identify the user
 	// even without an Authorization header.
 	var req RefreshRequest

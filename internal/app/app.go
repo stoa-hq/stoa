@@ -45,13 +45,14 @@ import (
 )
 
 type App struct {
-	Config         *config.Config
-	DB             *database.DB
-	Server         *server.Server
-	JWTManager     *auth.JWTManager
-	AuthMiddleware *auth.Middleware
-	PluginRegistry *plugin.Registry
-	Logger         zerolog.Logger
+	Config          *config.Config
+	DB              *database.DB
+	Server          *server.Server
+	JWTManager      *auth.JWTManager
+	AuthMiddleware  *auth.Middleware
+	TokenBlacklist  *auth.TokenBlacklist
+	PluginRegistry  *plugin.Registry
+	Logger          zerolog.Logger
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -70,7 +71,8 @@ func New(cfg *config.Config) (*App, error) {
 	)
 
 	apiKeyManager := auth.NewAPIKeyManager(db.Pool)
-	authMiddleware := auth.NewMiddleware(jwtManager, apiKeyManager)
+	tokenBlacklist := auth.NewTokenBlacklist()
+	authMiddleware := auth.NewMiddleware(jwtManager, apiKeyManager, tokenBlacklist)
 
 	pluginRegistry := plugin.NewRegistry(logger)
 
@@ -106,13 +108,14 @@ func New(cfg *config.Config) (*App, error) {
 	pluginRegistry.CollectUIExtensions()
 
 	a := &App{
-		Config:         cfg,
-		DB:             db,
-		Server:         srv,
-		JWTManager:     jwtManager,
-		AuthMiddleware: authMiddleware,
-		PluginRegistry: pluginRegistry,
-		Logger:         logger,
+		Config:          cfg,
+		DB:              db,
+		Server:          srv,
+		JWTManager:      jwtManager,
+		AuthMiddleware:  authMiddleware,
+		TokenBlacklist:  tokenBlacklist,
+		PluginRegistry:  pluginRegistry,
+		Logger:          logger,
 	}
 
 	if err := a.setupDomains(cfg); err != nil {
@@ -222,7 +225,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		cfg.Security.BruteForce.LockDuration,
 	)
 	tokenStore := auth.NewRefreshTokenStore(pool)
-	authH     := auth.NewHandler(pool, a.JWTManager, apiKeyManager, bruteForce, tokenStore, log)
+	authH     := auth.NewHandler(pool, a.JWTManager, apiKeyManager, bruteForce, tokenStore, a.TokenBlacklist, log)
 	productH  := product.NewHandler(productSvc, validate, log)
 	categoryH := category.NewHandler(categorySvc, log)
 	customerH := customer.NewHandler(customerSvc, validate, log)
@@ -430,6 +433,8 @@ func (a *App) Shutdown() error {
 	if err := a.PluginRegistry.ShutdownAll(); err != nil {
 		a.Logger.Error().Err(err).Msg("plugin shutdown error")
 	}
+
+	a.TokenBlacklist.Stop()
 
 	if err := a.Server.Shutdown(ctx); err != nil {
 		a.Logger.Error().Err(err).Msg("server shutdown error")
