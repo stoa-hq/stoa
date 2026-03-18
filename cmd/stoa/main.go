@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/stoa-hq/stoa/internal/app"
 	"github.com/stoa-hq/stoa/internal/auth"
@@ -140,10 +141,23 @@ func adminCmd() *cobra.Command {
 		Short: "Create an admin user",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			email, _ := cmd.Flags().GetString("email")
-			password, _ := cmd.Flags().GetString("password")
+			if email == "" {
+				return fmt.Errorf("--email is required")
+			}
 
-			if email == "" || password == "" {
-				return fmt.Errorf("--email and --password are required")
+			var password string
+			if cmd.Flags().Changed("password") {
+				password, _ = cmd.Flags().GetString("password")
+				if password == "" {
+					return fmt.Errorf("--password cannot be empty")
+				}
+				fmt.Fprintln(cmd.ErrOrStderr(), "Warning: passing passwords via CLI flags is insecure and visible in process listings. Omit --password to enter interactively.")
+			} else {
+				var err error
+				password, err = readPasswordInteractive()
+				if err != nil {
+					return err
+				}
 			}
 
 			cfg, err := config.Load(configPath)
@@ -177,10 +191,41 @@ func adminCmd() *cobra.Command {
 		},
 	}
 	createCmd.Flags().String("email", "", "Admin email address")
-	createCmd.Flags().String("password", "", "Admin password")
+	createCmd.Flags().String("password", "", "Admin password (deprecated: omit to enter interactively)")
+	createCmd.Flags().MarkDeprecated("password", "passing passwords via CLI flags is insecure; omit --password to enter interactively")
 
 	cmd.AddCommand(createCmd)
 	return cmd
+}
+
+func readPasswordInteractive() (string, error) {
+	fd := int(os.Stdin.Fd())
+	if !term.IsTerminal(fd) {
+		return "", fmt.Errorf("stdin is not a terminal; use --password flag or run interactively")
+	}
+
+	fmt.Fprint(os.Stderr, "Enter password: ")
+	pw1, err := term.ReadPassword(fd)
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", fmt.Errorf("reading password: %w", err)
+	}
+
+	fmt.Fprint(os.Stderr, "Confirm password: ")
+	pw2, err := term.ReadPassword(fd)
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", fmt.Errorf("reading password confirmation: %w", err)
+	}
+
+	if string(pw1) != string(pw2) {
+		return "", fmt.Errorf("passwords do not match")
+	}
+	if len(pw1) == 0 {
+		return "", fmt.Errorf("password cannot be empty")
+	}
+
+	return string(pw1), nil
 }
 
 func seedCmd() *cobra.Command {
