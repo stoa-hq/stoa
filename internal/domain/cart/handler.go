@@ -8,6 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/auth"
 )
 
 // Handler holds the HTTP handlers for the cart domain.
@@ -45,7 +47,13 @@ func (h *Handler) handleCreateCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.service.CreateCart(r.Context(), req.Currency, req.SessionID, nil, req.ExpiresAt)
+	// Bind cart to authenticated customer when present.
+	var customerID *uuid.UUID
+	if uid := auth.UserID(r.Context()); uid != uuid.Nil {
+		customerID = &uid
+	}
+
+	c, err := h.service.CreateCart(r.Context(), req.Currency, req.SessionID, customerID, req.ExpiresAt)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("cart handler: create cart")
 		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to create cart")
@@ -71,6 +79,10 @@ func (h *Handler) handleGetCart(w http.ResponseWriter, r *http.Request) {
 		}
 		h.logger.Error().Err(err).Str("cart_id", id.String()).Msg("cart handler: get cart")
 		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve cart")
+		return
+	}
+
+	if !h.verifyCartOwnership(w, r, c) {
 		return
 	}
 
@@ -100,7 +112,21 @@ func (h *Handler) handleAddItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.service.AddItem(r.Context(), cartID, req.ProductID, req.VariantID, req.Quantity, req.CustomFields)
+	c, err := h.service.GetCart(r.Context(), cartID)
+	if err != nil {
+		if errors.Is(err, ErrCartNotFound) {
+			h.writeError(w, http.StatusNotFound, "not_found", "cart not found")
+			return
+		}
+		h.logger.Error().Err(err).Str("cart_id", cartID.String()).Msg("cart handler: add item ownership check")
+		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve cart")
+		return
+	}
+	if !h.verifyCartOwnership(w, r, c) {
+		return
+	}
+
+	_, err = h.service.AddItem(r.Context(), cartID, req.ProductID, req.VariantID, req.Quantity, req.CustomFields)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrCartNotFound):
@@ -148,6 +174,20 @@ func (h *Handler) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c, err := h.service.GetCart(r.Context(), cartID)
+	if err != nil {
+		if errors.Is(err, ErrCartNotFound) {
+			h.writeError(w, http.StatusNotFound, "not_found", "cart not found")
+			return
+		}
+		h.logger.Error().Err(err).Str("cart_id", cartID.String()).Msg("cart handler: update item ownership check")
+		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve cart")
+		return
+	}
+	if !h.verifyCartOwnership(w, r, c) {
+		return
+	}
+
 	if err := h.service.UpdateItemQuantity(r.Context(), itemID, req.Quantity); err != nil {
 		switch {
 		case errors.Is(err, ErrItemNotFound):
@@ -184,6 +224,20 @@ func (h *Handler) handleRemoveItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c, err := h.service.GetCart(r.Context(), cartID)
+	if err != nil {
+		if errors.Is(err, ErrCartNotFound) {
+			h.writeError(w, http.StatusNotFound, "not_found", "cart not found")
+			return
+		}
+		h.logger.Error().Err(err).Str("cart_id", cartID.String()).Msg("cart handler: remove item ownership check")
+		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve cart")
+		return
+	}
+	if !h.verifyCartOwnership(w, r, c) {
+		return
+	}
+
 	if err := h.service.RemoveItem(r.Context(), itemID); err != nil {
 		switch {
 		case errors.Is(err, ErrItemNotFound):
@@ -195,14 +249,15 @@ func (h *Handler) handleRemoveItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cart, err := h.service.GetCart(r.Context(), cartID)
+	// Re-fetch cart after removal.
+	c, err = h.service.GetCart(r.Context(), cartID)
 	if err != nil {
 		h.logger.Error().Err(err).Str("cart_id", cartID.String()).Msg("cart handler: get cart after remove item")
 		h.writeError(w, http.StatusInternalServerError, "internal_error", "failed to retrieve cart")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, apiResponse{Data: toCartResponse(cart)})
+	writeJSON(w, http.StatusOK, apiResponse{Data: toCartResponse(c)})
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -239,4 +294,28 @@ func (h *Handler) parseUUID(w http.ResponseWriter, raw, param string) (uuid.UUID
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// verifyCartOwnership checks that the requesting user or guest session owns
+// the given cart. Returns true when access is allowed, false after writing a
+// 403 response.
+func (h *Handler) verifyCartOwnership(w http.ResponseWriter, r *http.Request, c *Cart) bool {
+	userID := auth.UserID(r.Context())
+
+	// Authenticated customer — cart must belong to them.
+	if userID != uuid.Nil {
+		if c.CustomerID == nil || *c.CustomerID != userID {
+			h.writeError(w, http.StatusForbidden, "forbidden", "you do not have access to this cart")
+			return false
+		}
+		return true
+	}
+
+	// Guest — validate session_id via X-Session-ID header.
+	sessionID := r.Header.Get("X-Session-ID")
+	if sessionID == "" || c.SessionID != sessionID {
+		h.writeError(w, http.StatusForbidden, "forbidden", "you do not have access to this cart")
+		return false
+	}
+	return true
 }

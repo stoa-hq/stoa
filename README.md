@@ -4,7 +4,7 @@
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/stoahq)
 [![Matrix](https://img.shields.io/matrix/stoa-dev?server_fqdn=matrix.pineconeops.com&fetchMode=guest)](https://matrix.to/#/#stoa-dev:matrix.pineconeops.com)
 
-A lightweight, open-source headless e-commerce platform built with Go. Ships as a single binary with the admin panel and storefront embedded.
+A lightweight, open-source headless, agentic commerce platform built with Go. Ships as a single binary with the admin panel and storefront embedded.
 
 ## Features
 
@@ -29,7 +29,7 @@ A lightweight, open-source headless e-commerce platform built with Go. Ships as 
 ## Quick Start
 
 ```bash
-git clone <repository-url> && cd stoa
+git clone https://github.com/stoa-hq/stoa.git && cd stoa
 cp config.example.yaml config.yaml
 docker compose up -d
 docker compose exec stoa ./stoa migrate up

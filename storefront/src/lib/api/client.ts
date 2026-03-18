@@ -103,7 +103,7 @@ async function doFetch<T>(
 	method: string,
 	path: string,
 	body?: unknown,
-	opts: { auth?: boolean; formData?: FormData } = {}
+	opts: { auth?: boolean; formData?: FormData; extraHeaders?: Record<string, string> } = {}
 ): Promise<Response> {
 	const headers: Record<string, string> = {};
 
@@ -119,6 +119,10 @@ async function doFetch<T>(
 		headers['Content-Type'] = 'application/json';
 	}
 
+	if (opts.extraHeaders) {
+		Object.assign(headers, opts.extraHeaders);
+	}
+
 	return fetch(`${API_BASE}${path}`, {
 		method,
 		headers,
@@ -131,7 +135,7 @@ export async function request<T>(
 	method: string,
 	path: string,
 	body?: unknown,
-	opts: { auth?: boolean; formData?: FormData } = {}
+	opts: { auth?: boolean; formData?: FormData; extraHeaders?: Record<string, string> } = {}
 ): Promise<ApiResponse<T>> {
 	let res = await doFetch<T>(method, path, body, opts);
 

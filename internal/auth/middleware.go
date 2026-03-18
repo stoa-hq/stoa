@@ -208,6 +208,12 @@ func UserPermissions(ctx context.Context) []Permission {
 	return nil
 }
 
+// WithUserID returns a child context carrying the given user ID.
+// Intended for testing.
+func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, ctxKeyUserID, id)
+}
+
 func writeAuthError(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
