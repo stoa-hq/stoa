@@ -14,6 +14,7 @@
     "payment": "Zahlungen",
     "warehouses": "Lager",
     "audit": "Audit-Log",
+    "settings": "Einstellungen",
     "collapse": "Einklappen"
   },
   "common": {
@@ -425,6 +426,29 @@
   "pagination": {
     "previous": "Zurück",
     "next": "Weiter"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "general": "Allgemein",
+    "storeName": "Store-Name",
+    "storeDescription": "Beschreibung",
+    "contactEmail": "Kontakt-E-Mail",
+    "branding": "Branding",
+    "logo": "Logo",
+    "favicon": "Favicon",
+    "uploadImage": "Bild hochladen",
+    "regional": "Regional",
+    "currency": "Währung",
+    "country": "Land",
+    "timezone": "Zeitzone",
+    "advanced": "Erweitert",
+    "copyrightText": "Copyright-Text",
+    "copyrightPlaceholder": "z.B. © 2026 Mein Shop",
+    "copyrightHint": "Wird im Storefront-Footer angezeigt. 'powered by stoa' wird automatisch angehängt.",
+    "maintenanceMode": "Wartungsmodus",
+    "maintenanceModeHint": "Aktiviert den Wartungsmodus für den Storefront.",
+    "saved": "Einstellungen gespeichert.",
+    "loadFailed": "Einstellungen konnten nicht geladen werden."
   },
   "modal": {
     "closeLabel": "Modal schließen"

@@ -1,0 +1,29 @@
+<svg viewBox="0 0 156 36" width="156" height="36" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pillar-grad" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#c026d3"/>
+      <stop offset="100%" stop-color="#86198f"/>
+    </linearGradient>
+    <linearGradient id="text-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a21caf"/>
+      <stop offset="100%" stop-color="#86198f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Two angular pillars — the Stoa mark -->
+  <!-- Left pillar, angled slightly right -->
+  <polygon points="2,2 11,2 15.5,34 6.5,34" fill="url(#pillar-grad)"/>
+  <!-- Right pillar -->
+  <polygon points="19,2 28,2 32.5,34 23.5,34" fill="url(#pillar-grad)"/>
+
+  <!-- Wordmark: stoa -->
+  <text
+    x="43"
+    y="27"
+    font-family="'Rajdhani', 'Exo 2', 'Arial Narrow', sans-serif"
+    font-size="24"
+    font-weight="600"
+    fill="url(#text-grad)"
+    letter-spacing="2"
+  >stoa</text>
+</svg>

@@ -6,6 +6,7 @@
 	import { base } from '$app/paths';
 	import { ApiClientError } from '$lib/api/client';
 	import { t } from 'svelte-i18n';
+	import Logo from '$lib/components/Logo.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -33,7 +34,9 @@
 <div class="min-h-screen flex items-center justify-center bg-[var(--bg)]">
 	<div class="w-full max-w-sm p-8 bg-[var(--surface)] dark:bg-[#1A1A2E]/90 dark:backdrop-blur-xl rounded-xl shadow-xl border border-[var(--card-border)]">
 		<div class="text-center mb-8">
-			<h1 class="text-2xl font-bold text-[var(--text)]">{$t('login.title')}</h1>
+			<div class="flex justify-center mb-3">
+				<Logo />
+			</div>
 			<p class="text-sm text-[var(--text-muted)] mt-1">{$t('login.subtitle')}</p>
 		</div>
 

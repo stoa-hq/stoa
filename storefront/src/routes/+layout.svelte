@@ -5,6 +5,7 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import { cartStore } from '$lib/stores/cart';
 	import { loadPluginManifest } from '$lib/stores/plugins';
+	import { loadStoreSettings, storeSettings } from '$lib/stores/settings';
 	import { onMount } from 'svelte';
 	import { isLoading } from 'svelte-i18n';
 
@@ -16,6 +17,19 @@
 	onMount(() => {
 		cartStore.load();
 		loadPluginManifest();
+		loadStoreSettings();
+	});
+
+	$effect(() => {
+		if ($storeSettings.favicon_url) {
+			let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+			if (!link) {
+				link = document.createElement('link');
+				link.rel = 'icon';
+				document.head.appendChild(link);
+			}
+			link.href = $storeSettings.favicon_url;
+		}
 	});
 </script>
 
