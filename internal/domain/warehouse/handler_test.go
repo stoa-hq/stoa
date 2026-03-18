@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -385,6 +387,35 @@ func TestHandler_RemoveStock_NotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status: got %d, want 404", w.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// List — error information disclosure
+// ---------------------------------------------------------------------------
+
+func TestHandler_List_ServiceError_NoInfoDisclosure(t *testing.T) {
+	repo := &mockWarehouseRepo{
+		findAll: func(_ context.Context, _ WarehouseFilter) ([]Warehouse, int, error) {
+			return nil, 0, errors.New("pq: relation \"warehouses\" does not exist")
+		},
+	}
+	h := newTestHandler(repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/warehouses", nil)
+	w := httptest.NewRecorder()
+	h.list(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want 500", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "an unexpected error occurred") {
+		t.Errorf("expected generic error message in response body, got: %s", body)
+	}
+	if strings.Contains(body, "warehouses") {
+		t.Errorf("response body must not contain internal error details, got: %s", body)
 	}
 }
 

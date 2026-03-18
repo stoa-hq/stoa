@@ -8,6 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/server"
 )
 
 type handler struct {
@@ -59,7 +61,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 
 	logs, total, err := h.svc.List(r.Context(), filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -104,6 +106,11 @@ func writeError(w http.ResponseWriter, status int, code, detail string) {
 	writeJSON(w, status, apiResponse{
 		Errors: []apiError{{Code: code, Detail: detail}},
 	})
+}
+
+func (h *handler) serverError(w http.ResponseWriter, r *http.Request, err error) {
+	h.logger.Error().Err(err).Str("request_id", server.RequestID(r.Context())).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
+	writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred")
 }
 
 func parseIntQuery(r *http.Request, key string, defaultVal int) int {

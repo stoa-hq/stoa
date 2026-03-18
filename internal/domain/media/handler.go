@@ -10,6 +10,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/server"
 )
 
 const maxUploadSize = 32 << 20 // 32 MiB
@@ -50,7 +52,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 
 	items, total, err := h.svc.List(r.Context(), filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -86,10 +88,10 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 	m, err := h.svc.Upload(r.Context(), header.Filename, mimeType, altText, header.Size, file)
 	if err != nil {
 		if errors.Is(err, ErrInvalidInput) {
-			writeError(w, http.StatusBadRequest, "invalid_input", err.Error())
+			writeError(w, http.StatusBadRequest, "invalid_input", "invalid file upload")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "upload_failed", err.Error())
+		h.serverError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, apiResponse{Data: m})
@@ -108,7 +110,7 @@ func (h *handler) getByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not_found", "media not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+		h.serverError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Data: m})
@@ -126,7 +128,7 @@ func (h *handler) delete(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not_found", "media not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "delete_failed", err.Error())
+		h.serverError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -165,10 +167,15 @@ func writeError(w http.ResponseWriter, status int, code, detail string) {
 	})
 }
 
+func (h *handler) serverError(w http.ResponseWriter, r *http.Request, err error) {
+	h.logger.Error().Err(err).Str("request_id", server.RequestID(r.Context())).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
+	writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred")
+}
+
 func writeValidationErrors(w http.ResponseWriter, err error) {
 	var ve validator.ValidationErrors
 	if !errors.As(err, &ve) {
-		writeError(w, http.StatusBadRequest, "validation_failed", err.Error())
+		writeError(w, http.StatusBadRequest, "validation_failed", "invalid request data")
 		return
 	}
 	errs := make([]apiError, 0, len(ve))

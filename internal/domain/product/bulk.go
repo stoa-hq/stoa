@@ -35,7 +35,8 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []BulkCreateProductReques
 		// Upsert: find by SKU → update if exists, create if not.
 		existing, findErr := s.repo.FindBySKU(ctx, req.SKU)
 		if findErr != nil && !errors.Is(findErr, ErrNotFound) {
-			result.Errors = []string{findErr.Error()}
+			s.logger.Error().Err(findErr).Str("sku", req.SKU).Msg("bulk: find by SKU failed")
+			result.Errors = []string{"failed to look up product"}
 			resp.Failed++
 			resp.Results = append(resp.Results, result)
 			continue
@@ -47,7 +48,8 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []BulkCreateProductReques
 			p = existing
 			applyCreateRequest(p, &req.CreateProductRequest)
 			if err := s.repo.Update(ctx, p); err != nil {
-				result.Errors = []string{err.Error()}
+				s.logger.Error().Err(err).Str("sku", req.SKU).Msg("bulk: update product failed")
+				result.Errors = []string{"failed to update product"}
 				resp.Failed++
 				resp.Results = append(resp.Results, result)
 				continue
@@ -57,7 +59,8 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []BulkCreateProductReques
 			p = FromCreateRequest(&req.CreateProductRequest)
 			p.ID = uuid.New()
 			if err := s.Create(ctx, p); err != nil {
-				result.Errors = []string{err.Error()}
+				s.logger.Error().Err(err).Str("sku", req.SKU).Msg("bulk: create product failed")
+				result.Errors = []string{"failed to create product"}
 				resp.Failed++
 				resp.Results = append(resp.Results, result)
 				continue
@@ -68,7 +71,8 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []BulkCreateProductReques
 		for vi, varReq := range req.Variants {
 			optionIDs, err := s.resolveOptionIDs(ctx, varReq.Options)
 			if err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("variant %d: resolve options: %s", vi, err.Error()))
+				s.logger.Error().Err(err).Str("sku", req.SKU).Int("variant_index", vi).Msg("bulk: resolve options failed")
+				result.Errors = append(result.Errors, fmt.Sprintf("variant %d: failed to resolve options", vi))
 				continue
 			}
 
@@ -81,7 +85,8 @@ func (s *Service) BulkCreate(ctx context.Context, reqs []BulkCreateProductReques
 				OptionIDs:  optionIDs,
 			}
 			if _, err := s.CreateVariant(ctx, p.ID, cvReq); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("variant %d (%s): %s", vi, varReq.SKU, err.Error()))
+				s.logger.Error().Err(err).Str("sku", req.SKU).Str("variant_sku", varReq.SKU).Int("variant_index", vi).Msg("bulk: create variant failed")
+				result.Errors = append(result.Errors, fmt.Sprintf("variant %d (%s): failed to create", vi, varReq.SKU))
 			}
 		}
 

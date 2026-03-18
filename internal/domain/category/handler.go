@@ -11,6 +11,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/server"
 )
 
 // Handler exposes category functionality over HTTP.
@@ -95,8 +97,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	cats, total, err := h.svc.List(r.Context(), filter)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("List categories failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not list categories", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -121,8 +122,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	cat := req.ToEntity()
 	if err := h.svc.Create(r.Context(), cat); err != nil {
-		h.logger.Error().Err(err).Msg("Create category failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not create category", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -142,8 +142,7 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not_found", "category not found", "")
 			return
 		}
-		h.logger.Error().Err(err).Msg("GetByID category failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not fetch category", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -173,15 +172,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not_found", "category not found", "")
 			return
 		}
-		h.logger.Error().Err(err).Msg("Update: GetByID failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not fetch category", "")
+		h.serverError(w, r, err)
 		return
 	}
 
 	req.ApplyTo(cat)
 	if err := h.svc.Update(r.Context(), cat); err != nil {
-		h.logger.Error().Err(err).Msg("Update category failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not update category", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -200,8 +197,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "not_found", "category not found", "")
 			return
 		}
-		h.logger.Error().Err(err).Msg("Delete category failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete category", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -221,8 +217,7 @@ func (h *Handler) GetTree(w http.ResponseWriter, r *http.Request) {
 
 	tree, err := h.svc.GetTree(r.Context(), locale)
 	if err != nil {
-		h.logger.Error().Err(err).Msg("GetTree failed")
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not fetch category tree", "")
+		h.serverError(w, r, err)
 		return
 	}
 
@@ -275,10 +270,15 @@ func writeError(w http.ResponseWriter, status int, code, detail, field string) {
 	})
 }
 
+func (h *Handler) serverError(w http.ResponseWriter, r *http.Request, err error) {
+	h.logger.Error().Err(err).Str("request_id", server.RequestID(r.Context())).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
+	writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred", "")
+}
+
 func writeValidationErrors(w http.ResponseWriter, err error) {
 	var verr validator.ValidationErrors
 	if !errors.As(err, &verr) {
-		writeError(w, http.StatusBadRequest, "validation_error", err.Error(), "")
+		writeError(w, http.StatusBadRequest, "validation_error", "invalid request data", "")
 		return
 	}
 	errs := make([]apiError, 0, len(verr))

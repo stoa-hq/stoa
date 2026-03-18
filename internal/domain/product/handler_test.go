@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -230,6 +232,36 @@ func TestHandler_StoreGetBySlug_Success(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Errorf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseLocale helper
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminList_ErrorDoesNotLeakInternalDetails(t *testing.T) {
+	internalMsg := "pq: relation \"products\" does not exist"
+	repo := &mockRepo{
+		findAll: func(_ context.Context, _ ProductFilter) ([]Product, int, error) {
+			return nil, 0, errors.New(internalMsg)
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/products", nil)
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminList(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want 500", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "an unexpected error occurred") {
+		t.Errorf("response should contain generic error message, got: %s", body)
+	}
+	if strings.Contains(body, internalMsg) {
+		t.Errorf("response must NOT contain internal error detail %q, got: %s", internalMsg, body)
 	}
 }
 

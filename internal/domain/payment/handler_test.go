@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -355,6 +356,31 @@ func TestHandler_ListTransactionsByOrderStore_GuestNoToken(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandler_List_ServiceError_NoInfoDisclosure(t *testing.T) {
+	methodSvc := &mockMethodSvc{
+		list: func(_ context.Context, _ PaymentMethodFilter) ([]PaymentMethod, int, error) {
+			return nil, 0, errors.New("pq: relation \"payment_methods\" does not exist")
+		},
+	}
+	h := NewHandler(methodSvc, &mockTxSvc{}, nil, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/payment-methods", nil)
+	w := httptest.NewRecorder()
+	h.list(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "an unexpected error occurred") {
+		t.Errorf("expected generic error message in response body, got: %s", body)
+	}
+	if strings.Contains(body, "payment_methods") {
+		t.Errorf("response body must not contain internal error details, got: %s", body)
 	}
 }
 

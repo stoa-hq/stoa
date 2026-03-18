@@ -12,6 +12,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/server"
 )
 
 const maxCSVUploadBytes = 10 << 20 // 10 MB
@@ -251,7 +253,7 @@ func (h *Handler) adminBulkCreate(w http.ResponseWriter, r *http.Request) {
 // adminImportCSV handles POST /products/import (multipart/form-data, field "file").
 func (h *Handler) adminImportCSV(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(maxCSVUploadBytes); err != nil {
-		h.writeError(w, http.StatusBadRequest, "invalid_form", "failed to parse multipart form: "+err.Error(), "")
+		h.writeError(w, http.StatusBadRequest, "invalid_form", "failed to parse multipart form", "")
 		return
 	}
 
@@ -300,7 +302,7 @@ func (h *Handler) adminCreateOrGenerateVariants(w http.ResponseWriter, r *http.R
 		// GenerateVariants path.
 		var req GenerateVariantsRequest
 		if err := json.Unmarshal(mustMarshal(raw), &req); err != nil {
-			h.writeError(w, http.StatusBadRequest, "invalid_body", "invalid request body: "+err.Error(), "")
+			h.writeError(w, http.StatusBadRequest, "invalid_body", "invalid request body", "")
 			return
 		}
 		if !h.validate(w, &req) {
@@ -322,7 +324,7 @@ func (h *Handler) adminCreateOrGenerateVariants(w http.ResponseWriter, r *http.R
 	// CreateVariant (single) path.
 	var req CreateVariantRequest
 	if err := json.Unmarshal(mustMarshal(raw), &req); err != nil {
-		h.writeError(w, http.StatusBadRequest, "invalid_body", "invalid request body: "+err.Error(), "")
+		h.writeError(w, http.StatusBadRequest, "invalid_body", "invalid request body", "")
 		return
 	}
 	if !h.validate(w, &req) {
@@ -771,7 +773,7 @@ func (h *Handler) parseUUID(w http.ResponseWriter, r *http.Request, param string
 // decodeJSON decodes the request body into dst, writing a 400 on failure.
 func (h *Handler) decodeJSON(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
-		h.writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON: "+err.Error(), "")
+		h.writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", "")
 		return false
 	}
 	return true
@@ -793,7 +795,7 @@ func (h *Handler) validate(w http.ResponseWriter, v interface{}) bool {
 			h.writeJSON(w, http.StatusUnprocessableEntity, apiResponse{Errors: errs})
 			return false
 		}
-		h.writeError(w, http.StatusUnprocessableEntity, "validation_error", err.Error(), "")
+		h.writeError(w, http.StatusUnprocessableEntity, "validation_error", "invalid request data", "")
 		return false
 	}
 	return true
@@ -822,6 +824,6 @@ func (h *Handler) notFound(w http.ResponseWriter, detail string) {
 }
 
 func (h *Handler) serverError(w http.ResponseWriter, r *http.Request, err error) {
-	h.logger.Error().Err(err).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
+	h.logger.Error().Err(err).Str("request_id", server.RequestID(r.Context())).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
 	h.writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred", "")
 }

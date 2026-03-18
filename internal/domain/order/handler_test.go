@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -86,6 +87,34 @@ func doCheckout(h *Handler, body *bytes.Buffer) *httptest.ResponseRecorder {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+func TestHandler_AdminList_ErrorDoesNotLeakInternalDetails(t *testing.T) {
+	internalMsg := "pq: relation \"orders\" does not exist"
+	repo := &mockOrderRepo{
+		findAll: func(_ context.Context, _ OrderFilter) ([]Order, int, error) {
+			return nil, 0, errors.New(internalMsg)
+		},
+	}
+	h := newTestHandler(repo, nil, nil)
+
+	r := chi.NewRouter()
+	r.Get("/orders", h.adminList)
+	req := httptest.NewRequest(http.MethodGet, "/orders", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want 500", rr.Code)
+	}
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "an unexpected error occurred") {
+		t.Errorf("response should contain generic error message, got: %s", body)
+	}
+	if strings.Contains(body, internalMsg) {
+		t.Errorf("response must NOT contain internal error detail %q, got: %s", internalMsg, body)
+	}
+}
 
 func TestStoreCheckout_NoActivePaymentMethods_OK(t *testing.T) {
 	repo := &mockOrderRepo{}
