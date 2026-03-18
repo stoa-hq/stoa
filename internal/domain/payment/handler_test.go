@@ -286,7 +286,37 @@ func TestHandler_ListTransactionsByOrderStore_WrongCustomer(t *testing.T) {
 	}
 }
 
-func TestHandler_ListTransactionsByOrderStore_GuestValidToken(t *testing.T) {
+func TestHandler_ListTransactionsByOrderStore_GuestValidTokenCookie(t *testing.T) {
+	orderID := uuid.New()
+	guestToken := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return nil, guestToken, nil
+	})
+
+	txSvc := &mockTxSvc{
+		getTransactionsByOrder: func(_ context.Context, _ uuid.UUID) ([]PaymentTransaction, error) {
+			return []PaymentTransaction{}, nil
+		},
+	}
+
+	h := NewHandler(&mockMethodSvc{}, txSvc, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
+	req.AddCookie(&http.Cookie{Name: "stoa_guest_token", Value: guestToken})
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_GuestValidTokenQueryParam(t *testing.T) {
 	orderID := uuid.New()
 	guestToken := "secret-guest-token-123"
 

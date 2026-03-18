@@ -141,3 +141,24 @@ func TestEndpointRateLimit_RetryAfterHeader(t *testing.T) {
 		t.Error("429 response missing Retry-After header")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Guest Order Lookup: 10 req/min
+// ---------------------------------------------------------------------------
+
+func TestEndpointRateLimit_GuestOrderLookup(t *testing.T) {
+	r := chi.NewRouter()
+	r.With(httprate.LimitByIP(10, time.Minute)).
+		Get("/api/v1/store/orders/{orderID}/transactions", dummyHandler)
+
+	results := doRequests(t, r, http.MethodGet, "/api/v1/store/orders/00000000-0000-0000-0000-000000000001/transactions", "192.0.2.1:1234", 11)
+
+	for i := 0; i < 10; i++ {
+		if results[i].Code != http.StatusOK {
+			t.Errorf("request %d: got %d, want %d", i+1, results[i].Code, http.StatusOK)
+		}
+	}
+	if results[10].Code != http.StatusTooManyRequests {
+		t.Errorf("request 11: got %d, want %d", results[10].Code, http.StatusTooManyRequests)
+	}
+}

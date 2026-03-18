@@ -296,7 +296,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		}
 		return hasActive, m.Active, m.Provider, nil
 	})
-	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, productPriceFn, paymentMethodCheckFn, validate, log)
+	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, productPriceFn, paymentMethodCheckFn, validate, log, cfg.Security.CSRF.Secure)
 	cartH     := cart.NewHandler(cartSvc, log)
 	taxH      := tax.NewHandler(taxSvc, log)
 	shippingH := shipping.NewHandler(shippingSvc, log)
@@ -386,6 +386,9 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		cartH.RegisterStoreRoutes(r)
 		shippingH.RegisterStoreRoutes(r)
 		paymentH.RegisterStoreRoutes(r)
+		// Guest order transaction lookup with dedicated rate limit.
+		r.With(httprate.LimitByIP(cfg.Security.RateLimit.GuestOrder.RequestsPerMinute, time.Minute)).
+			Get("/orders/{orderID}/transactions", paymentH.ListTransactionsByOrderStore)
 		searchH.RegisterStoreRoutes(r)
 		settingsH.RegisterStoreRoutes(r)
 		r.Get("/plugin-manifest", manifestH.StoreManifest)

@@ -22,7 +22,6 @@
 	let awaitingProviderPayment = $state(false);
 	let orderId = $state('');
 	let orderNumber = $state('');
-	let guestToken = $state('');
 	let paymentReference = $state('');
 
 	const hasPaymentPlugin = $derived(
@@ -206,7 +205,6 @@
 				// Legacy flow: plugin payment after order creation (non-provider plugins).
 				orderId = res.data.id;
 				orderNumber = res.data.order_number ?? '';
-				guestToken = res.data.guest_token ?? '';
 				awaitingPayment = true;
 			} else {
 				cartStore.clear();
@@ -382,7 +380,7 @@
 				{#if awaitingPayment}
 					<PluginSlot
 						slot="storefront:checkout:payment"
-						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR', guestToken, email: (sameAsShipping ? form.email : billingForm.email) || form.email, billingDetails: buildAddresses().billingAddress }}
+						context={{ orderId, orderNumber, paymentMethodId: selectedPayment, amount: total, currency: 'EUR', email: (sameAsShipping ? form.email : billingForm.email) || form.email, billingDetails: buildAddresses().billingAddress }}
 						onEvent={handlePluginEvent}
 					/>
 				{/if}

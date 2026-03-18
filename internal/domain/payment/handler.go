@@ -76,12 +76,13 @@ func (h *handler) ListTransactionsByOrder(w http.ResponseWriter, r *http.Request
 }
 
 // RegisterStoreRoutes mounts store-facing (active-only) payment method routes on r.
+// Note: /orders/{orderID}/transactions is registered separately in app.go with
+// a dedicated rate limiter for guest order lookups.
 func (h *handler) RegisterStoreRoutes(r chi.Router) {
 	r.Route("/payment-methods", func(r chi.Router) {
 		r.Get("/", h.listActive)
 		r.Get("/{id}", h.getByID)
 	})
-	r.Get("/orders/{orderID}/transactions", h.ListTransactionsByOrderStore)
 }
 
 // ListTransactionsByOrderStore returns payment transactions for an order after
@@ -113,7 +114,13 @@ func (h *handler) ListTransactionsByOrderStore(w http.ResponseWriter, r *http.Re
 			return
 		}
 	} else {
-		reqToken := r.URL.Query().Get("guest_token")
+		// Read guest token from HTTP-only cookie (preferred) or query parameter (legacy).
+		var reqToken string
+		if c, err := r.Cookie("stoa_guest_token"); err == nil {
+			reqToken = c.Value
+		} else {
+			reqToken = r.URL.Query().Get("guest_token")
+		}
 		if guestToken == "" || reqToken == "" || guestToken != reqToken {
 			writeError(w, http.StatusForbidden, "forbidden", "you do not have access to this order")
 			return

@@ -2,6 +2,8 @@ package order
 
 import (
 	"context"
+	crypto_rand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -78,6 +80,7 @@ type Handler struct {
 	paymentMethodCheckFn PaymentMethodCheckFn
 	validator            *validator.Validate
 	logger               zerolog.Logger
+	secureCookie         bool
 }
 
 // NewHandler creates a new order Handler.
@@ -85,7 +88,7 @@ type Handler struct {
 // productTaxRateFn may be nil; if non-nil it is used to look up tax rates per product during checkout.
 // productPriceFn may be nil; if non-nil it is used to enforce server-side prices during checkout.
 // paymentMethodCheckFn may be nil; if non-nil it validates payment method selection during checkout.
-func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, productPriceFn ProductPriceFn, paymentMethodCheckFn PaymentMethodCheckFn, validate *validator.Validate, logger zerolog.Logger) *Handler {
+func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, productPriceFn ProductPriceFn, paymentMethodCheckFn PaymentMethodCheckFn, validate *validator.Validate, logger zerolog.Logger, secureCookie bool) *Handler {
 	return &Handler{
 		service:              service,
 		shippingCostFn:       shippingCostFn,
@@ -94,6 +97,7 @@ func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateF
 		paymentMethodCheckFn: paymentMethodCheckFn,
 		validator:            validate,
 		logger:               logger,
+		secureCookie:         secureCookie,
 	}
 }
 
@@ -293,10 +297,15 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 		o.Total = o.SubtotalGross
 	}
 
-	// Generate a guest token for unauthenticated orders so that the
-	// browser session can prove ownership without a JWT.
+	// Generate a cryptographically strong guest token for unauthenticated
+	// orders so that the browser session can prove ownership without a JWT.
 	if customerID == nil {
-		o.GuestToken = uuid.New().String()
+		token, err := generateGuestToken()
+		if err != nil {
+			h.serverError(w, r, err)
+			return
+		}
+		o.GuestToken = token
 	}
 
 	// Look up the shipping method price and apply it to the order.
@@ -357,7 +366,20 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn().Err(err).Str("order_id", o.ID.String()).Msg("after_checkout hook returned error")
 	}
 
-	h.writeJSON(w, http.StatusCreated, apiResponse{Data: ToResponse(o)})
+	// Set guest token as HTTP-only cookie instead of exposing it in the response body.
+	if o.GuestToken != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "stoa_guest_token",
+			Value:    o.GuestToken,
+			Path:     "/api/v1/store",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   h.secureCookie,
+			MaxAge:   86400 * 30, // 30 days
+		})
+	}
+
+	h.writeJSON(w, http.StatusCreated, apiResponse{Data: ToStoreResponse(o)})
 }
 
 // storeListOrders handles GET /account/orders
@@ -565,6 +587,16 @@ func (h *Handler) notFound(w http.ResponseWriter, detail string) {
 func (h *Handler) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	h.logger.Error().Err(err).Str("request_id", server.RequestID(r.Context())).Str("method", r.Method).Str("path", r.URL.Path).Msg("internal server error")
 	h.writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred", "")
+}
+
+// generateGuestToken returns a cryptographically strong 32-byte hex-encoded
+// token (64 characters) for guest order ownership verification.
+func generateGuestToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := crypto_rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // Ensure parseLocale is used (available for store route locale work).

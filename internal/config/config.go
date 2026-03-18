@@ -99,6 +99,7 @@ type RateLimitConfig struct {
 	Login             EndpointRateLimitConfig `mapstructure:"login"`
 	Register          EndpointRateLimitConfig `mapstructure:"register"`
 	Checkout          EndpointRateLimitConfig `mapstructure:"checkout"`
+	GuestOrder        EndpointRateLimitConfig `mapstructure:"guest_order"`
 }
 
 type EndpointRateLimitConfig struct {
@@ -138,6 +139,7 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("security.rate_limit.login.requests_per_minute", 10)
 	v.SetDefault("security.rate_limit.register.requests_per_minute", 5)
 	v.SetDefault("security.rate_limit.checkout.requests_per_minute", 10)
+	v.SetDefault("security.rate_limit.guest_order.requests_per_minute", 10)
 	v.SetDefault("security.bcrypt_cost", 12)
 	v.SetDefault("security.brute_force.max_attempts", 5)
 	v.SetDefault("security.brute_force.lock_duration", "60m")

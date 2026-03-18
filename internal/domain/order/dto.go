@@ -80,6 +80,7 @@ type OrderResponse struct {
 	OrderNumber      string                       `json:"order_number"`
 	CustomerID       *uuid.UUID                   `json:"customer_id,omitempty"`
 	GuestToken       string                       `json:"guest_token,omitempty"`
+	IsGuestOrder     bool                         `json:"is_guest_order,omitempty"`
 	Status           string                       `json:"status"`
 	Currency         string                       `json:"currency"`
 	SubtotalNet      int                          `json:"subtotal_net"`
@@ -157,6 +158,16 @@ func ToResponse(o *Order) OrderResponse {
 		})
 	}
 
+	return resp
+}
+
+// ToStoreResponse converts an Order entity to its store-facing API response.
+// Unlike ToResponse, it does NOT include the guest token (delivered via
+// HTTP-only cookie) and sets IsGuestOrder as a boolean flag instead.
+func ToStoreResponse(o *Order) OrderResponse {
+	resp := ToResponse(o)
+	resp.GuestToken = ""
+	resp.IsGuestOrder = o.GuestToken != ""
 	return resp
 }
 
