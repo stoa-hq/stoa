@@ -29,7 +29,13 @@ func (r *Registry) Hooks() *HookRegistry {
 	return r.hooks
 }
 
-func (r *Registry) Register(p Plugin, appCtx *AppContext) error {
+func (r *Registry) Register(p Plugin, appCtx *AppContext) (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("plugin panicked during registration: %v", rec)
+		}
+	}()
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
