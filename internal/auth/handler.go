@@ -106,6 +106,8 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 			 FROM customers WHERE email = $1`, req.Email).
 			Scan(&user.ID, &user.Email, &user.PasswordHash, &user.FirstName, &user.LastName, &user.Active)
 		if err != nil {
+			// User not found — run dummy hash comparison to prevent timing-based user enumeration
+			VerifyPassword(req.Password, dummyHash)
 			h.bruteForce.RecordFailure(req.Email)
 			writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 				"errors": []map[string]string{{"code": "invalid_credentials", "detail": "invalid email or password"}},

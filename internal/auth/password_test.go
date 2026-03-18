@@ -1,6 +1,10 @@
 package auth
 
-import "testing"
+import (
+	"math"
+	"testing"
+	"time"
+)
 
 func TestHashAndVerify(t *testing.T) {
 	hash, err := HashPassword("correct-horse-battery-staple")
@@ -57,5 +61,54 @@ func TestVerify_CorruptHash(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error for corrupt hash %q, got nil", bad)
 		}
+	}
+}
+
+func TestDummyHash_Initialized(t *testing.T) {
+	if dummyHash == "" {
+		t.Fatal("dummyHash should be initialized at package init")
+	}
+
+	// dummyHash must be a valid Argon2id hash that VerifyPassword can decode
+	_, err := VerifyPassword("any-password", dummyHash)
+	if err != nil {
+		t.Fatalf("dummyHash should be a valid hash, got error: %v", err)
+	}
+}
+
+func TestDummyHash_TimingSafe(t *testing.T) {
+	// Verify that VerifyPassword against a real hash and against the dummyHash
+	// take approximately the same time, preventing timing-based user enumeration.
+	realHash, err := HashPassword("real-user-password")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+
+	const iterations = 5
+
+	// Measure real hash verification
+	var realTotal time.Duration
+	for i := 0; i < iterations; i++ {
+		start := time.Now()
+		VerifyPassword("wrong-password", realHash)
+		realTotal += time.Since(start)
+	}
+	realAvg := realTotal / time.Duration(iterations)
+
+	// Measure dummy hash verification
+	var dummyTotal time.Duration
+	for i := 0; i < iterations; i++ {
+		start := time.Now()
+		VerifyPassword("wrong-password", dummyHash)
+		dummyTotal += time.Since(start)
+	}
+	dummyAvg := dummyTotal / time.Duration(iterations)
+
+	diff := math.Abs(float64(realAvg - dummyAvg))
+	threshold := 50 * time.Millisecond
+
+	if diff > float64(threshold) {
+		t.Errorf("timing difference between real and dummy hash too large: real=%v, dummy=%v, diff=%v (threshold=%v)",
+			realAvg, dummyAvg, time.Duration(diff), threshold)
 	}
 }

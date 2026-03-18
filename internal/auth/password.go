@@ -26,6 +26,19 @@ var DefaultParams = &Argon2Params{
 	KeyLength:   32,
 }
 
+// dummyHash is a pre-computed Argon2id hash used to prevent timing-based user enumeration.
+// When a login attempt targets a non-existent user, VerifyPassword runs against this hash
+// so that both code paths (user exists / user doesn't exist) take the same time.
+var dummyHash string
+
+func init() {
+	h, err := HashPassword("dummy-timing-safe-password")
+	if err != nil {
+		panic("auth: failed to generate dummy hash: " + err.Error())
+	}
+	dummyHash = h
+}
+
 func HashPassword(password string) (string, error) {
 	return HashPasswordWithParams(password, DefaultParams)
 }
