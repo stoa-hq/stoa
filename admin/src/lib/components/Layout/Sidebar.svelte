@@ -2,10 +2,11 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { t } from 'svelte-i18n';
+	import Logo from '$lib/components/Logo.svelte';
 	import {
 		LayoutDashboard, Package, FolderTree, Wrench, Users, ShoppingCart,
 		Image, Tag, Bookmark, Receipt, Truck, CreditCard, ClipboardList,
-		Warehouse,
+		Warehouse, Settings,
 		PanelLeftClose, PanelLeftOpen
 	} from 'lucide-svelte';
 
@@ -30,6 +31,7 @@
 		{ href: '/shipping', labelKey: 'nav.shipping', icon: Truck },
 		{ href: '/payment', labelKey: 'nav.payment', icon: CreditCard },
 		{ href: '/audit', labelKey: 'nav.audit', icon: ClipboardList },
+		{ href: '/settings', labelKey: 'nav.settings', icon: Settings },
 	];
 
 	function isActive(href: string): boolean {
@@ -45,12 +47,9 @@
 >
 	<div class="px-4 py-5 border-b border-[var(--sidebar-border)] flex items-center {collapsed ? 'justify-center' : ''}">
 		{#if !collapsed}
-			<div>
-				<span class="text-[var(--text)] font-bold text-lg">Stoa</span>
-				<span class="text-[var(--text-muted)] text-xs block">Admin</span>
-			</div>
+			<Logo />
 		{:else}
-			<span class="text-[var(--text)] font-bold text-lg">S</span>
+			<Logo iconOnly />
 		{/if}
 	</div>
 

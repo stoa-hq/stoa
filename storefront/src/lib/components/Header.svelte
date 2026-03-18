@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cartCount } from '$lib/stores/cart';
 	import { authStore } from '$lib/stores/auth';
+	import { storeSettings } from '$lib/stores/settings';
 	import { goto } from '$app/navigation';
 	import { t, locale } from 'svelte-i18n';
 
@@ -26,7 +27,13 @@
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 		<div class="flex items-center justify-between h-16">
 			<!-- Logo -->
-			<a href="/" class="text-xl font-bold text-primary-700 tracking-tight">stoa</a>
+			<a href="/" class="flex items-center gap-2">
+				{#if $storeSettings.logo_url}
+					<img src={$storeSettings.logo_url} alt={$storeSettings.store_name} class="h-8 object-contain" />
+				{:else}
+					<span class="text-xl font-bold text-primary-700 tracking-tight">{$storeSettings.store_name}</span>
+				{/if}
+			</a>
 
 			<!-- Nav -->
 			<nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">

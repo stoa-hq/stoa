@@ -270,7 +270,9 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	auditH    := audit.NewHandler(auditSvc, log)
 	mediaH    := domainmedia.NewHandler(mediaSvc, log)
 	warehouseH := warehouse.NewHandler(warehouseSvc, validate, log)
-	settingsH := settings.NewHandler(cfg, log)
+	settingsRepo := settings.NewPostgresRepository(pool, log)
+	settingsSvc := settings.NewService(settingsRepo, log)
+	settingsH := settings.NewHandler(settingsSvc, cfg, validate, log)
 
 	// ── Routes ────────────────────────────────────────────────────────────────
 
