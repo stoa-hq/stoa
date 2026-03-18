@@ -176,12 +176,7 @@
 			items: lineItems.map((i) => ({
 				product_id: i.product_id,
 				variant_id: i.variant_id,
-				sku: i.sku,
-				name: i.name,
-				quantity: i.quantity,
-				unit_price_net: i.price_net,
-				unit_price_gross: i.price_gross,
-				tax_rate: 0
+				quantity: i.quantity
 			}))
 		};
 

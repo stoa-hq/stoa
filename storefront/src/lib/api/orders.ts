@@ -22,14 +22,9 @@ export interface Order {
 }
 
 export interface CheckoutItem {
-	product_id?: string;
+	product_id: string;
 	variant_id?: string;
-	sku: string;
-	name: string;
 	quantity: number;
-	unit_price_net: number;
-	unit_price_gross: number;
-	tax_rate: number;
 }
 
 export interface CheckoutRequest {

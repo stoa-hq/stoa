@@ -22,12 +22,20 @@ import (
 // Test helpers
 // ---------------------------------------------------------------------------
 
+// defaultProductPriceFn returns a ProductPriceFn that always succeeds with
+// fixed test prices, simulating a DB lookup.
+func defaultProductPriceFn() ProductPriceFn {
+	return func(_ context.Context, _ uuid.UUID, _ *uuid.UUID) (int, int, string, string, error) {
+		return 1000, 1190, "Test Item", "TEST-001", nil
+	}
+}
+
 func newTestHandler(repo OrderRepository, paymentCheckFn PaymentMethodCheckFn, hooks *sdk.HookRegistry) *Handler {
 	if hooks == nil {
 		hooks = sdk.NewHookRegistry()
 	}
 	svc := NewService(repo, nil, hooks, zerolog.Nop())
-	return NewHandler(svc, nil, nil, paymentCheckFn, validator.New(), zerolog.Nop())
+	return NewHandler(svc, nil, nil, defaultProductPriceFn(), paymentCheckFn, validator.New(), zerolog.Nop())
 }
 
 func newTestHandlerWithStock(repo OrderRepository, stock stockDeductor, hooks *sdk.HookRegistry) *Handler {
@@ -35,7 +43,7 @@ func newTestHandlerWithStock(repo OrderRepository, stock stockDeductor, hooks *s
 		hooks = sdk.NewHookRegistry()
 	}
 	svc := NewService(repo, stock, hooks, zerolog.Nop())
-	return NewHandler(svc, nil, nil, nil, validator.New(), zerolog.Nop())
+	return NewHandler(svc, nil, nil, defaultProductPriceFn(), nil, validator.New(), zerolog.Nop())
 }
 
 func checkoutBody(t *testing.T, pmID *uuid.UUID) *bytes.Buffer {
@@ -44,6 +52,7 @@ func checkoutBody(t *testing.T, pmID *uuid.UUID) *bytes.Buffer {
 
 func checkoutBodyWithRef(t *testing.T, pmID *uuid.UUID, paymentRef string) *bytes.Buffer {
 	t.Helper()
+	pid := uuid.New()
 	req := CheckoutRequest{
 		Currency:         "EUR",
 		BillingAddress:   map[string]interface{}{"city": "Berlin"},
@@ -52,12 +61,8 @@ func checkoutBodyWithRef(t *testing.T, pmID *uuid.UUID, paymentRef string) *byte
 		PaymentReference: paymentRef,
 		Items: []CheckoutItemRequest{
 			{
-				SKU:            "TEST-001",
-				Name:           "Test Item",
-				Quantity:       1,
-				UnitPriceNet:   1000,
-				UnitPriceGross: 1190,
-				TaxRate:        1900,
+				ProductID: &pid,
+				Quantity:  1,
 			},
 		},
 	}
@@ -308,13 +313,8 @@ func checkoutBodyWithProductID(t *testing.T) *bytes.Buffer {
 		ShippingAddress: map[string]interface{}{"city": "Berlin"},
 		Items: []CheckoutItemRequest{
 			{
-				SKU:            "TEST-001",
-				Name:           "Test Item",
-				Quantity:       5,
-				UnitPriceNet:   1000,
-				UnitPriceGross: 1190,
-				TaxRate:        1900,
-				ProductID:      &pid,
+				ProductID: &pid,
+				Quantity:  5,
 			},
 		},
 	}
@@ -325,7 +325,7 @@ func checkoutBodyWithProductID(t *testing.T) *bytes.Buffer {
 	return bytes.NewBuffer(body)
 }
 
-func TestStoreCheckout_ZeroPrice_Rejected(t *testing.T) {
+func TestStoreCheckout_MissingProductID_Rejected(t *testing.T) {
 	repo := &mockOrderRepo{}
 	h := newTestHandler(repo, nil, nil)
 
@@ -335,12 +335,7 @@ func TestStoreCheckout_ZeroPrice_Rejected(t *testing.T) {
 		ShippingAddress: map[string]interface{}{"city": "Berlin"},
 		Items: []CheckoutItemRequest{
 			{
-				SKU:            "FREE-001",
-				Name:           "Free Item",
-				Quantity:       1,
-				UnitPriceNet:   0,
-				UnitPriceGross: 0,
-				TaxRate:        0,
+				Quantity: 1,
 			},
 		},
 	}
@@ -351,6 +346,100 @@ func TestStoreCheckout_ZeroPrice_Rejected(t *testing.T) {
 
 	rr := doCheckout(h, bytes.NewBuffer(body))
 	if rr.Code != http.StatusUnprocessableEntity {
-		t.Errorf("expected 422 for zero-price items, got %d: %s", rr.Code, rr.Body.String())
+		t.Errorf("expected 422 for missing product_id, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestStoreCheckout_InvalidProduct_Rejected(t *testing.T) {
+	repo := &mockOrderRepo{}
+	hooks := sdk.NewHookRegistry()
+	svc := NewService(repo, nil, hooks, zerolog.Nop())
+	// ProductPriceFn that always fails — simulates product not found.
+	failPriceFn := ProductPriceFn(func(_ context.Context, _ uuid.UUID, _ *uuid.UUID) (int, int, string, string, error) {
+		return 0, 0, "", "", errors.New("product not found")
+	})
+	h := NewHandler(svc, nil, nil, failPriceFn, nil, validator.New(), zerolog.Nop())
+
+	pid := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items: []CheckoutItemRequest{
+			{
+				ProductID: &pid,
+				Quantity:  1,
+			},
+		},
+	}
+	body, _ := json.Marshal(req)
+
+	rr := doCheckout(h, bytes.NewBuffer(body))
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422 for invalid product, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp apiResponse
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if len(resp.Errors) == 0 || resp.Errors[0].Code != "invalid_product" {
+		t.Errorf("expected invalid_product error, got %+v", resp.Errors)
+	}
+}
+
+func TestStoreCheckout_PriceEnforcedServerSide(t *testing.T) {
+	var createdOrder *Order
+	repo := &mockOrderRepo{
+		create: func(_ context.Context, o *Order) error {
+			createdOrder = o
+			return nil
+		},
+	}
+	hooks := sdk.NewHookRegistry()
+	svc := NewService(repo, nil, hooks, zerolog.Nop())
+	// ProductPriceFn returns fixed prices that differ from client-supplied ones.
+	priceFn := ProductPriceFn(func(_ context.Context, _ uuid.UUID, _ *uuid.UUID) (int, int, string, string, error) {
+		return 2000, 2380, "Server Product", "SRV-001", nil
+	})
+	h := NewHandler(svc, nil, nil, priceFn, nil, validator.New(), zerolog.Nop())
+
+	pid := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items: []CheckoutItemRequest{
+			{
+				ProductID:      &pid,
+				Quantity:       2,
+				UnitPriceNet:   1, // attacker tries 1 cent
+				UnitPriceGross: 1,
+			},
+		},
+	}
+	body, _ := json.Marshal(req)
+
+	rr := doCheckout(h, bytes.NewBuffer(body))
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if createdOrder == nil {
+		t.Fatal("expected order to be created")
+	}
+	item := createdOrder.Items[0]
+	if item.UnitPriceNet != 2000 {
+		t.Errorf("expected server-side UnitPriceNet=2000, got %d", item.UnitPriceNet)
+	}
+	if item.UnitPriceGross != 2380 {
+		t.Errorf("expected server-side UnitPriceGross=2380, got %d", item.UnitPriceGross)
+	}
+	if item.Name != "Server Product" {
+		t.Errorf("expected server-side Name='Server Product', got %q", item.Name)
+	}
+	if item.SKU != "SRV-001" {
+		t.Errorf("expected server-side SKU='SRV-001', got %q", item.SKU)
+	}
+	if item.TotalGross != 4760 {
+		t.Errorf("expected TotalGross=4760, got %d", item.TotalGross)
 	}
 }

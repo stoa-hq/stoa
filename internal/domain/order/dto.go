@@ -24,15 +24,18 @@ type CheckoutRequest struct {
 }
 
 // CheckoutItemRequest describes a single line item in a checkout request.
+// Prices (UnitPriceNet, UnitPriceGross, TaxRate) and product metadata (Name,
+// SKU) are resolved server-side from the database and must not be trusted
+// from client input.
 type CheckoutItemRequest struct {
-	ProductID      *uuid.UUID `json:"product_id"`
+	ProductID      *uuid.UUID `json:"product_id"      validate:"required"`
 	VariantID      *uuid.UUID `json:"variant_id"`
-	SKU            string     `json:"sku"             validate:"required,max=100"`
-	Name           string     `json:"name"            validate:"required,max=255"`
+	SKU            string     `json:"sku"             validate:"omitempty,max=100"`
+	Name           string     `json:"name"            validate:"omitempty,max=255"`
 	Quantity       int        `json:"quantity"        validate:"required,min=1"`
-	UnitPriceNet   int        `json:"unit_price_net"  validate:"min=1"`
-	UnitPriceGross int        `json:"unit_price_gross" validate:"min=1"`
-	TaxRate        int        `json:"tax_rate"        validate:"min=0"`
+	UnitPriceNet   int        `json:"unit_price_net"  validate:"omitempty"`
+	UnitPriceGross int        `json:"unit_price_gross" validate:"omitempty"`
+	TaxRate        int        `json:"tax_rate"        validate:"omitempty"`
 }
 
 // UpdateStatusRequest is the admin-facing payload for transitioning an order's status.

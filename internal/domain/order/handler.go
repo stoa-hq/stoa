@@ -26,6 +26,11 @@ type ShippingCostFn func(ctx context.Context, id uuid.UUID) (int, error)
 // Returns an error if the product has no tax rule or the lookup fails.
 type ProductTaxRateFn func(ctx context.Context, productID uuid.UUID) (int, error)
 
+// ProductPriceFn resolves the authoritative prices for a checkout line item.
+// Given a product ID and an optional variant ID it returns the net price,
+// gross price, product name and SKU straight from the database.
+type ProductPriceFn func(ctx context.Context, productID uuid.UUID, variantID *uuid.UUID) (priceNet, priceGross int, name, sku string, err error)
+
 // PaymentMethodCheckFn checks whether the given payment method ID is valid.
 // It returns whether any active payment methods are configured, whether the
 // specific ID (if non-nil) references a valid active method, the provider
@@ -68,6 +73,7 @@ type Handler struct {
 	service              *Service
 	shippingCostFn       ShippingCostFn
 	productTaxRateFn     ProductTaxRateFn
+	productPriceFn       ProductPriceFn
 	paymentMethodCheckFn PaymentMethodCheckFn
 	validator            *validator.Validate
 	logger               zerolog.Logger
@@ -76,12 +82,14 @@ type Handler struct {
 // NewHandler creates a new order Handler.
 // shippingCostFn may be nil; if non-nil it is called during checkout to apply shipping costs.
 // productTaxRateFn may be nil; if non-nil it is used to look up tax rates per product during checkout.
+// productPriceFn may be nil; if non-nil it is used to enforce server-side prices during checkout.
 // paymentMethodCheckFn may be nil; if non-nil it validates payment method selection during checkout.
-func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, paymentMethodCheckFn PaymentMethodCheckFn, validate *validator.Validate, logger zerolog.Logger) *Handler {
+func NewHandler(service *Service, shippingCostFn ShippingCostFn, productTaxRateFn ProductTaxRateFn, productPriceFn ProductPriceFn, paymentMethodCheckFn PaymentMethodCheckFn, validate *validator.Validate, logger zerolog.Logger) *Handler {
 	return &Handler{
 		service:              service,
 		shippingCostFn:       shippingCostFn,
 		productTaxRateFn:     productTaxRateFn,
+		productPriceFn:       productPriceFn,
 		paymentMethodCheckFn: paymentMethodCheckFn,
 		validator:            validate,
 		logger:               logger,
@@ -251,6 +259,38 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 	customerID := h.optionalCustomerID(r)
 
 	o := FromCheckoutRequest(&req, customerID)
+
+	// ── Server-side price enforcement ────────────────────────────────────
+	// Override client-supplied prices with authoritative values from the
+	// database to prevent price manipulation attacks (STOA-59).
+	if h.productPriceFn != nil {
+		for i := range o.Items {
+			if o.Items[i].ProductID == nil {
+				h.writeError(w, http.StatusUnprocessableEntity, "missing_product_id",
+					"product_id is required for every line item", "items")
+				return
+			}
+			priceNet, priceGross, name, sku, err := h.productPriceFn(r.Context(), *o.Items[i].ProductID, o.Items[i].VariantID)
+			if err != nil {
+				h.writeError(w, http.StatusUnprocessableEntity, "invalid_product",
+					"product or variant not found", "items")
+				return
+			}
+			o.Items[i].UnitPriceNet = priceNet
+			o.Items[i].UnitPriceGross = priceGross
+			o.Items[i].Name = name
+			o.Items[i].SKU = sku
+			o.Items[i].TotalNet = priceNet * o.Items[i].Quantity
+			o.Items[i].TotalGross = priceGross * o.Items[i].Quantity
+		}
+		// Recompute order-level totals from enforced prices.
+		o.SubtotalNet, o.SubtotalGross = 0, 0
+		for _, item := range o.Items {
+			o.SubtotalNet += item.TotalNet
+			o.SubtotalGross += item.TotalGross
+		}
+		o.Total = o.SubtotalGross
+	}
 
 	// Generate a guest token for unauthenticated orders so that the
 	// browser session can prove ownership without a JWT.

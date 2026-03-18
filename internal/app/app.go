@@ -244,6 +244,37 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		}
 		return tr.Rate, nil
 	})
+	productPriceFn := order.ProductPriceFn(func(ctx context.Context, productID uuid.UUID, variantID *uuid.UUID) (int, int, string, string, error) {
+		p, err := productSvc.GetByID(ctx, productID)
+		if err != nil {
+			return 0, 0, "", "", fmt.Errorf("product not found: %w", err)
+		}
+		// Resolve the default locale name for the order line item.
+		name := ""
+		for _, t := range p.Translations {
+			name = t.Name
+			break
+		}
+		// When a variant is specified, use variant prices and SKU.
+		if variantID != nil {
+			for _, v := range p.Variants {
+				if v.ID == *variantID {
+					sku := v.SKU
+					priceNet := p.PriceNet
+					priceGross := p.PriceGross
+					if v.PriceNet != nil {
+						priceNet = *v.PriceNet
+					}
+					if v.PriceGross != nil {
+						priceGross = *v.PriceGross
+					}
+					return priceNet, priceGross, name, sku, nil
+				}
+			}
+			return 0, 0, "", "", fmt.Errorf("variant not found")
+		}
+		return p.PriceNet, p.PriceGross, name, p.SKU, nil
+	})
 	paymentMethodCheckFn := order.PaymentMethodCheckFn(func(ctx context.Context, id *uuid.UUID) (bool, bool, string, error) {
 		active := true
 		methods, _, err := pmethodSvc.List(ctx, payment.PaymentMethodFilter{Page: 1, Limit: 1, Active: &active})
@@ -260,7 +291,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		}
 		return hasActive, m.Active, m.Provider, nil
 	})
-	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, paymentMethodCheckFn, validate, log)
+	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, productPriceFn, paymentMethodCheckFn, validate, log)
 	cartH     := cart.NewHandler(cartSvc, log)
 	taxH      := tax.NewHandler(taxSvc, log)
 	shippingH := shipping.NewHandler(shippingSvc, log)
