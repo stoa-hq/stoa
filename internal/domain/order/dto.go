@@ -30,8 +30,8 @@ type CheckoutItemRequest struct {
 	SKU            string     `json:"sku"             validate:"required,max=100"`
 	Name           string     `json:"name"            validate:"required,max=255"`
 	Quantity       int        `json:"quantity"        validate:"required,min=1"`
-	UnitPriceNet   int        `json:"unit_price_net"  validate:"min=0"`
-	UnitPriceGross int        `json:"unit_price_gross" validate:"min=0"`
+	UnitPriceNet   int        `json:"unit_price_net"  validate:"min=1"`
+	UnitPriceGross int        `json:"unit_price_gross" validate:"min=1"`
 	TaxRate        int        `json:"tax_rate"        validate:"min=0"`
 }
 

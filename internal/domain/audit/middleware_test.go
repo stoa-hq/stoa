@@ -43,6 +43,9 @@ func TestRouteAuditInfo(t *testing.T) {
 		{"PUT", "/api/v1/admin/orders/" + id.String() + "/status", "update_status", "order", true},
 		{"POST", "/api/v1/admin/discounts/" + id.String() + "/apply", "apply", "discount", true},
 
+		// Admin sub-actions with nested sub-resource ID (e.g. PUT /products/{id}/variants/{variantId})
+		{"PUT", "/api/v1/admin/products/" + id.String() + "/variants/" + uuid.New().String(), "update_variants", "product", true},
+
 		// Admin: discounts/validate should be skipped
 		{"POST", "/api/v1/admin/discounts/validate", "", "discount", false},
 

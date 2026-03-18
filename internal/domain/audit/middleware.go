@@ -133,7 +133,7 @@ func adminRouteInfo(r *http.Request, rel string) (action, entityType string, ent
 		//      PUT  /orders/{id}/status
 		//      POST /discounts/validate  (skip)
 		entityID, _ = uuid.Parse(parts[1])
-		sub := parts[2]
+		sub, _, _ := strings.Cut(parts[2], "/")
 
 		// /discounts/validate is a query, not a mutation.
 		if entityType == "discount" && sub == "validate" {

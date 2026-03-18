@@ -324,3 +324,33 @@ func checkoutBodyWithProductID(t *testing.T) *bytes.Buffer {
 	}
 	return bytes.NewBuffer(body)
 }
+
+func TestStoreCheckout_ZeroPrice_Rejected(t *testing.T) {
+	repo := &mockOrderRepo{}
+	h := newTestHandler(repo, nil, nil)
+
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items: []CheckoutItemRequest{
+			{
+				SKU:            "FREE-001",
+				Name:           "Free Item",
+				Quantity:       1,
+				UnitPriceNet:   0,
+				UnitPriceGross: 0,
+				TaxRate:        0,
+			},
+		},
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal checkout request: %v", err)
+	}
+
+	rr := doCheckout(h, bytes.NewBuffer(body))
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422 for zero-price items, got %d: %s", rr.Code, rr.Body.String())
+	}
+}

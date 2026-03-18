@@ -298,12 +298,23 @@ func ToResponse(p *Product) ProductResponse {
 	}
 
 	for _, v := range p.Variants {
+		// Inherit price from parent product when variant has no own price.
+		// A nil pointer (NULL in DB) or a zero value both mean "no own price".
+		priceNet := v.PriceNet
+		priceGross := v.PriceGross
+		if priceNet == nil || *priceNet == 0 {
+			priceNet = &p.PriceNet
+		}
+		if priceGross == nil || *priceGross == 0 {
+			priceGross = &p.PriceGross
+		}
+
 		vr := ProductVariantResponse{
 			ID:           v.ID,
 			ProductID:    v.ProductID,
 			SKU:          v.SKU,
-			PriceNet:     v.PriceNet,
-			PriceGross:   v.PriceGross,
+			PriceNet:     priceNet,
+			PriceGross:   priceGross,
 			Stock:        v.Stock,
 			Active:       v.Active,
 			CustomFields: v.CustomFields,

@@ -239,6 +239,9 @@ func (r *postgresRepository) FindAll(ctx context.Context, filter ProductFilter) 
 		if err := r.loadHasVariantsForMany(ctx, products); err != nil {
 			return nil, 0, err
 		}
+		if err := r.loadVariantsForMany(ctx, products); err != nil {
+			return nil, 0, err
+		}
 	}
 
 	return products, total, nil
@@ -596,6 +599,46 @@ func (r *postgresRepository) loadHasVariantsForMany(ctx context.Context, product
 		}
 		if i, ok := idx[productID]; ok {
 			products[i].HasVariants = true
+		}
+	}
+	return rows.Err()
+}
+
+// loadVariantsForMany bulk-loads variants for a slice of products (without options).
+func (r *postgresRepository) loadVariantsForMany(ctx context.Context, products []Product) error {
+	ids := make([]uuid.UUID, len(products))
+	idx := make(map[uuid.UUID]int, len(products))
+	for i := range products {
+		ids[i] = products[i].ID
+		idx[products[i].ID] = i
+	}
+
+	const query = `
+		SELECT id, product_id, sku, price_net, price_gross, stock, active, custom_fields, created_at, updated_at
+		FROM product_variants
+		WHERE product_id = ANY($1)`
+
+	rows, err := r.db.Query(ctx, query, ids)
+	if err != nil {
+		return fmt.Errorf("loadVariantsForMany query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var v ProductVariant
+		var customFieldsRaw []byte
+		if err := rows.Scan(
+			&v.ID, &v.ProductID, &v.SKU, &v.PriceNet, &v.PriceGross,
+			&v.Stock, &v.Active, &customFieldsRaw,
+			&v.CreatedAt, &v.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("loadVariantsForMany scan: %w", err)
+		}
+		if err := unmarshalJSON(customFieldsRaw, &v.CustomFields); err != nil {
+			return err
+		}
+		if i, ok := idx[v.ProductID]; ok {
+			products[i].Variants = append(products[i].Variants, v)
 		}
 	}
 	return rows.Err()

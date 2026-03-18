@@ -211,3 +211,90 @@ func TestApplyUpdateRequest_NilFieldsUnchanged(t *testing.T) {
 		t.Errorf("PriceGross should be unchanged, got %d", p.PriceGross)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ToResponse — Variant price inheritance
+// ---------------------------------------------------------------------------
+
+func TestToResponse_VariantInheritsPriceFromProduct(t *testing.T) {
+	p := &Product{
+		ID:         uuid.New(),
+		PriceNet:   1000,
+		PriceGross: 1190,
+		Variants: []ProductVariant{
+			{
+				ID:  uuid.New(),
+				SKU: "VAR-NO-PRICE",
+				// PriceNet and PriceGross are nil → should inherit from product.
+			},
+		},
+	}
+
+	resp := ToResponse(p)
+
+	if len(resp.Variants) != 1 {
+		t.Fatalf("want 1 variant, got %d", len(resp.Variants))
+	}
+	v := resp.Variants[0]
+	if v.PriceNet == nil || *v.PriceNet != 1000 {
+		t.Errorf("PriceNet: got %v, want 1000 (inherited)", v.PriceNet)
+	}
+	if v.PriceGross == nil || *v.PriceGross != 1190 {
+		t.Errorf("PriceGross: got %v, want 1190 (inherited)", v.PriceGross)
+	}
+}
+
+func TestToResponse_VariantZeroPriceInheritsFromProduct(t *testing.T) {
+	zero := 0
+	p := &Product{
+		ID:         uuid.New(),
+		PriceNet:   1000,
+		PriceGross: 1190,
+		Variants: []ProductVariant{
+			{
+				ID:         uuid.New(),
+				SKU:        "VAR-ZERO-PRICE",
+				PriceNet:   &zero,
+				PriceGross: &zero,
+			},
+		},
+	}
+
+	resp := ToResponse(p)
+
+	v := resp.Variants[0]
+	if v.PriceNet == nil || *v.PriceNet != 1000 {
+		t.Errorf("PriceNet: got %v, want 1000 (inherited, zero treated as unset)", v.PriceNet)
+	}
+	if v.PriceGross == nil || *v.PriceGross != 1190 {
+		t.Errorf("PriceGross: got %v, want 1190 (inherited, zero treated as unset)", v.PriceGross)
+	}
+}
+
+func TestToResponse_VariantKeepsOwnPrice(t *testing.T) {
+	varNet := 500
+	varGross := 595
+	p := &Product{
+		ID:         uuid.New(),
+		PriceNet:   1000,
+		PriceGross: 1190,
+		Variants: []ProductVariant{
+			{
+				ID:         uuid.New(),
+				SKU:        "VAR-OWN-PRICE",
+				PriceNet:   &varNet,
+				PriceGross: &varGross,
+			},
+		},
+	}
+
+	resp := ToResponse(p)
+
+	v := resp.Variants[0]
+	if v.PriceNet == nil || *v.PriceNet != 500 {
+		t.Errorf("PriceNet: got %v, want 500 (own price)", v.PriceNet)
+	}
+	if v.PriceGross == nil || *v.PriceGross != 595 {
+		t.Errorf("PriceGross: got %v, want 595 (own price)", v.PriceGross)
+	}
+}

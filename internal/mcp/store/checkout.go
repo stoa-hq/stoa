@@ -80,6 +80,14 @@ type productResponse struct {
 	PriceGross   int                      `json:"price_gross"`
 	Currency     string                   `json:"currency"`
 	Translations []productTranslationResp `json:"translations"`
+	Variants     []variantResp            `json:"variants"`
+}
+
+type variantResp struct {
+	ID         string `json:"id"`
+	SKU        string `json:"sku"`
+	PriceNet   *int   `json:"price_net"`
+	PriceGross *int   `json:"price_gross"`
 }
 
 type productTranslationResp struct {
@@ -137,13 +145,35 @@ func checkoutHandler(client *stoamcp.StoaClient) server.ToolHandlerFunc {
 				name = product.Translations[0].Name
 			}
 
+			sku := product.SKU
+			priceNet := product.PriceNet
+			priceGross := product.PriceGross
+
+			// If a variant is selected, use variant-specific price/SKU.
+			if item.VariantID != nil {
+				for _, v := range product.Variants {
+					if v.ID == *item.VariantID {
+						if v.SKU != "" {
+							sku = v.SKU
+						}
+						if v.PriceNet != nil {
+							priceNet = *v.PriceNet
+						}
+						if v.PriceGross != nil {
+							priceGross = *v.PriceGross
+						}
+						break
+					}
+				}
+			}
+
 			ci := map[string]interface{}{
 				"product_id":       item.ProductID,
-				"sku":              product.SKU,
+				"sku":              sku,
 				"name":             name,
 				"quantity":         item.Quantity,
-				"unit_price_net":   product.PriceNet,
-				"unit_price_gross": product.PriceGross,
+				"unit_price_net":   priceNet,
+				"unit_price_gross": priceGross,
 				"tax_rate":         0,
 			}
 			if item.VariantID != nil {

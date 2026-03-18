@@ -27,7 +27,7 @@
 	const activeVariants = $derived(product?.variants?.filter((v) => v.active) ?? []);
 	const needsVariantSelection = $derived(activeVariants.length > 0 && !selectedVariantId);
 
-	const displayPrice = $derived(() => {
+	const displayPrice = $derived.by(() => {
 		if (!product) return 0;
 		if (selectedVariantId) {
 			const v = activeVariants.find((v) => v.id === selectedVariantId);
@@ -38,7 +38,7 @@
 
 	const productImages = $derived(product?.media?.filter((m) => m.url) ?? []);
 
-	const inStock = $derived(() => {
+	const inStock = $derived.by(() => {
 		if (!product) return false;
 		if (needsVariantSelection) return false;
 		if (selectedVariantId) {
@@ -124,7 +124,7 @@
 				<p class="text-sm text-gray-400 mb-1">{product.sku}</p>
 				<h1 class="text-3xl font-bold text-gray-900">{translation.name}</h1>
 
-				<p class="text-3xl font-bold text-primary-700 mt-4">{$fmt.price(displayPrice())}</p>
+				<p class="text-3xl font-bold text-primary-700 mt-4">{$fmt.price(displayPrice)}</p>
 
 				{#if translation.description}
 					<div class="mt-4 text-gray-600 leading-relaxed prose prose-sm max-w-none">
@@ -180,7 +180,7 @@
 				<!-- Add to cart -->
 				<button
 					onclick={addToCart}
-					disabled={adding || needsVariantSelection || !inStock()}
+					disabled={adding || needsVariantSelection || !inStock}
 					class="btn btn-primary btn-lg mt-6 w-full"
 				>
 					{#if added}
@@ -192,7 +192,7 @@
 						</svg>
 					{:else if needsVariantSelection}
 						{$t('productDetail.selectVariant')}
-					{:else if !inStock()}
+					{:else if !inStock}
 						{$t('productDetail.soldOut')}
 					{:else}
 						{$t('productDetail.addToCart')}
@@ -205,7 +205,7 @@
 					{#if sv && sv.stock > 0 && sv.stock <= 5}
 						<p class="text-sm text-amber-600 mt-2 text-center">{$t('productDetail.lowStock', { values: { count: sv.stock } })}</p>
 					{/if}
-				{:else if !needsVariantSelection && inStock() && product.stock <= 5}
+				{:else if !needsVariantSelection && inStock && product.stock <= 5}
 					<p class="text-sm text-amber-600 mt-2 text-center">{$t('productDetail.lowStock', { values: { count: product.stock } })}</p>
 				{/if}
 			</div>

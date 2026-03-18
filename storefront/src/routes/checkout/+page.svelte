@@ -124,8 +124,8 @@
 					quantity: item.quantity,
 					product,
 					sku: variant?.sku ?? product?.sku ?? '',
-					price_net: variant?.price_net ?? product?.price_net ?? 0,
-					price_gross: variant?.price_gross ?? product?.price_gross ?? 0
+					price_net: variant?.price_net ?? product?.price_net,
+					price_gross: variant?.price_gross ?? product?.price_gross
 				};
 			});
 
