@@ -221,7 +221,8 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		cfg.Security.BruteForce.MaxAttempts,
 		cfg.Security.BruteForce.LockDuration,
 	)
-	authH     := auth.NewHandler(pool, a.JWTManager, apiKeyManager, bruteForce, log)
+	tokenStore := auth.NewRefreshTokenStore(pool)
+	authH     := auth.NewHandler(pool, a.JWTManager, apiKeyManager, bruteForce, tokenStore, log)
 	productH  := product.NewHandler(productSvc, validate, log)
 	categoryH := category.NewHandler(categorySvc, log)
 	customerH := customer.NewHandler(customerSvc, validate, log)

@@ -18,6 +18,7 @@ type Handler struct {
 	jwtManager    *JWTManager
 	apiKeyManager *APIKeyManager
 	bruteForce    *BruteForceTracker
+	tokenStore    *RefreshTokenStore
 	logger        zerolog.Logger
 }
 
@@ -48,8 +49,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, bruteForce *BruteForceTracker, logger zerolog.Logger) *Handler {
-	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, bruteForce: bruteForce, logger: logger}
+func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKeyManager, bruteForce *BruteForceTracker, tokenStore *RefreshTokenStore, logger zerolog.Logger) *Handler {
+	return &Handler{pool: pool, jwtManager: jwtManager, apiKeyManager: apiKeyManager, bruteForce: bruteForce, tokenStore: tokenStore, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
@@ -145,6 +146,24 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Persist refresh token for rotation tracking.
+	refreshClaims, err := h.jwtManager.ValidateToken(refreshToken)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("parsing refresh token claims")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to generate token"}},
+		})
+		return
+	}
+	familyID := uuid.New()
+	if err := h.tokenStore.Store(r.Context(), refreshClaims.ID, user.ID, familyID, refreshClaims.ExpiresAt.Time); err != nil {
+		h.logger.Error().Err(err).Msg("storing refresh token")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to generate token"}},
+		})
+		return
+	}
+
 	// Update last login
 	h.updateLastLogin(r.Context(), user.ID, userType)
 
@@ -182,6 +201,23 @@ func (h *Handler) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Consume the old refresh token (marks it as revoked).
+	// If the token was already used, reuse detection kicks in and
+	// invalidates the entire token family.
+	rec, err := h.tokenStore.Consume(r.Context(), claims.ID)
+	if err != nil {
+		code := "invalid_token"
+		detail := "refresh token is invalid"
+		if err == ErrTokenReuse {
+			h.logger.Warn().Str("user_id", claims.UserID.String()).Msg("refresh token reuse detected — family revoked")
+			detail = "token reuse detected, please login again"
+		}
+		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
+			"errors": []map[string]string{{"code": code, "detail": detail}},
+		})
+		return
+	}
+
 	accessToken, err := h.jwtManager.GenerateAccessToken(claims.UserID, claims.Email, claims.UserType, claims.Role)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
@@ -192,6 +228,16 @@ func (h *Handler) handleRefresh(w http.ResponseWriter, r *http.Request) {
 
 	newRefreshToken, err := h.jwtManager.GenerateRefreshToken(claims.UserID, claims.Email, claims.UserType, claims.Role)
 	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to generate token"}},
+		})
+		return
+	}
+
+	// Persist the new refresh token in the same family.
+	newClaims, _ := h.jwtManager.ValidateToken(newRefreshToken)
+	if err := h.tokenStore.Store(r.Context(), newClaims.ID, claims.UserID, rec.FamilyID, newClaims.ExpiresAt.Time); err != nil {
+		h.logger.Error().Err(err).Msg("storing rotated refresh token")
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to generate token"}},
 		})
@@ -302,8 +348,20 @@ func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// For stateless JWT, logout is handled client-side by discarding the token.
-	// If token blacklisting is needed, it can be added here.
+	// Accept an optional refresh_token in the body to identify the user
+	// even without an Authorization header.
+	var req RefreshRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.RefreshToken != "" {
+		claims, err := h.jwtManager.ValidateToken(req.RefreshToken)
+		if err == nil && claims.Type == RefreshToken {
+			_ = h.tokenStore.RevokeAllForUser(r.Context(), claims.UserID)
+		}
+	} else if uid := UserID(r.Context()); uid != uuid.Nil {
+		_ = h.tokenStore.RevokeAllForUser(r.Context(), uid)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"data": map[string]string{"message": "logged out successfully"},
 	})
