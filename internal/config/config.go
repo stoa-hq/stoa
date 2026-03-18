@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -171,6 +172,18 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func (c *Config) Validate() error {
+	key := c.Payment.EncryptionKey
+	if key == "" {
+		return errors.New("payment.encryption_key is required — it protects stored payment credentials. Generate one with: openssl rand -hex 32")
+	}
+	n := len(key)
+	if n != 32 && n != 64 {
+		return fmt.Errorf("payment.encryption_key must be exactly 32 bytes (raw) or 64 hex characters, got %d characters. Generate one with: openssl rand -hex 32", n)
+	}
+	return nil
 }
 
 func (c *Config) Addr() string {

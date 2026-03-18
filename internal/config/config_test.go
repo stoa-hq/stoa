@@ -1,8 +1,44 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
+
+func TestValidate_PaymentEncryptionKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		wantErr string
+	}{
+		{"empty key", "", "required"},
+		{"valid 32-byte raw key", "abcdefghijklmnopqrstuvwxyz012345", ""},
+		{"valid 64 hex chars", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", ""},
+		{"too short 16 chars", "0123456789abcdef", "must be exactly 32 bytes"},
+		{"too long 48 chars", "0123456789abcdef0123456789abcdef0123456789abcdef", "must be exactly 32 bytes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Payment: PaymentConfig{EncryptionKey: tt.key},
+			}
+			err := cfg.Validate()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q should contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestDefaults_EndpointRateLimits(t *testing.T) {
 	cfg, err := Load("")
