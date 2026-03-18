@@ -12,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/auth"
 )
 
 // ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ func (m *mockTxSvc) GetTransactionsByOrderID(ctx context.Context, orderID uuid.U
 // ---------------------------------------------------------------------------
 
 func TestHandler_ListTransactionsByOrder_InvalidID(t *testing.T) {
-	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, zerolog.Nop())
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, nil, zerolog.Nop())
 
 	req := httptest.NewRequest(http.MethodGet, "/orders/not-a-uuid/transactions", nil)
 	rctx := chi.NewRouteContext()
@@ -121,7 +123,7 @@ func TestHandler_ListTransactionsByOrder_Success(t *testing.T) {
 		},
 	}
 
-	h := NewHandler(&mockMethodSvc{}, txSvc, zerolog.Nop())
+	h := NewHandler(&mockMethodSvc{}, txSvc, nil, zerolog.Nop())
 
 	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
 	rctx := chi.NewRouteContext()
@@ -158,7 +160,7 @@ func TestHandler_ListTransactionsByOrder_Success(t *testing.T) {
 }
 
 func TestHandler_ListTransactionsByOrder_EmptyList(t *testing.T) {
-	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, zerolog.Nop())
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, nil, zerolog.Nop())
 
 	orderID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
@@ -193,7 +195,7 @@ func TestHandler_ListTransactionsByOrder_ServiceError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	h := NewHandler(&mockMethodSvc{}, txSvc, zerolog.Nop())
+	h := NewHandler(&mockMethodSvc{}, txSvc, nil, zerolog.Nop())
 
 	orderID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
@@ -206,5 +208,173 @@ func TestHandler_ListTransactionsByOrder_ServiceError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ListTransactionsByOrderStore — ownership checks
+// ---------------------------------------------------------------------------
+
+func TestHandler_ListTransactionsByOrderStore_AuthenticatedOwner(t *testing.T) {
+	orderID := uuid.New()
+	customerID := uuid.New()
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, id uuid.UUID) (*uuid.UUID, string, error) {
+		if id != orderID {
+			t.Errorf("expected orderID %s, got %s", orderID, id)
+		}
+		return &customerID, "", nil
+	})
+
+	txSvc := &mockTxSvc{
+		getTransactionsByOrder: func(_ context.Context, id uuid.UUID) ([]PaymentTransaction, error) {
+			return []PaymentTransaction{
+				{ID: uuid.New(), OrderID: id, Status: "completed", Amount: 4999},
+			}, nil
+		},
+	}
+
+	h := NewHandler(&mockMethodSvc{}, txSvc, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = auth.WithUserID(ctx, customerID)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp apiResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Meta == nil || resp.Meta.Total != 1 {
+		t.Errorf("expected total=1, got %v", resp.Meta)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_WrongCustomer(t *testing.T) {
+	orderID := uuid.New()
+	ownerID := uuid.New()
+	attackerID := uuid.New()
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return &ownerID, "", nil
+	})
+
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = auth.WithUserID(ctx, attackerID)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_GuestValidToken(t *testing.T) {
+	orderID := uuid.New()
+	guestToken := "secret-guest-token-123"
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return nil, guestToken, nil
+	})
+
+	txSvc := &mockTxSvc{
+		getTransactionsByOrder: func(_ context.Context, _ uuid.UUID) ([]PaymentTransaction, error) {
+			return []PaymentTransaction{}, nil
+		},
+	}
+
+	h := NewHandler(&mockMethodSvc{}, txSvc, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions?guest_token="+guestToken, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_GuestInvalidToken(t *testing.T) {
+	orderID := uuid.New()
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return nil, "real-token", nil
+	})
+
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions?guest_token=wrong-token", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_GuestNoToken(t *testing.T) {
+	orderID := uuid.New()
+
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return nil, "real-token", nil
+	})
+
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, ownershipFn, zerolog.Nop())
+
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestHandler_ListTransactionsByOrderStore_OrderNotFound(t *testing.T) {
+	ownershipFn := OrderOwnershipFn(func(_ context.Context, _ uuid.UUID) (*uuid.UUID, string, error) {
+		return nil, "", errors.New("order not found")
+	})
+
+	h := NewHandler(&mockMethodSvc{}, &mockTxSvc{}, ownershipFn, zerolog.Nop())
+
+	orderID := uuid.New()
+	req := httptest.NewRequest(http.MethodGet, "/orders/"+orderID.String()+"/transactions", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orderID", orderID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	h.ListTransactionsByOrderStore(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
 	}
 }

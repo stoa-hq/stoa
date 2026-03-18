@@ -295,7 +295,14 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	cartH     := cart.NewHandler(cartSvc, log)
 	taxH      := tax.NewHandler(taxSvc, log)
 	shippingH := shipping.NewHandler(shippingSvc, log)
-	paymentH  := payment.NewHandler(pmethodSvc, ptxSvc, log)
+	orderOwnershipFn := payment.OrderOwnershipFn(func(ctx context.Context, orderID uuid.UUID) (*uuid.UUID, string, error) {
+		o, err := orderRepo.FindByID(ctx, orderID)
+		if err != nil {
+			return nil, "", err
+		}
+		return o.CustomerID, o.GuestToken, nil
+	})
+	paymentH  := payment.NewHandler(pmethodSvc, ptxSvc, orderOwnershipFn, log)
 	discountH := discount.NewHandler(discountSvc, log)
 	tagH      := tag.NewHandler(tagSvc, log)
 	auditH    := audit.NewHandler(auditSvc, log)

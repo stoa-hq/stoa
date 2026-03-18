@@ -1,6 +1,7 @@
 package payment
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,22 +11,32 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+
+	"github.com/stoa-hq/stoa/internal/auth"
 )
 
+// OrderOwnershipFn verifies whether an order belongs to the given customer or
+// guest token. It returns the order's customer_id and guest_token so the
+// handler can perform the ownership check without depending on the order domain.
+type OrderOwnershipFn func(ctx context.Context, orderID uuid.UUID) (customerID *uuid.UUID, guestToken string, err error)
+
 type handler struct {
-	methodSvc      PaymentMethodService
-	transactionSvc PaymentTransactionService
-	validate       *validator.Validate
-	logger         zerolog.Logger
+	methodSvc        PaymentMethodService
+	transactionSvc   PaymentTransactionService
+	orderOwnershipFn OrderOwnershipFn
+	validate         *validator.Validate
+	logger           zerolog.Logger
 }
 
 // NewHandler creates a new payment HTTP handler.
-func NewHandler(methodSvc PaymentMethodService, transactionSvc PaymentTransactionService, logger zerolog.Logger) *handler {
+// orderOwnershipFn may be nil; when nil, store transaction endpoints are not available.
+func NewHandler(methodSvc PaymentMethodService, transactionSvc PaymentTransactionService, orderOwnershipFn OrderOwnershipFn, logger zerolog.Logger) *handler {
 	return &handler{
-		methodSvc:      methodSvc,
-		transactionSvc: transactionSvc,
-		validate:       validator.New(),
-		logger:         logger,
+		methodSvc:        methodSvc,
+		transactionSvc:   transactionSvc,
+		orderOwnershipFn: orderOwnershipFn,
+		validate:         validator.New(),
+		logger:           logger,
 	}
 }
 
@@ -68,6 +79,58 @@ func (h *handler) RegisterStoreRoutes(r chi.Router) {
 	r.Route("/payment-methods", func(r chi.Router) {
 		r.Get("/", h.listActive)
 		r.Get("/{id}", h.getByID)
+	})
+	r.Get("/orders/{orderID}/transactions", h.ListTransactionsByOrderStore)
+}
+
+// ListTransactionsByOrderStore returns payment transactions for an order after
+// verifying that the authenticated customer owns the order, or that the
+// correct guest_token is provided.
+func (h *handler) ListTransactionsByOrderStore(w http.ResponseWriter, r *http.Request) {
+	orderID, err := uuid.Parse(chi.URLParam(r, "orderID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_id", "orderID must be a valid UUID")
+		return
+	}
+
+	if h.orderOwnershipFn == nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "order lookup not configured")
+		return
+	}
+
+	ownerID, guestToken, err := h.orderOwnershipFn(r.Context(), orderID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "order not found")
+		return
+	}
+
+	// Ownership verification: authenticated customer or valid guest token.
+	customerID := auth.UserID(r.Context())
+	if customerID != uuid.Nil {
+		if ownerID == nil || *ownerID != customerID {
+			writeError(w, http.StatusForbidden, "forbidden", "you do not have access to this order")
+			return
+		}
+	} else {
+		reqToken := r.URL.Query().Get("guest_token")
+		if guestToken == "" || reqToken == "" || guestToken != reqToken {
+			writeError(w, http.StatusForbidden, "forbidden", "you do not have access to this order")
+			return
+		}
+	}
+
+	txns, err := h.transactionSvc.GetTransactionsByOrderID(r.Context(), orderID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to load transactions")
+		return
+	}
+	if txns == nil {
+		txns = []PaymentTransaction{}
+	}
+
+	writeJSON(w, http.StatusOK, apiResponse{
+		Data: txns,
+		Meta: &apiMeta{Total: len(txns), Page: 1, Limit: len(txns), Pages: 1},
 	})
 }
 
