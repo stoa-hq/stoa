@@ -23,7 +23,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      STOA_DATABASE_URL: "postgres://stoa:secret@postgres:5432/stoa?sslmode=disable"
+      STOA_DATABASE_URL: "postgres://stoa:secret@postgres:5432/stoa?sslmode=disable"  # sslmode=disable is safe here — internal Docker bridge network
       STOA_AUTH_JWT_SECRET: "change-me-in-production"
     depends_on:
       postgres:

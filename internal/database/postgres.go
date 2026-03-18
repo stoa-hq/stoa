@@ -22,6 +22,10 @@ func New(cfg config.DatabaseConfig, logger zerolog.Logger) (*DB, error) {
 		return nil, fmt.Errorf("parsing database URL: %w", err)
 	}
 
+	if poolCfg.ConnConfig.TLSConfig == nil {
+		logger.Warn().Msg("database connection uses sslmode=disable — not recommended for production")
+	}
+
 	poolCfg.MaxConns = int32(cfg.MaxOpenConns)
 	poolCfg.MinConns = int32(cfg.MaxIdleConns)
 	poolCfg.MaxConnLifetime = cfg.ConnMaxLifetime

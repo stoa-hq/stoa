@@ -8,7 +8,7 @@ server:
     allowed_methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
 
 database:
-  url: "postgres://stoa:secret@localhost:5432/stoa?sslmode=disable"
+  url: "postgres://stoa:secret@localhost:5432/stoa?sslmode=require"  # Use sslmode=disable only for local development
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 5m
