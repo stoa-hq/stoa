@@ -1,8 +1,10 @@
 package media
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -13,6 +15,16 @@ import (
 
 	"github.com/stoa-hq/stoa/internal/server"
 )
+
+// allowedMIMETypes is the whitelist of MIME types accepted for upload.
+var allowedMIMETypes = map[string]bool{
+	"image/jpeg":      true,
+	"image/png":       true,
+	"image/gif":       true,
+	"image/webp":      true,
+	"image/svg+xml":   true,
+	"application/pdf": true,
+}
 
 const maxUploadSize = 32 << 20 // 32 MiB
 
@@ -80,12 +92,33 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	altText := r.FormValue("alt_text")
-	mimeType := header.Header.Get("Content-Type")
-	if mimeType == "" {
-		mimeType = "application/octet-stream"
+
+	// Read the first 512 bytes for magic byte detection.
+	buf := make([]byte, 512)
+	n, err := io.ReadAtLeast(file, buf, 1)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "read_failed", "could not read file content")
+		return
+	}
+	buf = buf[:n]
+
+	detectedMIME := http.DetectContentType(buf)
+
+	// SVG is detected as text/xml or text/plain — fall back to client header for SVG.
+	clientMIME := header.Header.Get("Content-Type")
+	if clientMIME == "image/svg+xml" && (detectedMIME == "text/xml; charset=utf-8" || detectedMIME == "text/plain; charset=utf-8") {
+		detectedMIME = "image/svg+xml"
 	}
 
-	m, err := h.svc.Upload(r.Context(), header.Filename, mimeType, altText, header.Size, file)
+	if !allowedMIMETypes[detectedMIME] {
+		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "file type not allowed")
+		return
+	}
+
+	// Reconstruct reader: prepend already-read bytes before remaining file content.
+	fullReader := io.MultiReader(bytes.NewReader(buf), file)
+
+	m, err := h.svc.Upload(r.Context(), header.Filename, detectedMIME, altText, header.Size, fullReader)
 	if err != nil {
 		if errors.Is(err, ErrInvalidInput) {
 			writeError(w, http.StatusBadRequest, "invalid_input", "invalid file upload")
