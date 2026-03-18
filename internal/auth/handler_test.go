@@ -192,6 +192,49 @@ func TestHandleRefresh_HTTPEndpoint_RejectsExpiredToken(t *testing.T) {
 	}
 }
 
+func TestLogin_AccountLock_RetryAfterHeader(t *testing.T) {
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
+	logger := zerolog.Nop()
+	// Lock after 2 attempts with a short duration (1 minute) —
+	// the header must still return 3600, not the actual remaining seconds.
+	bruteForce := NewBruteForceTracker(2, 1*time.Minute)
+	store := NewRefreshTokenStore(nil)
+	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, NewTokenBlacklist(), logger)
+
+	email := "locked@example.com"
+
+	// Trigger lockout by recording enough failures.
+	for i := 0; i < 2; i++ {
+		bruteForce.RecordFailure(email)
+	}
+
+	// Verify the account is locked.
+	locked, actualRetryAfter := bruteForce.IsLocked(email)
+	if !locked {
+		t.Fatal("expected account to be locked")
+	}
+	// The actual remaining time should be less than 3600s (we set 1 minute).
+	if actualRetryAfter.Seconds() >= 3600 {
+		t.Fatal("test setup error: actual lockout duration should be less than 3600s")
+	}
+
+	body, _ := json.Marshal(map[string]string{"email": email, "password": "wrong"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleLogin(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429, got %d", w.Code)
+	}
+
+	retryAfter := w.Header().Get("Retry-After")
+	if retryAfter != "3600" {
+		t.Errorf("expected Retry-After header to be fixed value '3600', got '%s'", retryAfter)
+	}
+}
+
 func TestRevokeAllForUser(t *testing.T) {
 	userID := uuid.New()
 	otherUserID := uuid.New()

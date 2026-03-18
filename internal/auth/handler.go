@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -85,8 +84,8 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if locked, retryAfter := h.bruteForce.IsLocked(req.Email); locked {
-		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())))
+	if locked, _ := h.bruteForce.IsLocked(req.Email); locked {
+		w.Header().Set("Retry-After", "3600")
 		writeJSON(w, http.StatusTooManyRequests, map[string]interface{}{
 			"errors": []map[string]string{{"code": "account_locked", "detail": "too many failed login attempts, please try again later"}},
 		})
