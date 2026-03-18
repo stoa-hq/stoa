@@ -76,7 +76,7 @@ func checkoutBodyWithRef(t *testing.T, pmID *uuid.UUID, paymentRef string) *byte
 
 func doCheckout(h *Handler, body *bytes.Buffer) *httptest.ResponseRecorder {
 	r := chi.NewRouter()
-	r.Post("/checkout", h.storeCheckout)
+	r.Post("/checkout", h.StoreCheckout)
 	req := httptest.NewRequest(http.MethodPost, "/checkout", body)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()

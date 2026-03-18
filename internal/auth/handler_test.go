@@ -163,7 +163,7 @@ func TestHandleRefresh_HTTPEndpoint_RejectsAccessToken(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	h.handleRefresh(w, req)
+	h.HandleRefresh(w, req)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", w.Code)
@@ -185,7 +185,7 @@ func TestHandleRefresh_HTTPEndpoint_RejectsExpiredToken(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	h.handleRefresh(w, req)
+	h.HandleRefresh(w, req)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", w.Code)

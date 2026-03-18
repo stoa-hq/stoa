@@ -76,9 +76,9 @@ func (h *Handler) RegisterAdminRoutes(r chi.Router) {
 // RegisterStoreRoutes mounts the self-service account endpoints.
 // Expected prefix: (root of store router)
 func (h *Handler) RegisterStoreRoutes(r chi.Router) {
-	r.Post("/register", h.storeRegister)
-	r.Get("/account", h.storeGetAccount)
-	r.Put("/account", h.storeUpdateAccount)
+	r.Post("/register", h.StoreRegister)
+	r.Get("/account", h.StoreGetAccount)
+	r.Put("/account", h.StoreUpdateAccount)
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ func (h *Handler) adminDelete(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // storeRegister handles POST /register
-func (h *Handler) storeRegister(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StoreRegister(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if !h.decodeJSON(w, r, &req) {
 		return
@@ -258,7 +258,7 @@ func (h *Handler) storeRegister(w http.ResponseWriter, r *http.Request) {
 // storeGetAccount handles GET /account
 // Requires the customer's UUID to be present in the request context (set by
 // the auth middleware under the ctxKeyUserID key from the auth package).
-func (h *Handler) storeGetAccount(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StoreGetAccount(w http.ResponseWriter, r *http.Request) {
 	customerID, ok := h.customerIDFromContext(w, r)
 	if !ok {
 		return
@@ -278,7 +278,7 @@ func (h *Handler) storeGetAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeUpdateAccount handles PUT /account
-func (h *Handler) storeUpdateAccount(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StoreUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	customerID, ok := h.customerIDFromContext(w, r)
 	if !ok {
 		return

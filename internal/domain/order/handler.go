@@ -112,8 +112,8 @@ func (h *Handler) RegisterAdminRoutes(r chi.Router) {
 // RegisterStoreRoutes mounts the customer-facing order endpoints.
 // Expected prefix: (root of store router)
 func (h *Handler) RegisterStoreRoutes(r chi.Router) {
-	r.Post("/checkout", h.storeCheckout)
-	r.Get("/account/orders", h.storeListOrders)
+	r.Post("/checkout", h.StoreCheckout)
+	r.Get("/account/orders", h.StoreListOrders)
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ func (h *Handler) adminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // storeCheckout handles POST /checkout
-func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 	var req CheckoutRequest
 	if !h.decodeJSON(w, r, &req) {
 		return
@@ -362,7 +362,7 @@ func (h *Handler) storeCheckout(w http.ResponseWriter, r *http.Request) {
 
 // storeListOrders handles GET /account/orders
 // Returns all orders for the authenticated customer.
-func (h *Handler) storeListOrders(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StoreListOrders(w http.ResponseWriter, r *http.Request) {
 	customerID, ok := h.customerIDFromContext(w, r)
 	if !ok {
 		return

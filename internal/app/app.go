@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/httprate"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -323,8 +324,13 @@ func (a *App) setupDomains(cfg *config.Config) error {
 	// ── Plugin Manifest ──────────────────────────────────────────────────────
 	manifestH := plugin.NewManifestHandler(a.PluginRegistry)
 
-	// /api/v1/auth/* – no authentication required
-	authH.RegisterRoutes(r)
+	// /api/v1/auth/* – no authentication required, login has dedicated rate limit
+	r.Route("/api/v1/auth", func(r chi.Router) {
+		r.With(httprate.LimitByIP(cfg.Security.RateLimit.Login.RequestsPerMinute, time.Minute)).
+			Post("/login", authH.HandleLogin)
+		r.Post("/refresh", authH.HandleRefresh)
+		r.Post("/logout", authH.HandleLogout)
+	})
 
 	// /api/v1/admin/* – JWT required, staff roles only
 	r.Route("/api/v1/admin", func(r chi.Router) {
@@ -367,8 +373,16 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 		productH.RegisterStoreRoutes(r)
 		r.Route("/categories", categoryH.RegisterStoreRoutes)
-		customerH.RegisterStoreRoutes(r)
-		orderH.RegisterStoreRoutes(r)
+		// Customer: /register with dedicated rate limit, /account without
+		r.With(httprate.LimitByIP(cfg.Security.RateLimit.Register.RequestsPerMinute, time.Minute)).
+			Post("/register", customerH.StoreRegister)
+		r.Get("/account", customerH.StoreGetAccount)
+		r.Put("/account", customerH.StoreUpdateAccount)
+
+		// Order: /checkout with dedicated rate limit, /account/orders without
+		r.With(httprate.LimitByIP(cfg.Security.RateLimit.Checkout.RequestsPerMinute, time.Minute)).
+			Post("/checkout", orderH.StoreCheckout)
+		r.Get("/account/orders", orderH.StoreListOrders)
 		cartH.RegisterStoreRoutes(r)
 		shippingH.RegisterStoreRoutes(r)
 		paymentH.RegisterStoreRoutes(r)

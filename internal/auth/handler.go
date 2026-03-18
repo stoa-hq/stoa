@@ -57,12 +57,12 @@ func NewHandler(pool *pgxpool.Pool, jwtManager *JWTManager, apiKeyManager *APIKe
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
-	r.Post("/api/v1/auth/login", h.handleLogin)
-	r.Post("/api/v1/auth/refresh", h.handleRefresh)
-	r.Post("/api/v1/auth/logout", h.handleLogout)
+	r.Post("/api/v1/auth/login", h.HandleLogin)
+	r.Post("/api/v1/auth/refresh", h.HandleRefresh)
+	r.Post("/api/v1/auth/logout", h.HandleLogout)
 }
 
-func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		var maxBytesErr *http.MaxBytesError
@@ -187,7 +187,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) handleRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		var maxBytesErr *http.MaxBytesError
@@ -371,7 +371,7 @@ func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// Blacklist the current access token so it cannot be reused.
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		parts := strings.SplitN(authHeader, " ", 2)
