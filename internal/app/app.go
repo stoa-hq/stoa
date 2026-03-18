@@ -69,11 +69,14 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	jwtManager := auth.NewJWTManager(
+	jwtManager, err := auth.NewJWTManager(
 		cfg.Auth.JWTSecret,
 		cfg.Auth.AccessTokenTTL,
 		cfg.Auth.RefreshTokenTTL,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing jwt manager: %w", err)
+	}
 
 	apiKeyManager := auth.NewAPIKeyManager(db.Pool)
 	tokenBlacklist := auth.NewTokenBlacklist()

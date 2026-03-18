@@ -1,14 +1,26 @@
 package auth
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+const testSecret = "test-secret-that-is-at-least-32-bytes-long"
+
+func mustNewJWTManager(t *testing.T, secret string, accessTTL, refreshTTL time.Duration) *JWTManager {
+	t.Helper()
+	m, err := NewJWTManager(secret, accessTTL, refreshTTL)
+	if err != nil {
+		t.Fatalf("NewJWTManager: %v", err)
+	}
+	return m
+}
+
 func TestJWTManager_GenerateAndValidateAccessToken(t *testing.T) {
-	m := NewJWTManager("test-secret", 15*time.Minute, 24*time.Hour)
+	m := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
 	userID := uuid.New()
 
 	token, err := m.GenerateAccessToken(userID, "admin@test.com", "admin", "super_admin")
@@ -36,7 +48,7 @@ func TestJWTManager_GenerateAndValidateAccessToken(t *testing.T) {
 }
 
 func TestJWTManager_RefreshToken(t *testing.T) {
-	m := NewJWTManager("secret", 15*time.Minute, 7*24*time.Hour)
+	m := mustNewJWTManager(t, testSecret, 15*time.Minute, 7*24*time.Hour)
 	userID := uuid.New()
 
 	token, err := m.GenerateRefreshToken(userID, "customer@test.com", "customer", "customer")
@@ -58,8 +70,7 @@ func TestJWTManager_RefreshToken(t *testing.T) {
 }
 
 func TestJWTManager_ExpiredToken(t *testing.T) {
-	// Negative TTL → immediately expired token.
-	m := NewJWTManager("secret", -time.Second, time.Hour)
+	m := mustNewJWTManager(t, testSecret, -time.Second, time.Hour)
 
 	token, err := m.GenerateAccessToken(uuid.New(), "admin@test.com", "admin", "admin")
 	if err != nil {
@@ -73,8 +84,10 @@ func TestJWTManager_ExpiredToken(t *testing.T) {
 }
 
 func TestJWTManager_WrongSecret(t *testing.T) {
-	m1 := NewJWTManager("secret-a", time.Hour, time.Hour)
-	m2 := NewJWTManager("secret-b", time.Hour, time.Hour)
+	secret1 := "secret-a-that-is-at-least-32-bytes-long"
+	secret2 := "secret-b-that-is-at-least-32-bytes-long"
+	m1 := mustNewJWTManager(t, secret1, time.Hour, time.Hour)
+	m2 := mustNewJWTManager(t, secret2, time.Hour, time.Hour)
 
 	token, err := m1.GenerateAccessToken(uuid.New(), "admin@test.com", "admin", "admin")
 	if err != nil {
@@ -88,7 +101,7 @@ func TestJWTManager_WrongSecret(t *testing.T) {
 }
 
 func TestJWTManager_MalformedToken(t *testing.T) {
-	m := NewJWTManager("secret", time.Hour, time.Hour)
+	m := mustNewJWTManager(t, testSecret, time.Hour, time.Hour)
 
 	for _, bad := range []string{"", "not.a.jwt", "header.payload"} {
 		_, err := m.ValidateToken(bad)
@@ -99,7 +112,7 @@ func TestJWTManager_MalformedToken(t *testing.T) {
 }
 
 func TestJWTManager_ClaimsIDUnique(t *testing.T) {
-	m := NewJWTManager("secret", time.Hour, time.Hour)
+	m := mustNewJWTManager(t, testSecret, time.Hour, time.Hour)
 	uid := uuid.New()
 
 	t1, _ := m.GenerateAccessToken(uid, "admin@test.com", "admin", "admin")
@@ -110,5 +123,35 @@ func TestJWTManager_ClaimsIDUnique(t *testing.T) {
 
 	if c1.ID == c2.ID {
 		t.Error("expected unique JWT IDs (jti) for each token")
+	}
+}
+
+func TestNewJWTManager_RejectsDefaultSecret(t *testing.T) {
+	_, err := NewJWTManager(defaultSecret, time.Hour, time.Hour)
+	if err == nil {
+		t.Fatal("expected error for default secret, got nil")
+	}
+	if !strings.Contains(err.Error(), "default secret") {
+		t.Errorf("error should mention default secret, got: %v", err)
+	}
+}
+
+func TestNewJWTManager_RejectsShortSecret(t *testing.T) {
+	_, err := NewJWTManager("too-short", time.Hour, time.Hour)
+	if err == nil {
+		t.Fatal("expected error for short secret, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least") {
+		t.Errorf("error should mention minimum length, got: %v", err)
+	}
+}
+
+func TestNewJWTManager_AcceptsValidSecret(t *testing.T) {
+	m, err := NewJWTManager(testSecret, time.Hour, time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m == nil {
+		t.Fatal("expected non-nil JWTManager")
 	}
 }

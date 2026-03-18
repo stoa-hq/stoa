@@ -67,7 +67,7 @@ func (m *mockRefreshTokenStore) revokeAllForUser(userID uuid.UUID) {
 // calling the handler methods directly against httptest recorders.
 
 func TestHandleRefresh_RotatesToken(t *testing.T) {
-	jwtMgr := NewJWTManager("test-secret", 15*time.Minute, 24*time.Hour)
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
 	userID := uuid.New()
 	familyID := uuid.New()
 
@@ -106,7 +106,7 @@ func TestHandleRefresh_RotatesToken(t *testing.T) {
 }
 
 func TestHandleRefresh_ReuseDetection(t *testing.T) {
-	jwtMgr := NewJWTManager("test-secret", 15*time.Minute, 24*time.Hour)
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
 	userID := uuid.New()
 	familyID := uuid.New()
 
@@ -148,7 +148,7 @@ func TestHandleRefresh_UnknownToken(t *testing.T) {
 }
 
 func TestHandleRefresh_HTTPEndpoint_RejectsAccessToken(t *testing.T) {
-	jwtMgr := NewJWTManager("test-secret", 15*time.Minute, 24*time.Hour)
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
 	logger := zerolog.Nop()
 	bruteForce := NewBruteForceTracker(5, 15*time.Minute)
 	store := NewRefreshTokenStore(nil) // won't be reached
@@ -171,7 +171,7 @@ func TestHandleRefresh_HTTPEndpoint_RejectsAccessToken(t *testing.T) {
 }
 
 func TestHandleRefresh_HTTPEndpoint_RejectsExpiredToken(t *testing.T) {
-	jwtMgr := NewJWTManager("test-secret", 15*time.Minute, -time.Second) // negative refresh TTL
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, -time.Second) // negative refresh TTL
 	logger := zerolog.Nop()
 	bruteForce := NewBruteForceTracker(5, 15*time.Minute)
 	store := NewRefreshTokenStore(nil) // won't be reached
