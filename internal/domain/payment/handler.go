@@ -190,6 +190,11 @@ func (h *handler) listActive(w http.ResponseWriter, r *http.Request) {
 func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	var req CreatePaymentMethodRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}
@@ -248,6 +253,11 @@ func (h *handler) update(w http.ResponseWriter, r *http.Request) {
 
 	var req UpdatePaymentMethodRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}

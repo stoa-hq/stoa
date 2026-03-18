@@ -25,11 +25,13 @@ type PaymentConfig struct {
 }
 
 type ServerConfig struct {
-	Host         string     `mapstructure:"host"`
-	Port         int        `mapstructure:"port"`
-	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout time.Duration `mapstructure:"write_timeout"`
-	CORS         CORSConfig `mapstructure:"cors"`
+	Host          string        `mapstructure:"host"`
+	Port          int           `mapstructure:"port"`
+	ReadTimeout   time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout  time.Duration `mapstructure:"write_timeout"`
+	MaxBodySize   int64         `mapstructure:"max_body_size"`
+	MaxUploadSize int64         `mapstructure:"max_upload_size"`
+	CORS          CORSConfig    `mapstructure:"cors"`
 }
 
 type CORSConfig struct {
@@ -104,6 +106,8 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("server.port", 8080)
 	v.SetDefault("server.read_timeout", "10s")
 	v.SetDefault("server.write_timeout", "30s")
+	v.SetDefault("server.max_body_size", 1<<20)
+	v.SetDefault("server.max_upload_size", 35<<20)
 	v.SetDefault("server.cors.allowed_origins", []string{"http://localhost:5173"})
 	v.SetDefault("server.cors.allowed_methods", []string{"GET", "POST", "PUT", "PATCH", "DELETE"})
 

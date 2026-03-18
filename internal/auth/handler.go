@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -62,6 +63,13 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
+				"errors": []map[string]string{{"code": "body_too_large", "detail": "request body exceeds size limit"}},
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid request body"}},
 		})
@@ -180,6 +188,13 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
+				"errors": []map[string]string{{"code": "body_too_large", "detail": "request body exceeds size limit"}},
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid request body"}},
 		})
@@ -271,6 +286,13 @@ type CreateAPIKeyRequest struct {
 func (h *Handler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	var req CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
+				"errors": []map[string]string{{"code": "body_too_large", "detail": "request body exceeds size limit"}},
+			})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid request body"}},
 		})

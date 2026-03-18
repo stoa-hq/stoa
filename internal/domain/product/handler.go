@@ -773,6 +773,11 @@ func (h *Handler) parseUUID(w http.ResponseWriter, r *http.Request, param string
 // decodeJSON decodes the request body into dst, writing a 400 on failure.
 func (h *Handler) decodeJSON(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit", "")
+			return false
+		}
 		h.writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", "")
 		return false
 	}

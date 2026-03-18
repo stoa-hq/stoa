@@ -41,10 +41,11 @@ func New(cfg *config.Config, db *database.DB, logger zerolog.Logger) *Server {
 	s.setupRoutes()
 
 	s.http = &http.Server{
-		Addr:         cfg.Addr(),
-		Handler:      r,
-		ReadTimeout:  cfg.Server.ReadTimeout,
-		WriteTimeout: cfg.Server.WriteTimeout,
+		Addr:           cfg.Addr(),
+		Handler:        r,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		MaxHeaderBytes: 1 << 20,
 	}
 
 	return s
@@ -56,7 +57,10 @@ func (s *Server) setupMiddleware() {
 	// 1. Recovery
 	r.Use(chimw.Recoverer)
 
-	// 2. Request ID
+	// 2. Max request body size
+	r.Use(MaxBytes(s.cfg.Server.MaxBodySize, s.cfg.Server.MaxUploadSize))
+
+	// 3. Request ID
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reqID := r.Header.Get("X-Request-ID")
@@ -69,7 +73,7 @@ func (s *Server) setupMiddleware() {
 		})
 	})
 
-	// 3. Structured Logging
+	// 4. Structured Logging
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
@@ -85,7 +89,7 @@ func (s *Server) setupMiddleware() {
 		})
 	})
 
-	// 4. CORS
+	// 5. CORS
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.Server.CORS.AllowedOrigins,
 		AllowedMethods:   s.cfg.Server.CORS.AllowedMethods,
@@ -95,7 +99,7 @@ func (s *Server) setupMiddleware() {
 		MaxAge:           300,
 	}))
 
-	// 5. Security Headers
+	// 6. Security Headers
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -107,13 +111,13 @@ func (s *Server) setupMiddleware() {
 		})
 	})
 
-	// 6. Rate Limiter
+	// 7. Rate Limiter
 	r.Use(httprate.LimitByIP(
 		s.cfg.Security.RateLimit.RequestsPerMinute,
 		time.Minute,
 	))
 
-	// 7. CSRF – Double Submit Cookie (exempt when Authorization header is present).
+	// 8. CSRF – Double Submit Cookie (exempt when Authorization header is present).
 	// Plugin webhook paths are exempt because they authenticate via provider
 	// signatures (e.g. Stripe HMAC), not cookies or CSRF tokens.
 	r.Use(CSRF(s.cfg.Security.CSRF.Secure, "/plugins/"))

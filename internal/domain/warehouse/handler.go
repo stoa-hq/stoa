@@ -78,6 +78,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	var req CreateWarehouseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}
@@ -143,6 +148,11 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 
 	var req UpdateWarehouseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}
@@ -227,6 +237,11 @@ func (h *Handler) setStock(w http.ResponseWriter, r *http.Request) {
 
 	var req SetStockRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", "request body is not valid JSON")
 		return
 	}

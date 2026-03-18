@@ -112,6 +112,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit", "")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", "")
 		return
 	}
@@ -158,6 +163,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var req UpdateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit", "")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", "")
 		return
 	}

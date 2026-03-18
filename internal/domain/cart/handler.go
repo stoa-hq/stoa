@@ -43,6 +43,11 @@ func (h *Handler) RegisterStoreRoutes(r chi.Router) {
 func (h *Handler) handleCreateCart(w http.ResponseWriter, r *http.Request) {
 	var req CreateCartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		h.writeError(w, http.StatusBadRequest, "invalid_request", "request body is not valid JSON")
 		return
 	}
@@ -99,6 +104,11 @@ func (h *Handler) handleAddItem(w http.ResponseWriter, r *http.Request) {
 
 	var req AddItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		h.writeError(w, http.StatusBadRequest, "invalid_request", "request body is not valid JSON")
 		return
 	}
@@ -165,6 +175,11 @@ func (h *Handler) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 
 	var req UpdateItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body exceeds size limit")
+			return
+		}
 		h.writeError(w, http.StatusBadRequest, "invalid_request", "request body is not valid JSON")
 		return
 	}
