@@ -476,7 +476,7 @@ func (a *storageAdapter) URL(storagePath string) string {
 // Domains from ExternalScripts are also added to frame-src and connect-src
 // because payment providers like Stripe embed iframes and make API calls.
 func buildCSP(extensions []sdk.UIExtension) string {
-	scriptSources := "'self' 'unsafe-inline'"
+	scriptSources := "'self' 'nonce-{{NONCE}}' 'strict-dynamic'"
 	frameSources := "'self'"
 	connectSources := "'self'"
 	seen := make(map[string]bool)

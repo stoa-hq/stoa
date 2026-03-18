@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/stoa-hq/stoa/internal/csp"
 )
 
 // Files holds the compiled SvelteKit build.
@@ -18,7 +20,7 @@ import (
 var Files embed.FS
 
 // defaultCSP is the Content-Security-Policy applied when no plugins add external scripts.
-const defaultCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+const defaultCSP = "default-src 'self'; script-src 'self' 'nonce-{{NONCE}}' 'strict-dynamic'; style-src 'self' 'unsafe-inline'"
 
 // HandlerWithCSP returns an http.Handler like Handler() but with a custom CSP
 // header, allowing plugins to whitelist external scripts.
@@ -78,11 +80,12 @@ func handlerWithCSP(csp string) http.Handler {
 	})
 }
 
-func serveIndex(w http.ResponseWriter, html []byte, csp string) {
-	w.Header().Set("Content-Security-Policy", csp)
+func serveIndex(w http.ResponseWriter, html []byte, cspTemplate string) {
+	nonce := csp.GenerateNonce()
+	w.Header().Set("Content-Security-Policy", csp.Apply(cspTemplate, nonce))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write(html) //nolint:errcheck
+	w.Write(csp.InjectNonce(html, nonce)) //nolint:errcheck
 }
 
 // withPath returns a shallow copy of r with URL.Path replaced by p.
