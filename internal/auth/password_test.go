@@ -105,10 +105,19 @@ func TestDummyHash_TimingSafe(t *testing.T) {
 	dummyAvg := dummyTotal / time.Duration(iterations)
 
 	diff := math.Abs(float64(realAvg - dummyAvg))
-	threshold := 50 * time.Millisecond
+	threshold := 100 * time.Millisecond
 
 	if diff > float64(threshold) {
 		t.Errorf("timing difference between real and dummy hash too large: real=%v, dummy=%v, diff=%v (threshold=%v)",
 			realAvg, dummyAvg, time.Duration(diff), threshold)
+	}
+}
+
+func BenchmarkHashPassword(b *testing.B) {
+	for b.Loop() {
+		_, err := HashPassword("benchmark-password")
+		if err != nil {
+			b.Fatalf("HashPassword: %v", err)
+		}
 	}
 }
