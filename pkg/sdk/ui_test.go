@@ -256,6 +256,88 @@ func TestValidateUIExtension_ComponentPathTraversal(t *testing.T) {
 	}
 }
 
+func TestValidateUIExtension_DangerousURLSchemes(t *testing.T) {
+	dangerousURLs := []string{
+		"javascript:alert(1)",
+		"JAVASCRIPT:alert(1)",
+		"JavaScript:alert(1)",
+		"data:text/html,<script>alert(1)</script>",
+		"DATA:text/html,<script>alert(1)</script>",
+		"vbscript:MsgBox(1)",
+		"VBSCRIPT:MsgBox(1)",
+		"//attacker.com/evil.js",
+		"//evil.com",
+		"ftp://files.example.com/script.js",
+		"file:///etc/passwd",
+		"blob:http://example.com/uuid",
+	}
+
+	for _, u := range dangerousURLs {
+		ext := UIExtension{
+			ID:   "test_ext",
+			Slot: "admin:settings",
+			Type: "schema",
+			Schema: &UISchema{
+				Fields:    []UISchemaField{{Key: "k", Type: "text", Label: map[string]string{"en": "K"}}},
+				SubmitURL: u,
+			},
+		}
+
+		if err := ValidateUIExtension("test", ext); err == nil {
+			t.Errorf("expected error for dangerous URL %q", u)
+		}
+	}
+}
+
+func TestValidateUIExtension_DangerousComponentURLs(t *testing.T) {
+	dangerousURLs := []string{
+		"javascript:alert(1)",
+		"//attacker.com/evil.js",
+		"data:text/javascript,alert(1)",
+	}
+
+	for _, u := range dangerousURLs {
+		ext := UIExtension{
+			ID:   "test_ext",
+			Slot: "storefront:checkout:payment",
+			Type: "component",
+			Component: &UIComponent{
+				TagName:   "stoa-test-checkout",
+				ScriptURL: u,
+				Integrity: "sha256-abc",
+			},
+		}
+
+		if err := ValidateUIExtension("test", ext); err == nil {
+			t.Errorf("expected error for dangerous component ScriptURL %q", u)
+		}
+	}
+}
+
+func TestValidateUIExtension_ValidRelativePaths(t *testing.T) {
+	validURLs := []string{
+		"/api/v1/store/settings",
+		"/plugins/stripe/assets/checkout.js",
+		"/api/v1/admin/products",
+	}
+
+	for _, u := range validURLs {
+		ext := UIExtension{
+			ID:   "test_ext",
+			Slot: "admin:settings",
+			Type: "schema",
+			Schema: &UISchema{
+				Fields:    []UISchemaField{{Key: "k", Type: "text", Label: map[string]string{"en": "K"}}},
+				SubmitURL: u,
+			},
+		}
+
+		if err := ValidateUIExtension("test", ext); err != nil {
+			t.Errorf("valid relative path %q should pass, got: %v", u, err)
+		}
+	}
+}
+
 func TestValidateUIExtension_AllFieldTypes(t *testing.T) {
 	types := []string{"text", "password", "toggle", "select", "number", "textarea"}
 	for _, ft := range types {

@@ -133,7 +133,9 @@ func ValidateUIExtension(pluginName string, ext UIExtension) error {
 	return nil
 }
 
-// validateURL rejects path traversal and absolute URLs outside the expected scope.
+// validateURL allows only relative paths starting with / (but not //).
+// This blocks dangerous schemes (javascript:, data:, vbscript:), absolute URLs,
+// protocol-relative URLs, and path traversal.
 func validateURL(u string) error {
 	if u == "" {
 		return nil
@@ -141,8 +143,10 @@ func validateURL(u string) error {
 	if strings.Contains(u, "..") {
 		return fmt.Errorf("path traversal not allowed: %q", u)
 	}
-	if strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") {
-		return fmt.Errorf("absolute URLs not allowed: %q", u)
+	// Only allow relative paths starting with /
+	// Block protocol-relative URLs (//), dangerous schemes, and anything not starting with /
+	if !strings.HasPrefix(u, "/") || strings.HasPrefix(u, "//") {
+		return fmt.Errorf("only relative paths starting with / are allowed: %q", u)
 	}
 	return nil
 }
