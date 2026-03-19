@@ -110,6 +110,7 @@ func (s *Server) setupMiddleware() {
 			w.Header().Set("X-XSS-Protection", "1; mode=block")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
+			w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 			next.ServeHTTP(w, r)
 		})
 	})
