@@ -2,8 +2,9 @@ package order
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -215,7 +216,12 @@ func (s *Service) GenerateOrderNumber() string {
 	date := time.Now().UTC().Format("20060102")
 	suffix := make([]byte, 5)
 	for i := range suffix {
-		suffix[i] = charset[rand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// crypto/rand failure should never happen; fall back to timestamp
+			return fmt.Sprintf("ORD-%s-%s", date, time.Now().UTC().Format("15040"))
+		}
+		suffix[i] = charset[n.Int64()]
 	}
 	return fmt.Sprintf("ORD-%s-%s", date, suffix)
 }

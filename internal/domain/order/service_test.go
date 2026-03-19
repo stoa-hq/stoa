@@ -352,6 +352,21 @@ func TestService_DispatchHook_NoHandlers_NoError(t *testing.T) {
 	}
 }
 
+func TestService_GenerateOrderNumber_CharsetOnly(t *testing.T) {
+	svc := newTestOrderService(&mockOrderRepo{})
+	const validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	for i := 0; i < 50; i++ {
+		num := svc.GenerateOrderNumber()
+		// Extract suffix (last 5 chars)
+		suffix := num[len(num)-5:]
+		for _, c := range suffix {
+			if !strings.ContainsRune(validChars, c) {
+				t.Errorf("suffix %q contains invalid char %q", suffix, c)
+			}
+		}
+	}
+}
+
 func TestService_GenerateOrderNumber_Unique(t *testing.T) {
 	svc := newTestOrderService(&mockOrderRepo{})
 	seen := make(map[string]struct{})
