@@ -142,7 +142,7 @@ func TestStoreCheckout_ActiveMethods_NoID_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "payment_method_required" {
 		t.Errorf("expected payment_method_required error, got %+v", resp.Errors)
 	}
@@ -162,7 +162,7 @@ func TestStoreCheckout_ActiveMethods_InvalidID_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "invalid_payment_method" {
 		t.Errorf("expected invalid_payment_method error, got %+v", resp.Errors)
 	}
@@ -206,7 +206,7 @@ func TestStoreCheckout_BeforeHookRejects_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "checkout_rejected" {
 		t.Errorf("expected checkout_rejected error, got %+v", resp.Errors)
 	}
@@ -226,7 +226,7 @@ func TestStoreCheckout_ProviderMethod_NoReference_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "payment_reference_required" {
 		t.Errorf("expected payment_reference_required error, got %+v", resp.Errors)
 	}
@@ -282,7 +282,7 @@ func TestStoreCheckout_BeforeHookRejectsReference_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "checkout_rejected" {
 		t.Errorf("expected checkout_rejected error, got %+v", resp.Errors)
 	}
@@ -327,7 +327,7 @@ func TestStoreCheckout_InsufficientStock_422(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "insufficient_stock" {
 		t.Errorf("expected insufficient_stock error, got %+v", resp.Errors)
 	}
@@ -409,7 +409,7 @@ func TestStoreCheckout_InvalidProduct_Rejected(t *testing.T) {
 	}
 
 	var resp apiResponse
-	json.NewDecoder(rr.Body).Decode(&resp)
+	_ = json.NewDecoder(rr.Body).Decode(&resp)
 	if len(resp.Errors) == 0 || resp.Errors[0].Code != "invalid_product" {
 		t.Errorf("expected invalid_product error, got %+v", resp.Errors)
 	}
@@ -494,7 +494,7 @@ func TestStoreCheckout_GuestTokenNotInResponse(t *testing.T) {
 			IsGuestOrder bool `json:"is_guest_order"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(rr.Body.String()), &resp); err == nil {
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err == nil {
 		if !resp.Data.IsGuestOrder {
 			t.Error("expected is_guest_order=true for guest checkout")
 		}

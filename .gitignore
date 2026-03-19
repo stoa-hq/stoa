@@ -17,6 +17,7 @@ internal/admin/build
 internal/storefront/build
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/agents/docs-writer.md
 stoa-admin-mcp
 stoa-store-mcp
 

@@ -180,15 +180,7 @@ func (h *Handler) adminUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.service.Update(r.Context(), id, UpdateCustomerInput{
-		Email:                    req.Email,
-		FirstName:                req.FirstName,
-		LastName:                 req.LastName,
-		Active:                   req.Active,
-		DefaultBillingAddressID:  req.DefaultBillingAddressID,
-		DefaultShippingAddressID: req.DefaultShippingAddressID,
-		CustomFields:             req.CustomFields,
-	})
+	c, err := h.service.Update(r.Context(), id, UpdateCustomerInput(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrNotFound):

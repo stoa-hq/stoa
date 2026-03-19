@@ -51,7 +51,7 @@ func (s *RefreshTokenStore) Consume(ctx context.Context, tokenID string) (*Refre
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck
 
 	var rec RefreshTokenRecord
 	err = tx.QueryRow(ctx,

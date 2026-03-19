@@ -46,7 +46,7 @@ func (h *ManifestHandler) writeManifest(w http.ResponseWriter, prefix string) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(manifestResponse{
+	_ = json.NewEncoder(w).Encode(manifestResponse{
 		Data: manifestData{Extensions: filtered},
 	})
 }

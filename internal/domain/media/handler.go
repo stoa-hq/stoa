@@ -191,7 +191,7 @@ type apiError struct {
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func writeError(w http.ResponseWriter, status int, code, detail string) {
@@ -205,22 +205,6 @@ func (h *handler) serverError(w http.ResponseWriter, r *http.Request, err error)
 	writeError(w, http.StatusInternalServerError, "internal_error", "an unexpected error occurred")
 }
 
-func writeValidationErrors(w http.ResponseWriter, err error) {
-	var ve validator.ValidationErrors
-	if !errors.As(err, &ve) {
-		writeError(w, http.StatusBadRequest, "validation_failed", "invalid request data")
-		return
-	}
-	errs := make([]apiError, 0, len(ve))
-	for _, fe := range ve {
-		errs = append(errs, apiError{
-			Code:   "validation_error",
-			Detail: fe.Tag(),
-			Field:  fe.Field(),
-		})
-	}
-	writeJSON(w, http.StatusUnprocessableEntity, apiResponse{Errors: errs})
-}
 
 func parseIntQuery(r *http.Request, key string, defaultVal int) int {
 	s := r.URL.Query().Get(key)

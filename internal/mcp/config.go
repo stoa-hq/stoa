@@ -20,7 +20,7 @@ func LoadConfig() *Config {
 	}
 
 	if port := os.Getenv("STOA_MCP_PORT"); port != "" {
-		fmt.Sscanf(port, "%d", &cfg.Port)
+		_, _ = fmt.Sscanf(port, "%d", &cfg.Port)
 	}
 
 	cfg.BaseURL = envOrDefault("STOA_MCP_BASE_URL", fmt.Sprintf("http://localhost:%d", cfg.Port))

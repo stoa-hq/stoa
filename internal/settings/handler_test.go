@@ -152,7 +152,7 @@ func TestHandler_GetSettings_Store(t *testing.T) {
 	var resp struct {
 		Data StoreSettings `json:"data"`
 	}
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.StoreName != "Test Shop" {
 		t.Errorf("expected 'Test Shop', got %q", resp.Data.StoreName)
 	}
@@ -175,7 +175,7 @@ func TestHandler_GetSettings_DefaultFallback(t *testing.T) {
 	var resp struct {
 		Data StoreSettings `json:"data"`
 	}
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.StoreName != "Stoa" {
 		t.Errorf("expected default 'Stoa', got %q", resp.Data.StoreName)
 	}
@@ -215,7 +215,7 @@ func TestHandler_UpdateSettings_Success(t *testing.T) {
 	var resp struct {
 		Data StoreSettings `json:"data"`
 	}
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.StoreName != "New Name" {
 		t.Errorf("expected 'New Name', got %q", resp.Data.StoreName)
 	}

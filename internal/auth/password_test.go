@@ -90,7 +90,7 @@ func TestDummyHash_TimingSafe(t *testing.T) {
 	var realTotal time.Duration
 	for i := 0; i < iterations; i++ {
 		start := time.Now()
-		VerifyPassword("wrong-password", realHash)
+		_, _ = VerifyPassword("wrong-password", realHash)
 		realTotal += time.Since(start)
 	}
 	realAvg := realTotal / time.Duration(iterations)
@@ -99,7 +99,7 @@ func TestDummyHash_TimingSafe(t *testing.T) {
 	var dummyTotal time.Duration
 	for i := 0; i < iterations; i++ {
 		start := time.Now()
-		VerifyPassword("wrong-password", dummyHash)
+		_, _ = VerifyPassword("wrong-password", dummyHash)
 		dummyTotal += time.Since(start)
 	}
 	dummyAvg := dummyTotal / time.Duration(iterations)

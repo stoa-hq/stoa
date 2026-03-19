@@ -811,10 +811,6 @@ func (r *postgresRepository) loadOptionTranslations(ctx context.Context, optionI
 // Helpers – DML
 // --------------------------------------------------------------------------
 
-// pgTx is the interface satisfied by both pgx.Tx and pgxpool.Pool for Exec.
-type pgTx interface {
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (interface{ RowsAffected() int64 }, error)
-}
 
 func insertTranslations(ctx context.Context, tx pgx.Tx, productID uuid.UUID, translations []ProductTranslation) error {
 	for _, t := range translations {

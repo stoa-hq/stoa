@@ -228,7 +228,7 @@ func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
 func writeAuthError(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"errors": []map[string]string{
 			{"code": "unauthorized", "detail": detail},
 		},

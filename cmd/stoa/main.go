@@ -192,7 +192,7 @@ func adminCmd() *cobra.Command {
 	}
 	createCmd.Flags().String("email", "", "Admin email address")
 	createCmd.Flags().String("password", "", "Admin password (deprecated: omit to enter interactively)")
-	createCmd.Flags().MarkDeprecated("password", "passing passwords via CLI flags is insecure; omit --password to enter interactively")
+	_ = createCmd.Flags().MarkDeprecated("password", "passing passwords via CLI flags is insecure; omit --password to enter interactively")
 
 	cmd.AddCommand(createCmd)
 	return cmd

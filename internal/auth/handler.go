@@ -106,7 +106,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 			Scan(&user.ID, &user.Email, &user.PasswordHash, &user.FirstName, &user.LastName, &user.Active)
 		if err != nil {
 			// User not found — run dummy hash comparison to prevent timing-based user enumeration
-			VerifyPassword(req.Password, dummyHash)
+			_, _ = VerifyPassword(req.Password, dummyHash)
 			h.bruteForce.RecordFailure(req.Email)
 			writeJSON(w, http.StatusUnauthorized, map[string]interface{}{
 				"errors": []map[string]string{{"code": "invalid_credentials", "detail": "invalid email or password"}},
@@ -411,5 +411,5 @@ func (h *Handler) updateLastLogin(ctx context.Context, userID uuid.UUID, userTyp
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }

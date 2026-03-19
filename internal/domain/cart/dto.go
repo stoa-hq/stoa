@@ -69,12 +69,5 @@ func toCartResponse(c *Cart) CartResponse {
 
 // toCartItemResponse converts a CartItem entity into its API DTO.
 func toCartItemResponse(item CartItem) CartItemResponse {
-	return CartItemResponse{
-		ID:           item.ID,
-		CartID:       item.CartID,
-		ProductID:    item.ProductID,
-		VariantID:    item.VariantID,
-		Quantity:     item.Quantity,
-		CustomFields: item.CustomFields,
-	}
+	return CartItemResponse(item)
 }

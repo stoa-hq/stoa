@@ -131,31 +131,11 @@ func ToResponse(o *Order) OrderResponse {
 	}
 
 	for _, item := range o.Items {
-		resp.Items = append(resp.Items, OrderItemResponse{
-			ID:             item.ID,
-			OrderID:        item.OrderID,
-			ProductID:      item.ProductID,
-			VariantID:      item.VariantID,
-			SKU:            item.SKU,
-			Name:           item.Name,
-			Quantity:       item.Quantity,
-			UnitPriceNet:   item.UnitPriceNet,
-			UnitPriceGross: item.UnitPriceGross,
-			TotalNet:       item.TotalNet,
-			TotalGross:     item.TotalGross,
-			TaxRate:        item.TaxRate,
-		})
+		resp.Items = append(resp.Items, OrderItemResponse(item))
 	}
 
 	for _, h := range o.StatusHistory {
-		resp.StatusHistory = append(resp.StatusHistory, OrderStatusHistoryResponse{
-			ID:         h.ID,
-			OrderID:    h.OrderID,
-			FromStatus: h.FromStatus,
-			ToStatus:   h.ToStatus,
-			Comment:    h.Comment,
-			CreatedAt:  h.CreatedAt,
-		})
+		resp.StatusHistory = append(resp.StatusHistory, OrderStatusHistoryResponse(h))
 	}
 
 	return resp

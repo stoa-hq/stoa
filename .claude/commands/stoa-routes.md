@@ -1,1 +1,1 @@
-Use the stoa-routes skill to look up or work with Stoa API routes and MCP tools.
+Use the stoa-routes skill to look up or work with Stoa API routes (60+ endpoints), MCP tools (16 store + 41 admin), or API-key permissions.
