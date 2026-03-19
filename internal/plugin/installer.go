@@ -14,8 +14,9 @@ import (
 // KnownPlugins maps short names to their full Go import paths.
 // Keep in sync with scripts/docker-plugins.sh resolve_plugin().
 var KnownPlugins = map[string]string{
-	"n8n":    "github.com/stoa-hq/stoa-plugins/n8n",
-	"stripe": "github.com/stoa-hq/stoa-plugins/stripe",
+	"meilisearch": "github.com/stoa-hq/stoa-plugins/meilisearch",
+	"n8n":         "github.com/stoa-hq/stoa-plugins/n8n",
+	"stripe":      "github.com/stoa-hq/stoa-plugins/stripe",
 }
 
 // ResolvePackage resolves a short plugin name or full Go import path.
@@ -369,5 +370,7 @@ func (i *Installer) run(name string, args ...string) error {
 	cmd.Dir = i.moduleRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	// Disable workspace mode — -modfile is incompatible with go.work.
+	cmd.Env = append(os.Environ(), "GOWORK=off")
 	return cmd.Run()
 }

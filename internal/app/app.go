@@ -103,8 +103,15 @@ func New(cfg *config.Config) (*App, error) {
 			Auth: &sdk.AuthHelper{
 				OptionalAuth: authMiddleware.OptionalAuth,
 				Required:     authMiddleware.Authenticate,
-				UserID:       auth.UserID,
-				UserType:     auth.UserType,
+				RequireRole: func(roles ...string) func(http.Handler) http.Handler {
+					authRoles := make([]auth.Role, len(roles))
+					for i, r := range roles {
+						authRoles[i] = auth.Role(r)
+					}
+					return authMiddleware.RequireRole(authRoles...)
+				},
+				UserID:   auth.UserID,
+				UserType: auth.UserType,
 			},
 		}
 		if err := pluginRegistry.Register(p, pluginAppCtx); err != nil {
@@ -370,7 +377,13 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 	// ── Search ────────────────────────────────────────────────────────────────
 
-	searchEngine := search.NewPostgresEngine(pool, log)
+	var searchEngine search.Engine
+	if sdkEngine := a.PluginRegistry.SearchEngine(); sdkEngine != nil {
+		searchEngine = search.NewSDKEngineAdapter(sdkEngine)
+		log.Info().Msg("using plugin search engine")
+	} else {
+		searchEngine = search.NewPostgresEngine(pool, log)
+	}
 	searchH := search.NewHandler(searchEngine, log)
 
 	// /api/v1/store/* – public; optional auth enriches context for customer routes
@@ -396,7 +409,8 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		// Guest order transaction lookup with dedicated rate limit.
 		r.With(httprate.LimitByIP(cfg.Security.RateLimit.GuestOrder.RequestsPerMinute, time.Minute)).
 			Get("/orders/{orderID}/transactions", paymentH.ListTransactionsByOrderStore)
-		searchH.RegisterStoreRoutes(r)
+		r.With(httprate.LimitByIP(cfg.Security.RateLimit.Search.RequestsPerMinute, time.Minute)).
+			Get("/search", searchH.Search)
 		settingsH.RegisterStoreRoutes(r)
 		r.Get("/plugin-manifest", manifestH.StoreManifest)
 	})

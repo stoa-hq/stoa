@@ -48,9 +48,14 @@
 		"title": "Search",
 		"placeholder": "Search products…",
 		"button": "Search",
-		"noResults": "No products found for <strong>\"{query}\"</strong>.",
+		"noResults": "No results found for <strong>\"{query}\"</strong>.",
+		"noResultsPrefix": "No results found for",
+		"noResultsSuffix": ".",
 		"resultCount": "{count} result for \"{query}\"",
-		"resultCountPlural": "{count} results for \"{query}\""
+		"resultCountPlural": "{count} results for \"{query}\"",
+		"allTypes": "All",
+		"products": "Products",
+		"categories": "Categories"
 	},
 	"cart": {
 		"pageTitle": "Cart – stoa",

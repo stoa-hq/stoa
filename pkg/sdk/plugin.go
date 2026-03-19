@@ -37,6 +37,9 @@ type AuthHelper struct {
 	OptionalAuth func(http.Handler) http.Handler
 	// Required is middleware that requires a valid token; returns 401 otherwise.
 	Required func(http.Handler) http.Handler
+	// RequireRole is middleware that checks the user has one of the given roles.
+	// Roles are string constants: "super_admin", "admin", "manager", "customer", "api_client".
+	RequireRole func(roles ...string) func(http.Handler) http.Handler
 	// UserID extracts the authenticated user's UUID from the request context.
 	UserID func(ctx context.Context) uuid.UUID
 	// UserType returns "admin", "customer", or "api_key" from the request context.

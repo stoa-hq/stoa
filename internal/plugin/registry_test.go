@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -24,6 +25,27 @@ func (m *mockPlugin) Init(app *sdk.AppContext) error {
 	return nil
 }
 func (m *mockPlugin) Shutdown() error { return nil }
+
+// mockSearchEngine implements sdk.SearchEngine for testing.
+type mockSearchEngine struct{}
+
+func (m *mockSearchEngine) Search(_ context.Context, _ sdk.SearchRequest) (*sdk.SearchResponse, error) {
+	return &sdk.SearchResponse{}, nil
+}
+func (m *mockSearchEngine) Index(_ context.Context, _ string, _ string, _ map[string]interface{}) error {
+	return nil
+}
+func (m *mockSearchEngine) Remove(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+// mockSearchPlugin implements both sdk.Plugin and sdk.SearchPlugin.
+type mockSearchPlugin struct {
+	mockPlugin
+	engine sdk.SearchEngine
+}
+
+func (m *mockSearchPlugin) SearchEngine() sdk.SearchEngine { return m.engine }
 
 type panicNamePlugin struct{}
 
@@ -97,6 +119,105 @@ func TestRegistry_Register_PanicRecovery(t *testing.T) {
 		}
 		if _, ok := reg.Get("good-plugin"); !ok {
 			t.Error("good plugin should be registered")
+		}
+	})
+}
+
+func TestRegistry_SearchEngine(t *testing.T) {
+	logger := zerolog.Nop()
+	appCtx := &sdk.AppContext{}
+
+	t.Run("returns nil when no search plugin registered", func(t *testing.T) {
+		reg := NewRegistry(logger)
+
+		// Register a regular plugin (not a SearchPlugin)
+		regular := &mockPlugin{name: "regular", version: "1.0.0"}
+		if err := reg.Register(regular, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if engine := reg.SearchEngine(); engine != nil {
+			t.Error("expected nil engine when no search plugin registered")
+		}
+	})
+
+	t.Run("returns engine from search plugin", func(t *testing.T) {
+		reg := NewRegistry(logger)
+
+		engine := &mockSearchEngine{}
+		sp := &mockSearchPlugin{
+			mockPlugin: mockPlugin{name: "meili", version: "1.0.0"},
+			engine:     engine,
+		}
+		if err := reg.Register(sp, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		got := reg.SearchEngine()
+		if got == nil {
+			t.Fatal("expected non-nil engine")
+		}
+		if got != engine {
+			t.Error("returned engine does not match registered engine")
+		}
+	})
+
+	t.Run("returns first search plugin engine", func(t *testing.T) {
+		reg := NewRegistry(logger)
+
+		engine1 := &mockSearchEngine{}
+		sp1 := &mockSearchPlugin{
+			mockPlugin: mockPlugin{name: "first-search", version: "1.0.0"},
+			engine:     engine1,
+		}
+		engine2 := &mockSearchEngine{}
+		sp2 := &mockSearchPlugin{
+			mockPlugin: mockPlugin{name: "second-search", version: "1.0.0"},
+			engine:     engine2,
+		}
+
+		if err := reg.Register(sp1, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := reg.Register(sp2, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		got := reg.SearchEngine()
+		if got != engine1 {
+			t.Error("expected engine from first registered search plugin")
+		}
+	})
+
+	t.Run("skips non-search plugins", func(t *testing.T) {
+		reg := NewRegistry(logger)
+
+		// Register regular plugin first
+		regular := &mockPlugin{name: "analytics", version: "1.0.0"}
+		if err := reg.Register(regular, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Then a search plugin
+		engine := &mockSearchEngine{}
+		sp := &mockSearchPlugin{
+			mockPlugin: mockPlugin{name: "meili", version: "1.0.0"},
+			engine:     engine,
+		}
+		if err := reg.Register(sp, appCtx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		got := reg.SearchEngine()
+		if got != engine {
+			t.Error("expected engine from search plugin, skipping non-search plugin")
+		}
+	})
+
+	t.Run("returns nil for empty registry", func(t *testing.T) {
+		reg := NewRegistry(logger)
+		if engine := reg.SearchEngine(); engine != nil {
+			t.Error("expected nil engine for empty registry")
 		}
 	})
 }

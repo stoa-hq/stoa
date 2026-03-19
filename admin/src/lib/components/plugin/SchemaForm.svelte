@@ -3,6 +3,7 @@
 	import { locale } from 'svelte-i18n';
 	import type { UISchema } from '$lib/stores/plugins';
 	import { createPluginClient } from '$lib/api/plugin-client';
+	import { notifications } from '$lib/stores/notifications';
 
 	interface Props {
 		schema: UISchema;
@@ -46,6 +47,9 @@
 		error = '';
 		try {
 			await client.post(schema.submit_url, { ...values, ...context });
+			if (schema.success_message) {
+				notifications.success(label(schema.success_message));
+			}
 			onEvent?.(new CustomEvent('plugin:submit', { detail: { values } }));
 		} catch (err) {
 			error = (err as Error).message;
@@ -58,7 +62,13 @@
 {#if loading}
 	<div class="animate-pulse h-20 bg-gray-100 rounded-lg"></div>
 {:else}
-	<form onsubmit={handleSubmit} class="space-y-4">
+	<form onsubmit={handleSubmit} class="card p-6 space-y-4">
+		{#if schema.title}
+			<h3 class="text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label(schema.title)}</h3>
+		{/if}
+		{#if schema.description}
+			<p class="text-sm text-[var(--text-muted)]">{label(schema.description)}</p>
+		{/if}
 		{#each schema.fields as field (field.key)}
 			<div>
 				<label class="label" for="plugin-{field.key}">{label(field.label)}</label>
@@ -117,7 +127,7 @@
 
 		{#if schema.submit_url}
 			<button type="submit" class="btn btn-primary" disabled={submitting}>
-				{submitting ? '...' : 'Save'}
+				{submitting ? '...' : (schema.submit_label ? label(schema.submit_label) : 'Save')}
 			</button>
 		{/if}
 	</form>

@@ -17,6 +17,10 @@ export interface UISchemaField {
 }
 
 export interface UISchema {
+	title?: Record<string, string>;
+	description?: Record<string, string>;
+	submit_label?: Record<string, string>;
+	success_message?: Record<string, string>;
 	fields: UISchemaField[];
 	submit_url?: string;
 	load_url?: string;

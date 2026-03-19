@@ -4,6 +4,7 @@
   import { settingsApi, type UpdateSettingsRequest } from '$lib/api/settings';
   import { mediaApi } from '$lib/api/media';
   import { notifications } from '$lib/stores/notifications';
+  import PluginSlot from '$lib/components/PluginSlot.svelte';
 
   let loading = $state(true);
   let submitting = $state(false);
@@ -212,4 +213,9 @@
       </button>
     </div>
   </form>
+
+  <!-- Plugin extensions -->
+  <div class="max-w-2xl mt-6">
+    <PluginSlot slot="admin:settings:plugins" />
+  </div>
 {/if}

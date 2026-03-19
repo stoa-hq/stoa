@@ -338,6 +338,94 @@ func TestValidateUIExtension_ValidRelativePaths(t *testing.T) {
 	}
 }
 
+func TestValidateUIExtension_EmptyFields(t *testing.T) {
+	ext := UIExtension{
+		ID:   "reindex_btn",
+		Slot: "admin:settings:plugins",
+		Type: "schema",
+		Schema: &UISchema{
+			Title:          map[string]string{"en": "Reindex"},
+			Description:    map[string]string{"en": "Trigger a full reindex."},
+			SubmitLabel:    map[string]string{"en": "Start Reindex"},
+			SuccessMessage: map[string]string{"en": "Reindex started."},
+			Fields:         []UISchemaField{},
+			SubmitURL:      "/admin/meilisearch/reindex",
+		},
+	}
+
+	if err := ValidateUIExtension("meilisearch", ext); err != nil {
+		t.Fatalf("expected valid schema with empty fields, got: %v", err)
+	}
+}
+
+func TestSanitizeUIExtension_EscapesHTML(t *testing.T) {
+	ext := UIExtension{
+		ID:   "test_ext",
+		Slot: "admin:settings",
+		Type: "schema",
+		Schema: &UISchema{
+			Title:          map[string]string{"en": "<script>alert(1)</script>"},
+			Description:    map[string]string{"en": "<img src=x onerror=alert(1)>"},
+			SubmitLabel:    map[string]string{"en": "Save & Continue"},
+			SuccessMessage: map[string]string{"en": "Done <b>bold</b>"},
+			Fields: []UISchemaField{
+				{
+					Key:         "k",
+					Type:        "text",
+					Label:       map[string]string{"en": "<em>Label</em>"},
+					Placeholder: map[string]string{"en": "<div>ph</div>"},
+					HelpText:    map[string]string{"en": "<a href='x'>help</a>"},
+					Options: []UISelectOption{
+						{Value: "v", Label: map[string]string{"en": "<b>opt</b>"}},
+					},
+				},
+			},
+		},
+	}
+
+	SanitizeUIExtension(&ext)
+
+	if ext.Schema.Title["en"] != "&lt;script&gt;alert(1)&lt;/script&gt;" {
+		t.Errorf("Title not escaped: %q", ext.Schema.Title["en"])
+	}
+	if ext.Schema.Description["en"] != "&lt;img src=x onerror=alert(1)&gt;" {
+		t.Errorf("Description not escaped: %q", ext.Schema.Description["en"])
+	}
+	if ext.Schema.SubmitLabel["en"] != "Save &amp; Continue" {
+		t.Errorf("SubmitLabel not escaped: %q", ext.Schema.SubmitLabel["en"])
+	}
+	if ext.Schema.SuccessMessage["en"] != "Done &lt;b&gt;bold&lt;/b&gt;" {
+		t.Errorf("SuccessMessage not escaped: %q", ext.Schema.SuccessMessage["en"])
+	}
+	if ext.Schema.Fields[0].Label["en"] != "&lt;em&gt;Label&lt;/em&gt;" {
+		t.Errorf("Field label not escaped: %q", ext.Schema.Fields[0].Label["en"])
+	}
+	if ext.Schema.Fields[0].Placeholder["en"] != "&lt;div&gt;ph&lt;/div&gt;" {
+		t.Errorf("Field placeholder not escaped: %q", ext.Schema.Fields[0].Placeholder["en"])
+	}
+	if ext.Schema.Fields[0].HelpText["en"] != "&lt;a href=&#39;x&#39;&gt;help&lt;/a&gt;" {
+		t.Errorf("Field help_text not escaped: %q", ext.Schema.Fields[0].HelpText["en"])
+	}
+	if ext.Schema.Fields[0].Options[0].Label["en"] != "&lt;b&gt;opt&lt;/b&gt;" {
+		t.Errorf("Option label not escaped: %q", ext.Schema.Fields[0].Options[0].Label["en"])
+	}
+}
+
+func TestSanitizeUIExtension_NilSchema(t *testing.T) {
+	ext := UIExtension{
+		ID:   "test_ext",
+		Slot: "admin:settings",
+		Type: "component",
+		Component: &UIComponent{
+			TagName:   "stoa-test-widget",
+			ScriptURL: "/plugins/test/widget.js",
+			Integrity: "sha256-abc",
+		},
+	}
+	// Should not panic on nil schema.
+	SanitizeUIExtension(&ext)
+}
+
 func TestValidateUIExtension_AllFieldTypes(t *testing.T) {
 	types := []string{"text", "password", "toggle", "select", "number", "textarea"}
 	for _, ft := range types {

@@ -94,6 +94,7 @@ func (r *Registry) CollectUIExtensions() {
 				r.logger.Warn().Err(err).Str("plugin", name).Msg("invalid UI extension, skipping")
 				continue
 			}
+			sdk.SanitizeUIExtension(&ext)
 			exts = append(exts, ext)
 		}
 		r.logger.Info().Str("plugin", name).Int("extensions", len(exts)).Msg("collected UI extensions")
@@ -106,6 +107,20 @@ func (r *Registry) UIExtensions() []sdk.UIExtension {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.uiExtensions
+}
+
+// SearchEngine returns the SearchEngine from the first registered SearchPlugin,
+// or nil if no SearchPlugin is registered.
+func (r *Registry) SearchEngine() sdk.SearchEngine {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, name := range r.order {
+		if sp, ok := r.plugins[name].(sdk.SearchPlugin); ok {
+			return sp.SearchEngine()
+		}
+	}
+	return nil
 }
 
 func (r *Registry) ShutdownAll() error {

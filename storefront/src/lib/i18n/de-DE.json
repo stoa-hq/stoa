@@ -48,9 +48,14 @@
 		"title": "Suche",
 		"placeholder": "Produkte suchen…",
 		"button": "Suchen",
-		"noResults": "Keine Produkte für <strong>\"{query}\"</strong> gefunden.",
+		"noResults": "Keine Ergebnisse für <strong>\"{query}\"</strong> gefunden.",
+		"noResultsPrefix": "Keine Ergebnisse für",
+		"noResultsSuffix": " gefunden.",
 		"resultCount": "{count} Ergebnis für \"{query}\"",
-		"resultCountPlural": "{count} Ergebnisse für \"{query}\""
+		"resultCountPlural": "{count} Ergebnisse für \"{query}\"",
+		"allTypes": "Alle",
+		"products": "Produkte",
+		"categories": "Kategorien"
 	},
 	"cart": {
 		"pageTitle": "Warenkorb – stoa",

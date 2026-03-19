@@ -3,12 +3,22 @@ package search
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 )
+
+// validLocale matches BCP-47 locale tags like "de", "de-DE", "en-US".
+var validLocale = regexp.MustCompile(`^[a-zA-Z]{2}(-[a-zA-Z]{2,8})?$`)
+
+// allowedSearchTypes restricts which entity types can be searched.
+var allowedSearchTypes = map[string]bool{
+	"product":  true,
+	"category": true,
+}
 
 type handler struct {
 	engine Engine
@@ -22,7 +32,13 @@ func NewHandler(engine Engine, logger zerolog.Logger) *handler {
 
 // RegisterStoreRoutes mounts the public search route on r.
 func (h *handler) RegisterStoreRoutes(r chi.Router) {
-	r.Get("/search", h.search)
+	r.Get("/search", h.Search)
+}
+
+// Search is the exported handler for GET /api/v1/store/search.
+// It can also be mounted directly with per-route middleware.
+func (h *handler) Search(w http.ResponseWriter, r *http.Request) {
+	h.search(w, r)
 }
 
 // search handles GET /api/v1/store/search
@@ -49,21 +65,30 @@ func (h *handler) search(w http.ResponseWriter, r *http.Request) {
 			locale = strings.TrimSpace(strings.SplitN(locale, ";", 2)[0])
 		}
 	}
+	// Reject invalid locales to prevent filter injection in search engines.
+	if locale != "" && !validLocale.MatchString(locale) {
+		locale = ""
+	}
 
 	var types []string
 	if raw := r.URL.Query().Get("type"); raw != "" {
 		for _, t := range strings.Split(raw, ",") {
-			if t = strings.TrimSpace(t); t != "" {
+			if t = strings.TrimSpace(t); t != "" && allowedSearchTypes[t] {
 				types = append(types, t)
 			}
 		}
+	}
+
+	limit := parseIntQuery(r, "limit", 25)
+	if limit > 100 {
+		limit = 100
 	}
 
 	req := SearchRequest{
 		Query:  q,
 		Locale: locale,
 		Page:   parseIntQuery(r, "page", 1),
-		Limit:  parseIntQuery(r, "limit", 25),
+		Limit:  limit,
 		Types:  types,
 	}
 

@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"fmt"
+	"html"
 	"strings"
 )
 
@@ -23,9 +24,13 @@ type UIExtension struct {
 
 // UISchema defines a form rendered from field descriptors.
 type UISchema struct {
-	Fields    []UISchemaField `json:"fields"`
-	SubmitURL string          `json:"submit_url,omitempty"`
-	LoadURL   string          `json:"load_url,omitempty"`
+	Title          map[string]string `json:"title,omitempty"`
+	Description    map[string]string `json:"description,omitempty"`
+	SubmitLabel    map[string]string `json:"submit_label,omitempty"`
+	SuccessMessage map[string]string `json:"success_message,omitempty"`
+	Fields         []UISchemaField   `json:"fields"`
+	SubmitURL      string            `json:"submit_url,omitempty"`
+	LoadURL        string            `json:"load_url,omitempty"`
 }
 
 // UISchemaField describes a single form field.
@@ -131,6 +136,38 @@ func ValidateUIExtension(pluginName string, ext UIExtension) error {
 	}
 
 	return nil
+}
+
+// sanitizeI18n escapes HTML entities in all values of an i18n string map.
+// This provides defense-in-depth against stored XSS via plugin-provided strings.
+func sanitizeI18n(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = html.EscapeString(v)
+	}
+	return out
+}
+
+// SanitizeUIExtension escapes HTML in all plugin-provided i18n string values.
+// Call after validation to ensure safe rendering regardless of the frontend.
+func SanitizeUIExtension(ext *UIExtension) {
+	if ext.Schema != nil {
+		ext.Schema.Title = sanitizeI18n(ext.Schema.Title)
+		ext.Schema.Description = sanitizeI18n(ext.Schema.Description)
+		ext.Schema.SubmitLabel = sanitizeI18n(ext.Schema.SubmitLabel)
+		ext.Schema.SuccessMessage = sanitizeI18n(ext.Schema.SuccessMessage)
+		for i := range ext.Schema.Fields {
+			ext.Schema.Fields[i].Label = sanitizeI18n(ext.Schema.Fields[i].Label)
+			ext.Schema.Fields[i].Placeholder = sanitizeI18n(ext.Schema.Fields[i].Placeholder)
+			ext.Schema.Fields[i].HelpText = sanitizeI18n(ext.Schema.Fields[i].HelpText)
+			for j := range ext.Schema.Fields[i].Options {
+				ext.Schema.Fields[i].Options[j].Label = sanitizeI18n(ext.Schema.Fields[i].Options[j].Label)
+			}
+		}
+	}
 }
 
 // validateURL allows only relative paths starting with / (but not //).
