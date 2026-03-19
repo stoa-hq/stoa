@@ -89,7 +89,10 @@ func (s *Server) setupMiddleware() {
 		})
 	})
 
-	// 5. CORS
+	// 5. CORS — validate before applying
+	if err := s.validateCORS(); err != nil {
+		s.logger.Fatal().Err(err).Msg("CORS configuration error")
+	}
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.Server.CORS.AllowedOrigins,
 		AllowedMethods:   s.cfg.Server.CORS.AllowedMethods,
@@ -203,6 +206,19 @@ type APIError struct {
 	Code   string `json:"code"`
 	Detail string `json:"detail"`
 	Field  string `json:"field,omitempty"`
+}
+
+func (s *Server) validateCORS() error {
+	origins := s.cfg.Server.CORS.AllowedOrigins
+	for _, o := range origins {
+		if o == "*" {
+			return fmt.Errorf("AllowedOrigins contains wildcard \"*\" with AllowCredentials enabled — this allows credential leaks; set explicit origins instead")
+		}
+	}
+	if len(origins) > 3 {
+		s.logger.Warn().Int("count", len(origins)).Strs("origins", origins).Msg("CORS: large number of allowed origins configured — review for overly broad access")
+	}
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
