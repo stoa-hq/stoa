@@ -120,7 +120,7 @@ func (s *Server) setupMiddleware() {
 	// 8. CSRF – Double Submit Cookie (exempt when Authorization header is present).
 	// Plugin webhook paths are exempt because they authenticate via provider
 	// signatures (e.g. Stripe HMAC), not cookies or CSRF tokens.
-	r.Use(CSRF(s.cfg.Security.CSRF.Secure, "/plugins/"))
+	r.Use(CSRF(s.cfg.Security.CSRF.Secure))
 
 	// Content-Type enforcement for mutations
 	r.Use(func(next http.Handler) http.Handler {

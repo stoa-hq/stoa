@@ -46,6 +46,13 @@ func CSRF(secure bool, exemptPrefixes ...string) func(http.Handler) http.Handler
 				}
 			}
 
+			// Plugin webhook paths authenticate via provider signatures
+			// (e.g. Stripe HMAC), not cookies or CSRF tokens.
+			if isPluginWebhookPath(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			cookieToken := ensureCSRFCookie(w, r, secure)
 
 			if requiresCSRFCheck(r.Method) {
@@ -91,6 +98,21 @@ func newCSRFToken() string {
 		panic("csrf: cannot generate token: " + err.Error())
 	}
 	return hex.EncodeToString(b)
+}
+
+// isPluginWebhookPath returns true for paths matching /plugins/{name}/webhooks/*.
+// Only webhook endpoints are exempt from CSRF because they authenticate via
+// provider-specific signatures (e.g. Stripe HMAC).
+func isPluginWebhookPath(path string) bool {
+	if !strings.HasPrefix(path, "/plugins/") {
+		return false
+	}
+	rest := strings.TrimPrefix(path, "/plugins/")
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) < 2 {
+		return false
+	}
+	return strings.HasPrefix(parts[1], "webhooks")
 }
 
 func requiresCSRFCheck(method string) bool {

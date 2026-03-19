@@ -176,22 +176,68 @@ func TestCSRF_APIKeyExemptsCSRFCheck(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCSRF_ExemptPrefixSkipsCheck(t *testing.T) {
-	mw := CSRF(false, "/plugins/")(http.HandlerFunc(okHandler))
-	r := httptest.NewRequest(http.MethodPost, "/plugins/stripe/webhook", nil)
+	mw := CSRF(false, "/hooks/")(http.HandlerFunc(okHandler))
+	r := httptest.NewRequest(http.MethodPost, "/hooks/something", nil)
 	w := httptest.NewRecorder()
 	mw.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
-		t.Errorf("POST to exempt path: got %d, want %d", w.Code, http.StatusOK)
+		t.Errorf("POST to exempt prefix path: got %d, want %d", w.Code, http.StatusOK)
 	}
 }
 
 func TestCSRF_NonExemptPathStillChecked(t *testing.T) {
-	mw := CSRF(false, "/plugins/")(http.HandlerFunc(okHandler))
+	mw := CSRF(false)(http.HandlerFunc(okHandler))
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/store/cart", nil)
 	w := httptest.NewRecorder()
 	mw.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("POST to non-exempt path: got %d, want %d", w.Code, http.StatusForbidden)
+	}
+}
+
+func TestCSRF_PluginWebhookPathExempt(t *testing.T) {
+	for _, path := range []string{
+		"/plugins/stripe/webhooks/event",
+		"/plugins/n8n/webhooks/trigger",
+		"/plugins/paypal/webhooks",
+	} {
+		t.Run(path, func(t *testing.T) {
+			mw := CSRF(false)(http.HandlerFunc(okHandler))
+			r := httptest.NewRequest(http.MethodPost, path, nil)
+			w := httptest.NewRecorder()
+			mw.ServeHTTP(w, r)
+			if w.Code != http.StatusOK {
+				t.Errorf("POST to plugin webhook path %s: got %d, want %d", path, w.Code, http.StatusOK)
+			}
+		})
+	}
+}
+
+func TestCSRF_PluginNonWebhookPathRequiresToken(t *testing.T) {
+	for _, path := range []string{
+		"/plugins/stripe/admin/settings",
+		"/plugins/stripe/store/products",
+		"/plugins/stripe/assets/script.js",
+	} {
+		t.Run(path, func(t *testing.T) {
+			mw := CSRF(false)(http.HandlerFunc(okHandler))
+			r := httptest.NewRequest(http.MethodPost, path, nil)
+			w := httptest.NewRecorder()
+			mw.ServeHTTP(w, r)
+			if w.Code != http.StatusForbidden {
+				t.Errorf("POST to non-webhook plugin path %s: got %d, want %d", path, w.Code, http.StatusForbidden)
+			}
+		})
+	}
+}
+
+func TestCSRF_PluginRootPathRequiresToken(t *testing.T) {
+	mw := CSRF(false)(http.HandlerFunc(okHandler))
+	r := httptest.NewRequest(http.MethodPost, "/plugins/stripe", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("POST to plugin root path: got %d, want %d", w.Code, http.StatusForbidden)
 	}
 }
 
