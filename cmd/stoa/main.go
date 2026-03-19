@@ -183,7 +183,7 @@ func adminCmd() *cobra.Command {
 			_, err = db.Pool.Exec(context.Background(),
 				`INSERT INTO admin_users (id, email, password_hash, role, active, created_at, updated_at)
 				 VALUES ($1, $2, $3, $4, true, $5, $5)`,
-				id, email, hash, string(auth.RoleSuperAdmin), time.Now())
+				id, email, hash, string(auth.RoleSuperAdmin), time.Now().UTC())
 			if err != nil {
 				return fmt.Errorf("creating admin user: %w", err)
 			}

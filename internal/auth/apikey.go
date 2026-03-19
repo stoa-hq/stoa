@@ -52,7 +52,7 @@ func (m *APIKeyManager) Create(ctx context.Context, name string, permissions []P
 	}
 
 	id := uuid.New()
-	now := time.Now()
+	now := time.Now().UTC()
 
 	permStrs := make([]string, len(permissions))
 	for i, p := range permissions {
@@ -99,7 +99,7 @@ func (m *APIKeyManager) Validate(ctx context.Context, key string) (*APIKey, erro
 	}
 
 	// Update last used
-	_, _ = m.pool.Exec(ctx, `UPDATE api_keys SET last_used_at = $1 WHERE id = $2`, time.Now(), apiKey.ID)
+	_, _ = m.pool.Exec(ctx, `UPDATE api_keys SET last_used_at = $1 WHERE id = $2`, time.Now().UTC(), apiKey.ID)
 
 	return &apiKey, nil
 }

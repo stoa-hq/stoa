@@ -406,7 +406,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) updateLastLogin(ctx context.Context, userID uuid.UUID, userType string) {
 	if userType == "admin" {
-		_, _ = h.pool.Exec(ctx, `UPDATE admin_users SET last_login_at = $1 WHERE id = $2`, time.Now(), userID)
+		_, _ = h.pool.Exec(ctx, `UPDATE admin_users SET last_login_at = $1 WHERE id = $2`, time.Now().UTC(), userID)
 	}
 }
 

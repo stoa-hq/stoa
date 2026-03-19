@@ -42,7 +42,7 @@ func (bl *TokenBlacklist) IsBlacklisted(jti string) bool {
 	if !ok {
 		return false
 	}
-	return time.Now().Before(exp)
+	return time.Now().UTC().Before(exp)
 }
 
 // Stop terminates the background cleanup goroutine.

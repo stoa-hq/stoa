@@ -31,7 +31,7 @@ func NewLocalStorage(basePath, baseURL string) (*LocalStorage, error) {
 
 func (s *LocalStorage) Store(ctx context.Context, filename string, reader io.Reader, size int64) (*StoredFile, error) {
 	// Generate unique path: YYYY/MM/uuid-filename
-	now := time.Now()
+	now := time.Now().UTC()
 	dir := filepath.Join(s.basePath, fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("creating directory: %w", err)

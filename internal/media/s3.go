@@ -60,7 +60,7 @@ func NewS3Storage(ctx context.Context, cfg S3Config) (*S3Storage, error) {
 }
 
 func (s *S3Storage) Store(ctx context.Context, filename string, reader io.Reader, size int64) (*StoredFile, error) {
-	now := time.Now()
+	now := time.Now().UTC()
 	key := fmt.Sprintf("%d/%02d/%s-%s", now.Year(), now.Month(), uuid.New().String()[:8], filename)
 
 	input := &s3.PutObjectInput{

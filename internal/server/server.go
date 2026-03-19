@@ -76,7 +76,7 @@ func (s *Server) setupMiddleware() {
 	// 4. Structured Logging
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
+			start := time.Now().UTC()
 			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
 			next.ServeHTTP(ww, r)
 			s.logger.Info().

@@ -76,7 +76,7 @@ func (s *Seeder) step(name string) {
 
 // seed performs all inserts in dependency order.
 func (s *Seeder) seed(ctx context.Context, tx pgx.Tx) error {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	// ── Tax Rules ────────────────────────────────────────────────────────────
 	s.step("tax_rules")

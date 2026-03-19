@@ -65,10 +65,10 @@ func (t *BruteForceTracker) RecordFailure(email string) {
 	}
 
 	a.Count++
-	a.LastFail = time.Now()
+	a.LastFail = time.Now().UTC()
 
 	if a.Count >= t.maxAttempts {
-		a.LockedAt = time.Now()
+		a.LockedAt = time.Now().UTC()
 	}
 }
 
@@ -91,7 +91,7 @@ func (t *BruteForceTracker) cleanupLoop() {
 		select {
 		case <-ticker.C:
 			t.mu.Lock()
-			now := time.Now()
+			now := time.Now().UTC()
 			for key, a := range t.attempts {
 				if !a.LockedAt.IsZero() && now.Sub(a.LockedAt) >= t.lockDuration {
 					delete(t.attempts, key)

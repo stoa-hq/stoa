@@ -63,7 +63,7 @@ func (m *JWTManager) GenerateRefreshToken(userID uuid.UUID, email, userType, rol
 }
 
 func (m *JWTManager) generateToken(userID uuid.UUID, email, userType, role string, tokenType TokenType, ttl time.Duration) (string, error) {
-	now := time.Now()
+	now := time.Now().UTC()
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
