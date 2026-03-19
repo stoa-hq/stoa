@@ -50,3 +50,23 @@ func TestValidateStorePath_Rejects_PathTraversal(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateStorePath_Rejects_DoubleEncodingBypass(t *testing.T) {
+	bypassPaths := []string{
+		"/api/v1/store/%2e%2e/admin/users",
+		"/api/v1/store/./../../api/v1/admin/users",
+		"/api/v1/store/products/..%2f..%2fadmin",
+		"/api/v1/store/products/%2e%2e/%2e%2e/admin/users",
+		"/api/v1/store/%2e%2e/%2e%2e/api/v1/admin/settings",
+	}
+	for _, path := range bypassPaths {
+		err := validateStorePath(path)
+		if err == nil {
+			t.Errorf("validateStorePath(%q) = nil, want error", path)
+			continue
+		}
+		if !strings.Contains(err.Error(), "access denied") {
+			t.Errorf("validateStorePath(%q) error = %v, want 'access denied'", path, err)
+		}
+	}
+}

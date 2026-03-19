@@ -2,6 +2,8 @@ package mcp
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"strings"
 )
 
@@ -31,12 +33,25 @@ func (c *StoreScopedClient) Post(path string, body interface{}) ([]byte, error) 
 	return c.inner.Post(path, body)
 }
 
-func validateStorePath(path string) error {
-	if !strings.HasPrefix(path, "/api/v1/store/") {
-		return fmt.Errorf("access denied: path %q is outside /api/v1/store/", path)
+func validateStorePath(rawPath string) error {
+	// Decode percent-encoded characters to catch double-encoding bypasses
+	// (e.g. %2e%2e → .., %2f → /)
+	decoded, err := url.PathUnescape(rawPath)
+	if err != nil {
+		return fmt.Errorf("access denied: invalid path encoding")
 	}
-	if strings.Contains(path, "..") {
+
+	// Normalize the decoded path to resolve traversal sequences
+	cleaned := path.Clean(decoded)
+
+	if !strings.HasPrefix(cleaned, "/api/v1/store/") {
+		return fmt.Errorf("access denied: path %q is outside /api/v1/store/", rawPath)
+	}
+
+	// Defense-in-depth: reject any remaining traversal attempts
+	if strings.Contains(cleaned, "..") {
 		return fmt.Errorf("access denied: path traversal not allowed")
 	}
+
 	return nil
 }
