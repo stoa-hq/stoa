@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"strings"
 	"sync"
 	"time"
 )
@@ -32,7 +31,7 @@ func NewBruteForceTracker(maxAttempts int, lockDuration time.Duration) *BruteFor
 }
 
 func (t *BruteForceTracker) IsLocked(email string) (bool, time.Duration) {
-	key := strings.ToLower(strings.TrimSpace(email))
+	key := NormalizeEmail(email)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -55,7 +54,7 @@ func (t *BruteForceTracker) IsLocked(email string) (bool, time.Duration) {
 }
 
 func (t *BruteForceTracker) RecordFailure(email string) {
-	key := strings.ToLower(strings.TrimSpace(email))
+	key := NormalizeEmail(email)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -74,7 +73,7 @@ func (t *BruteForceTracker) RecordFailure(email string) {
 }
 
 func (t *BruteForceTracker) RecordSuccess(email string) {
-	key := strings.ToLower(strings.TrimSpace(email))
+	key := NormalizeEmail(email)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.attempts, key)

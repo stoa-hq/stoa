@@ -169,6 +169,75 @@ func TestCustomerService_Create_BeforeHookCancels(t *testing.T) {
 	}
 }
 
+func TestCustomerService_Create_MixedCaseEmail_Normalizes(t *testing.T) {
+	var saved *Customer
+	repo := &mockCustomerRepo{
+		findByEmail: func(_ context.Context, email string) (*Customer, error) {
+			if email != "mixed@example.com" {
+				t.Errorf("FindByEmail called with %q, want normalized lowercase", email)
+			}
+			return nil, nil
+		},
+		create: func(_ context.Context, c *Customer) error {
+			saved = c
+			return nil
+		},
+	}
+	got, err := newTestCustomerService(repo).Create(context.Background(), CreateCustomerInput{
+		Email:    "Mixed@Example.COM",
+		Password: "secret123",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if saved == nil {
+		t.Fatal("expected repo.Create to be called")
+	}
+	if got.Email != "mixed@example.com" {
+		t.Errorf("email not normalized: got %q, want %q", got.Email, "mixed@example.com")
+	}
+}
+
+func TestCustomerService_Update_MixedCaseEmail_Normalizes(t *testing.T) {
+	id := uuid.New()
+	repo := &mockCustomerRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*Customer, error) {
+			return &Customer{ID: id, Email: "old@example.com", Active: true}, nil
+		},
+		findByEmail: func(_ context.Context, email string) (*Customer, error) {
+			if email != "new@example.com" {
+				t.Errorf("FindByEmail called with %q, want normalized lowercase", email)
+			}
+			return nil, nil
+		},
+		update: func(_ context.Context, _ *Customer) error { return nil },
+	}
+	got, err := newTestCustomerService(repo).Update(context.Background(), id, UpdateCustomerInput{
+		Email: "New@Example.COM",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Email != "new@example.com" {
+		t.Errorf("email not normalized: got %q, want %q", got.Email, "new@example.com")
+	}
+}
+
+func TestCustomerService_VerifyCredentials_MixedCaseEmail_Normalizes(t *testing.T) {
+	repo := &mockCustomerRepo{
+		findByEmail: func(_ context.Context, email string) (*Customer, error) {
+			if email != "user@example.com" {
+				t.Errorf("FindByEmail called with %q, want normalized lowercase", email)
+			}
+			return nil, nil // user not found
+		},
+	}
+	_, err := newTestCustomerService(repo).VerifyCredentials(context.Background(), "User@Example.COM", "pw")
+	if !errors.Is(err, ErrInvalidCreds) {
+		t.Errorf("expected ErrInvalidCreds, got %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // GetByEmail
 // ---------------------------------------------------------------------------

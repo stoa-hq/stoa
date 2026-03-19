@@ -51,6 +51,7 @@ func (s *CustomerService) GetByID(ctx context.Context, id uuid.UUID) (*Customer,
 
 // GetByEmail retrieves a customer by email. Returns ErrNotFound when absent.
 func (s *CustomerService) GetByEmail(ctx context.Context, email string) (*Customer, error) {
+	email = auth.NormalizeEmail(email)
 	c, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -68,6 +69,8 @@ func (s *CustomerService) List(ctx context.Context, filter CustomerFilter) ([]Cu
 
 // Create registers a new customer. The password is hashed before storage.
 func (s *CustomerService) Create(ctx context.Context, req CreateCustomerInput) (*Customer, error) {
+	req.Email = auth.NormalizeEmail(req.Email)
+
 	// Uniqueness check
 	existing, err := s.repo.FindByEmail(ctx, req.Email)
 	if err != nil {
@@ -122,6 +125,7 @@ func (s *CustomerService) Update(ctx context.Context, id uuid.UUID, req UpdateCu
 	}
 
 	// Email uniqueness check when changing email
+	req.Email = auth.NormalizeEmail(req.Email)
 	if req.Email != "" && req.Email != c.Email {
 		existing, err := s.repo.FindByEmail(ctx, req.Email)
 		if err != nil {
@@ -193,6 +197,7 @@ func (s *CustomerService) ChangePassword(ctx context.Context, id uuid.UUID, newP
 
 // VerifyCredentials checks email/password and returns the matching customer.
 func (s *CustomerService) VerifyCredentials(ctx context.Context, email, password string) (*Customer, error) {
+	email = auth.NormalizeEmail(email)
 	c, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, err

@@ -177,6 +177,8 @@ func adminCmd() *cobra.Command {
 				return fmt.Errorf("hashing password: %w", err)
 			}
 
+			email = auth.NormalizeEmail(email)
+
 			id := uuid.New()
 			_, err = db.Pool.Exec(context.Background(),
 				`INSERT INTO admin_users (id, email, password_hash, role, active, created_at, updated_at)

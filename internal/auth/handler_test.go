@@ -192,6 +192,31 @@ func TestHandleRefresh_HTTPEndpoint_RejectsExpiredToken(t *testing.T) {
 	}
 }
 
+func TestLogin_MixedCaseEmail_NormalizesBeforeLookup(t *testing.T) {
+	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
+	logger := zerolog.Nop()
+	bruteForce := NewBruteForceTracker(5, 15*time.Minute)
+	store := NewRefreshTokenStore(nil)
+	h := NewHandler(nil, jwtMgr, nil, bruteForce, store, NewTokenBlacklist(), logger)
+
+	// Lock account using lowercase email.
+	for i := 0; i < 5; i++ {
+		bruteForce.RecordFailure("test@example.com")
+	}
+
+	// Attempt login with mixed-case variant — should still be locked.
+	body, _ := json.Marshal(map[string]string{"email": "Test@Example.COM", "password": "wrong"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.HandleLogin(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 (account locked via case variant), got %d", w.Code)
+	}
+}
+
 func TestLogin_AccountLock_RetryAfterHeader(t *testing.T) {
 	jwtMgr := mustNewJWTManager(t, testSecret, 15*time.Minute, 24*time.Hour)
 	logger := zerolog.Nop()
