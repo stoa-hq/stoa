@@ -323,6 +323,27 @@ export interface AuditLog {
 	created_at: string;
 }
 
+// ── API Key ───────────────────────────────────────────────────────────────────
+
+export interface APIKey {
+	id: string;
+	name: string;
+	permissions: string[];
+	active: boolean;
+	created_by?: string;
+	last_used_at?: string;
+	created_at: string;
+}
+
+export interface APIKeyCreateResponse {
+	id: string;
+	name: string;
+	key: string;
+	permissions: string[];
+	created_by: string;
+	created_at: string;
+}
+
 // ── Warehouse ─────────────────────────────────────────────────────────────────
 
 export interface Warehouse {

@@ -356,7 +356,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 
 		productH.RegisterAdminRoutes(r)
 		r.Group(func(r chi.Router) {
-			r.Use(a.AuthMiddleware.RequireRole(auth.RoleSuperAdmin, auth.RoleAdmin))
+			r.Use(a.AuthMiddleware.RequireRole(auth.RoleSuperAdmin, auth.RoleAdmin, auth.RoleManager))
 			authH.RegisterAdminRoutes(r)
 		})
 		r.Route("/categories", categoryH.RegisterAdminRoutes)

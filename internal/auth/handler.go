@@ -288,6 +288,8 @@ type CreateAPIKeyRequest struct {
 	Permissions []string `json:"permissions"`
 }
 
+const maxAPIKeysPerUser = 10
+
 func (h *Handler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	var req CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -311,12 +313,51 @@ func (h *Handler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := UserID(r.Context())
+	role := UserRole(r.Context())
+
 	perms := make([]Permission, len(req.Permissions))
 	for i, p := range req.Permissions {
 		perms[i] = Permission(p)
 	}
 
-	rawKey, apiKey, err := h.apiKeyManager.Create(r.Context(), req.Name, perms)
+	// Permission-subset check: users can only create keys with permissions they themselves have.
+	if role != RoleSuperAdmin && role != RoleAdmin {
+		allowed := RolePermissions(role)
+		for _, p := range perms {
+			found := false
+			for _, a := range allowed {
+				if p == a {
+					found = true
+					break
+				}
+			}
+			if !found {
+				writeJSON(w, http.StatusForbidden, map[string]interface{}{
+					"errors": []map[string]string{{"code": "forbidden", "detail": "permission " + string(p) + " exceeds your role"}},
+				})
+				return
+			}
+		}
+	}
+
+	// Key limit per user.
+	count, err := h.apiKeyManager.CountActiveByUser(r.Context(), userID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("counting API keys")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to create API key"}},
+		})
+		return
+	}
+	if count >= maxAPIKeysPerUser {
+		writeJSON(w, http.StatusConflict, map[string]interface{}{
+			"errors": []map[string]string{{"code": "limit_exceeded", "detail": "maximum of 10 active API keys per user reached"}},
+		})
+		return
+	}
+
+	rawKey, apiKey, err := h.apiKeyManager.Create(r.Context(), req.Name, perms, userID)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("creating API key")
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
@@ -331,13 +372,25 @@ func (h *Handler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 			"name":        apiKey.Name,
 			"key":         rawKey,
 			"permissions": apiKey.Permissions,
+			"created_by":  apiKey.CreatedBy,
 			"created_at":  apiKey.CreatedAt,
 		},
 	})
 }
 
 func (h *Handler) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.apiKeyManager.List(r.Context())
+	role := UserRole(r.Context())
+	userID := UserID(r.Context())
+
+	var filterID *uuid.UUID
+	// Super admins can see all keys with ?all=true
+	if role == RoleSuperAdmin && r.URL.Query().Get("all") == "true" {
+		filterID = nil
+	} else {
+		filterID = &userID
+	}
+
+	keys, err := h.apiKeyManager.List(r.Context(), filterID)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("listing API keys")
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
@@ -361,7 +414,15 @@ func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.apiKeyManager.Revoke(r.Context(), id); err != nil {
+	role := UserRole(r.Context())
+	userID := UserID(r.Context())
+
+	var ownerFilter *uuid.UUID
+	if role != RoleSuperAdmin {
+		ownerFilter = &userID
+	}
+
+	if err := h.apiKeyManager.Revoke(r.Context(), id, ownerFilter); err != nil {
 		h.logger.Error().Err(err).Msg("revoking API key")
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to revoke API key"}},

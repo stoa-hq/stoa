@@ -20,6 +20,7 @@ CLAUDE.local.md
 .claude/agents/docs-writer.md
 stoa-admin-mcp
 stoa-store-mcp
+.mcp.json
 
 # User-specific plugin installation (managed by `stoa plugin install`)
 go.plugins.mod

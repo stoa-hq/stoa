@@ -14,6 +14,7 @@
     "payment": "Zahlungen",
     "warehouses": "Lager",
     "audit": "Audit-Log",
+    "apiKeys": "API Keys",
     "settings": "Einstellungen",
     "collapse": "Einklappen"
   },
@@ -449,6 +450,35 @@
     "maintenanceModeHint": "Aktiviert den Wartungsmodus für den Storefront.",
     "saved": "Einstellungen gespeichert.",
     "loadFailed": "Einstellungen konnten nicht geladen werden."
+  },
+  "apiKeys": {
+    "title": "API Keys",
+    "newKey": "Neuer API Key",
+    "name": "Name",
+    "namePlaceholder": "z.B. MCP Admin Server",
+    "permissions": "Berechtigungen",
+    "permissionCount": "{count} Berechtigungen",
+    "selectAll": "Alle auswählen",
+    "deselectAll": "Alle abwählen",
+    "mcpFullAccess": "MCP Full Access",
+    "lastUsed": "Zuletzt verwendet",
+    "never": "Nie",
+    "revoke": "Widerrufen",
+    "revokeTitle": "API Key widerrufen",
+    "revokeMessage": "Soll dieser API Key wirklich widerrufen werden? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "revoked": "API Key widerrufen.",
+    "created": "API Key erstellt.",
+    "createFailed": "API Key konnte nicht erstellt werden.",
+    "loadFailed": "API Keys konnten nicht geladen werden.",
+    "keyCreatedTitle": "API Key erstellt",
+    "keyCreatedWarning": "Dieser Schlüssel wird nicht erneut angezeigt. Bitte jetzt kopieren.",
+    "mcpHint": "Für den Admin MCP Server verwenden:",
+    "copyKey": "Kopieren",
+    "copied": "Kopiert!",
+    "showAll": "Alle Keys anzeigen",
+    "noKeys": "Noch keine API Keys erstellt.",
+    "active": "Aktiv",
+    "revokedStatus": "Widerrufen"
   },
   "modal": {
     "closeLabel": "Modal schließen"

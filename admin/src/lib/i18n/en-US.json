@@ -14,6 +14,7 @@
     "payment": "Payments",
     "warehouses": "Warehouses",
     "audit": "Audit Log",
+    "apiKeys": "API Keys",
     "settings": "Settings",
     "collapse": "Collapse"
   },
@@ -449,6 +450,35 @@
     "maintenanceModeHint": "Enables maintenance mode for the storefront.",
     "saved": "Settings saved.",
     "loadFailed": "Settings could not be loaded."
+  },
+  "apiKeys": {
+    "title": "API Keys",
+    "newKey": "New API Key",
+    "name": "Name",
+    "namePlaceholder": "e.g. MCP Admin Server",
+    "permissions": "Permissions",
+    "permissionCount": "{count} permissions",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "mcpFullAccess": "MCP Full Access",
+    "lastUsed": "Last used",
+    "never": "Never",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke API Key",
+    "revokeMessage": "Do you really want to revoke this API key? This action cannot be undone.",
+    "revoked": "API key revoked.",
+    "created": "API key created.",
+    "createFailed": "API key could not be created.",
+    "loadFailed": "API keys could not be loaded.",
+    "keyCreatedTitle": "API Key Created",
+    "keyCreatedWarning": "This key will not be shown again. Please copy it now.",
+    "mcpHint": "Use for the Admin MCP Server:",
+    "copyKey": "Copy",
+    "copied": "Copied!",
+    "showAll": "Show all keys",
+    "noKeys": "No API keys created yet.",
+    "active": "Active",
+    "revokedStatus": "Revoked"
   },
   "modal": {
     "closeLabel": "Close modal"

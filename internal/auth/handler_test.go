@@ -2,12 +2,14 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
@@ -257,6 +259,132 @@ func TestLogin_AccountLock_RetryAfterHeader(t *testing.T) {
 	retryAfter := w.Header().Get("Retry-After")
 	if retryAfter != "3600" {
 		t.Errorf("expected Retry-After header to be fixed value '3600', got '%s'", retryAfter)
+	}
+}
+
+// --- API Key handler tests ---
+
+// withRole sets role + userID in context (same-package access to unexported keys).
+func withRole(ctx context.Context, uid uuid.UUID, role Role) context.Context {
+	ctx = context.WithValue(ctx, ctxKeyUserID, uid)
+	ctx = context.WithValue(ctx, ctxKeyRole, role)
+	return ctx
+}
+
+func TestHandleCreateAPIKey_MissingName(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateAPIKeyRequest{Name: "", Permissions: []string{"products.read"}})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.handleCreateAPIKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateAPIKey_ManagerPermissionSubset(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	// Manager requests settings.update — not in their allowed permissions.
+	body, _ := json.Marshal(CreateAPIKeyRequest{
+		Name:        "test-key",
+		Permissions: []string{"products.read", "settings.update"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := withRole(req.Context(), uuid.New(), RoleManager)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleCreateAPIKey(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for permission exceeding role, got %d", w.Code)
+	}
+
+	// Verify response mentions the offending permission.
+	var resp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	errs := resp["errors"].([]interface{})
+	detail := errs[0].(map[string]interface{})["detail"].(string)
+	if detail != "permission settings.update exceeds your role" {
+		t.Errorf("unexpected error detail: %s", detail)
+	}
+}
+
+func TestHandleCreateAPIKey_AdminBypassesSubsetCheck(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateAPIKeyRequest{
+		Name:        "test-key",
+		Permissions: []string{"settings.update"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := withRole(req.Context(), uuid.New(), RoleAdmin)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	// The handler will panic on nil pool after passing the subset check.
+	// A panic means we passed the 403 gate — that's the assertion.
+	func() {
+		defer func() { recover() }()
+		h.handleCreateAPIKey(w, req)
+	}()
+
+	if w.Code == http.StatusForbidden {
+		t.Error("admin should bypass permission-subset check")
+	}
+}
+
+func TestHandleCreateAPIKey_ManagerAllowedPermsPass(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateAPIKeyRequest{
+		Name:        "test-key",
+		Permissions: []string{"products.read", "orders.read"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := withRole(req.Context(), uuid.New(), RoleManager)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	func() {
+		defer func() { recover() }()
+		h.handleCreateAPIKey(w, req)
+	}()
+
+	if w.Code == http.StatusForbidden {
+		t.Error("manager requesting allowed permissions should not get 403")
+	}
+}
+
+func TestHandleRevokeAPIKey_InvalidID(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api-keys/not-a-uuid", nil)
+
+	// Set up chi URL param.
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "not-a-uuid")
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	h.handleRevokeAPIKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid UUID, got %d", w.Code)
 	}
 }
 

@@ -6,7 +6,7 @@
 	import {
 		LayoutDashboard, Package, FolderTree, Wrench, Users, ShoppingCart,
 		Image, Tag, Bookmark, Receipt, Truck, CreditCard, ClipboardList,
-		Warehouse, Settings,
+		Warehouse, Settings, KeyRound,
 		PanelLeftClose, PanelLeftOpen
 	} from 'lucide-svelte';
 
@@ -31,6 +31,7 @@
 		{ href: '/shipping', labelKey: 'nav.shipping', icon: Truck },
 		{ href: '/payment', labelKey: 'nav.payment', icon: CreditCard },
 		{ href: '/audit', labelKey: 'nav.audit', icon: ClipboardList },
+		{ href: '/api-keys', labelKey: 'nav.apiKeys', icon: KeyRound },
 		{ href: '/settings', labelKey: 'nav.settings', icon: Settings },
 	];
 

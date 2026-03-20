@@ -77,6 +77,9 @@ const (
 	PermTaxRead   Permission = "tax.read"
 	PermTaxUpdate Permission = "tax.update"
 	PermTaxDelete Permission = "tax.delete"
+
+	// API Keys
+	PermAPIKeysManage Permission = "api_keys.manage"
 )
 
 var rolePermissions = map[Role][]Permission{
@@ -92,9 +95,14 @@ var rolePermissions = map[Role][]Permission{
 		PermShippingRead,
 		PermPaymentRead,
 		PermTaxRead,
+		PermAPIKeysManage,
 	},
 	RoleCustomer: {},
 	RoleAPIClient: {},
+}
+
+func RolePermissions(role Role) []Permission {
+	return rolePermissions[role]
 }
 
 func HasPermission(role Role, perm Permission) bool {
@@ -138,5 +146,6 @@ func allPermissions() []Permission {
 		PermShippingCreate, PermShippingRead, PermShippingUpdate, PermShippingDelete,
 		PermPaymentCreate, PermPaymentRead, PermPaymentUpdate, PermPaymentDelete,
 		PermTaxCreate, PermTaxRead, PermTaxUpdate, PermTaxDelete,
+		PermAPIKeysManage,
 	}
 }

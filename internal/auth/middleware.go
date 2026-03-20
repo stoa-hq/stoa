@@ -79,7 +79,11 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				writeAuthError(w, http.StatusUnauthorized, "invalid API key")
 				return
 			}
-			ctx = context.WithValue(r.Context(), ctxKeyUserID, apiKey.ID)
+			userID := apiKey.ID
+			if apiKey.CreatedBy != nil {
+				userID = *apiKey.CreatedBy
+			}
+			ctx = context.WithValue(r.Context(), ctxKeyUserID, userID)
 			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
 			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
 			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
@@ -178,7 +182,11 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			ctx := context.WithValue(r.Context(), ctxKeyUserID, apiKey.ID)
+			userID := apiKey.ID
+			if apiKey.CreatedBy != nil {
+				userID = *apiKey.CreatedBy
+			}
+			ctx := context.WithValue(r.Context(), ctxKeyUserID, userID)
 			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
 			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
 			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
