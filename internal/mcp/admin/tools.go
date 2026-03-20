@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -89,6 +90,7 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 }
 
 // buildQueryParams builds a URL query string from request arguments.
+// Keys with a "filter_" prefix are mapped to "filter[...]" query parameters.
 func buildQueryParams(req mcp.CallToolRequest, keys ...string) string {
 	query := ""
 	for _, key := range keys {
@@ -102,7 +104,11 @@ func buildQueryParams(req mcp.CallToolRequest, keys ...string) string {
 			if query != "" {
 				query += "&"
 			}
-			query += key + "=" + val
+			paramKey := key
+			if strings.HasPrefix(key, "filter_") {
+				paramKey = "filter[" + strings.TrimPrefix(key, "filter_") + "]"
+			}
+			query += paramKey + "=" + val
 		}
 	}
 	return query

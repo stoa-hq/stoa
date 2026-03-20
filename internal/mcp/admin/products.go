@@ -17,10 +17,10 @@ func adminListProducts(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandler
 		mcp.WithString("search", mcp.Description("Search term")),
 		mcp.WithString("sort", mcp.Description("Sort field")),
 		mcp.WithString("order", mcp.Description("Sort order: asc or desc")),
-		mcp.WithString("filter[active]", mcp.Description("Filter by active status: true or false")),
+		mcp.WithString("filter_active", mcp.Description("Filter by active status: true or false")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		path := "/api/v1/admin/products?" + buildQueryParams(req, "page", "limit", "search", "sort", "order", "filter[active]")
+		path := "/api/v1/admin/products?" + buildQueryParams(req, "page", "limit", "search", "sort", "order", "filter_active")
 		data, err := client.Get(path)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
@@ -150,6 +150,7 @@ func adminUpdateVariant(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandle
 		mcp.WithNumber("price", mcp.Description("Variant price in cents")),
 		mcp.WithNumber("stock", mcp.Description("Stock quantity")),
 		mcp.WithBoolean("active", mcp.Description("Whether the variant is active")),
+		mcp.WithArray("option_ids", mcp.Description("Property option UUIDs for this variant")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := req.GetArguments()

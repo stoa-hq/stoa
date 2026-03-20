@@ -16,10 +16,10 @@ func adminListOrders(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandlerFu
 		mcp.WithNumber("limit", mcp.Description("Items per page")),
 		mcp.WithString("sort", mcp.Description("Sort field")),
 		mcp.WithString("order", mcp.Description("Sort order: asc or desc")),
-		mcp.WithString("filter[status]", mcp.Description("Filter by status: pending, processing, shipped, delivered, cancelled")),
+		mcp.WithString("filter_status", mcp.Description("Filter by status: pending, processing, shipped, delivered, cancelled")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		path := "/api/v1/admin/orders?" + buildQueryParams(req, "page", "limit", "sort", "order", "filter[status]")
+		path := "/api/v1/admin/orders?" + buildQueryParams(req, "page", "limit", "sort", "order", "filter_status")
 		data, err := client.Get(path)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
