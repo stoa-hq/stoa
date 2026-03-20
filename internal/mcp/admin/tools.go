@@ -67,6 +67,16 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 	// Audit (1)
 	register(adminListAuditLog)
 
+	// Property Groups & Options (8)
+	register(adminListPropertyGroups)
+	register(adminGetPropertyGroup)
+	register(adminCreatePropertyGroup)
+	register(adminUpdatePropertyGroup)
+	register(adminDeletePropertyGroup)
+	register(adminCreatePropertyOption)
+	register(adminUpdatePropertyOption)
+	register(adminDeletePropertyOption)
+
 	// Warehouses (8)
 	register(adminListWarehouses)
 	register(adminGetWarehouse)

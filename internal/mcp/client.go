@@ -43,6 +43,10 @@ func (c *StoaClient) Delete(path string) ([]byte, error) {
 }
 
 func (c *StoaClient) do(method, path string, body interface{}) ([]byte, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("STOA_MCP_API_KEY is not configured — set the environment variable and restart the MCP server")
+	}
+
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)

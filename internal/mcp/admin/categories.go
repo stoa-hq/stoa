@@ -52,7 +52,7 @@ func adminCreateCategory(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandl
 		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		data, err := client.Post("/api/v1/admin/categories", req.GetArguments())
+		data, err := client.Post("/api/v1/admin/categories", transformCategoryArgs(req.GetArguments()))
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
 		}
@@ -76,6 +76,7 @@ func adminUpdateCategory(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandl
 		args := req.GetArguments()
 		id := req.GetString("id", "")
 		delete(args, "id")
+		args = transformCategoryArgs(args)
 		data, err := client.Put("/api/v1/admin/categories/"+id, args)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil

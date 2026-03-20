@@ -52,16 +52,17 @@ func adminCreateProduct(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandle
 		mcp.WithString("slug", mcp.Description("URL-friendly slug"), mcp.Required()),
 		mcp.WithString("description", mcp.Description("Product description")),
 		mcp.WithNumber("price", mcp.Description("Price in cents"), mcp.Required()),
+		mcp.WithString("currency", mcp.Description("Currency code, e.g. EUR (default: EUR)")),
 		mcp.WithString("sku", mcp.Description("Stock keeping unit")),
 		mcp.WithNumber("stock", mcp.Description("Stock quantity")),
 		mcp.WithBoolean("active", mcp.Description("Whether the product is active")),
 		mcp.WithString("tax_rule_id", mcp.Description("Tax rule UUID")),
 		mcp.WithArray("category_ids", mcp.Description("Category UUIDs")),
 		mcp.WithArray("tag_ids", mcp.Description("Tag UUIDs")),
-		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale, e.g. {\"de\": {\"name\": \"...\", \"description\": \"...\"}}")),
+		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale, e.g. {\"de-DE\": {\"name\": \"...\", \"slug\": \"...\", \"description\": \"...\"}}")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		data, err := client.Post("/api/v1/admin/products", req.GetArguments())
+		data, err := client.Post("/api/v1/admin/products", transformProductArgs(req.GetArguments()))
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
 		}
@@ -78,18 +79,20 @@ func adminUpdateProduct(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandle
 		mcp.WithString("slug", mcp.Description("URL-friendly slug")),
 		mcp.WithString("description", mcp.Description("Product description")),
 		mcp.WithNumber("price", mcp.Description("Price in cents")),
+		mcp.WithString("currency", mcp.Description("Currency code, e.g. EUR (default: EUR)")),
 		mcp.WithString("sku", mcp.Description("Stock keeping unit")),
 		mcp.WithNumber("stock", mcp.Description("Stock quantity")),
 		mcp.WithBoolean("active", mcp.Description("Whether the product is active")),
 		mcp.WithString("tax_rule_id", mcp.Description("Tax rule UUID")),
 		mcp.WithArray("category_ids", mcp.Description("Category UUIDs")),
 		mcp.WithArray("tag_ids", mcp.Description("Tag UUIDs")),
-		mcp.WithObject("translations", mcp.Description("Translation object")),
+		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale")),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := req.GetArguments()
 		id := req.GetString("id", "")
 		delete(args, "id")
+		args = transformProductArgs(args)
 		data, err := client.Put("/api/v1/admin/products/"+id, args)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
@@ -128,6 +131,7 @@ func adminCreateVariant(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandle
 		args := req.GetArguments()
 		productID := req.GetString("product_id", "")
 		delete(args, "product_id")
+		args = transformVariantArgs(args)
 		data, err := client.Post("/api/v1/admin/products/"+productID+"/variants", args)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil
@@ -153,6 +157,7 @@ func adminUpdateVariant(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandle
 		variantID := req.GetString("variant_id", "")
 		delete(args, "product_id")
 		delete(args, "variant_id")
+		args = transformVariantArgs(args)
 		data, err := client.Put("/api/v1/admin/products/"+productID+"/variants/"+variantID, args)
 		if err != nil {
 			return stoamcp.ErrorResult(err), nil

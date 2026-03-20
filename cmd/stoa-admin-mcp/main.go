@@ -25,6 +25,9 @@ func useStdio() bool {
 
 func main() {
 	cfg := stoamcp.LoadConfig()
+	if cfg.APIKey == "" {
+		log.Println("WARNING: STOA_MCP_API_KEY is not set — all tool calls will fail with 401")
+	}
 	client := stoamcp.NewStoaClient(cfg)
 
 	s := server.NewMCPServer(
@@ -43,6 +46,8 @@ Available operations:
 - Tags: manage product tags
 - Media: list and delete uploaded files
 - Shipping/Tax/Payment: view configuration
+- Property Groups: create and manage product properties (e.g. Color, Size)
+- Property Options: manage selectable values within property groups
 - Warehouses: CRUD operations, stock management per warehouse/product
 - Audit log: review all changes
 

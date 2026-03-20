@@ -40,6 +40,9 @@ func useStdio() bool {
 
 func main() {
 	cfg := stoamcp.LoadConfig()
+	if cfg.APIKey == "" {
+		log.Println("WARNING: STOA_MCP_API_KEY is not set — all tool calls will fail with 401")
+	}
 	client := stoamcp.NewStoaClient(cfg)
 
 	s := server.NewMCPServer(

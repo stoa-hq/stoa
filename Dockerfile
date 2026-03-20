@@ -35,9 +35,10 @@ COPY --from=frontend /build/internal/storefront/build ./internal/storefront/buil
 ARG PLUGINS=""
 RUN sh scripts/docker-plugins.sh "$PLUGINS"
 
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o stoa ./cmd/stoa
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o stoa-store-mcp ./cmd/stoa-store-mcp
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o stoa-admin-mcp ./cmd/stoa-admin-mcp
+RUN mkdir -p bin && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/stoa ./cmd/stoa && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/stoa-store-mcp ./cmd/stoa-store-mcp && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/stoa-admin-mcp ./cmd/stoa-admin-mcp
 
 FROM alpine:3.20
 
@@ -45,9 +46,9 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-COPY --from=builder /build/stoa .
-COPY --from=builder /build/stoa-store-mcp .
-COPY --from=builder /build/stoa-admin-mcp .
+COPY --from=builder /build/bin/stoa .
+COPY --from=builder /build/bin/stoa-store-mcp .
+COPY --from=builder /build/bin/stoa-admin-mcp .
 COPY --from=builder /build/migrations ./migrations
 COPY --from=builder /build/config.example.yaml ./config.yaml
 

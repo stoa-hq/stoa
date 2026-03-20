@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "stoa-admin": {
+      "type": "stdio",
+      "command": "go",
+      "args": ["run", "./cmd/stoa-admin-mcp", "--stdio"],
+      "env": {
+        "STOA_MCP_API_URL": "http://localhost:8080",
+        "STOA_MCP_API_KEY": "${STOA_MCP_API_KEY}"
+      }
+    },
+    "stoa-store": {
+      "type": "stdio",
+      "command": "go",
+      "args": ["run", "./cmd/stoa-store-mcp", "--stdio"],
+      "env": {
+        "STOA_MCP_API_URL": "http://localhost:8080",
+        "STOA_MCP_API_KEY": "${STOA_MCP_API_KEY}"
+      }
+    }
+  }
+}
