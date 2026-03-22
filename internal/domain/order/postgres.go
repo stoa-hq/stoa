@@ -201,7 +201,20 @@ func (r *PostgresRepository) FindByCustomerID(ctx context.Context, customerID uu
 	}
 	defer rows.Close()
 
-	return r.scanRows(rows)
+	orders, err := r.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range orders {
+		items, err := r.findItemsByOrderID(ctx, orders[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("loading items for order %s: %w", orders[i].ID, err)
+		}
+		orders[i].Items = items
+	}
+
+	return orders, nil
 }
 
 // -------------------------------------------------------------------

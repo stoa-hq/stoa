@@ -80,7 +80,8 @@ async function tryRefreshToken(): Promise<boolean> {
 			}
 			const data = await res.json();
 			if (data.data?.access_token && data.data?.refresh_token) {
-				setTokens(data.data.access_token, data.data.refresh_token);
+				const { authStore } = await import('$lib/stores/auth');
+				authStore.login(data.data.access_token, data.data.refresh_token);
 				return true;
 			}
 			clearTokens();

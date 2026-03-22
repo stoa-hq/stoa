@@ -16,9 +16,11 @@ type APIKey struct {
 	ID          uuid.UUID    `json:"id"`
 	Name        string       `json:"name"`
 	KeyHash     string       `json:"-"`
+	KeyType     string       `json:"key_type"`
 	Permissions []Permission `json:"permissions"`
 	Active      bool         `json:"active"`
 	CreatedBy   *uuid.UUID   `json:"created_by,omitempty"`
+	CustomerID  *uuid.UUID   `json:"customer_id,omitempty"`
 	LastUsedAt  *time.Time   `json:"last_used_at,omitempty"`
 	CreatedAt   time.Time    `json:"created_at"`
 }
@@ -37,6 +39,16 @@ func GenerateAPIKey() (string, string, error) {
 		return "", "", fmt.Errorf("generating API key: %w", err)
 	}
 	key := "ck_" + hex.EncodeToString(bytes)
+	hash := hashKey(key)
+	return key, hash, nil
+}
+
+func GenerateStoreAPIKey() (string, string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", "", fmt.Errorf("generating store API key: %w", err)
+	}
+	key := "sk_" + hex.EncodeToString(bytes)
 	hash := hashKey(key)
 	return key, hash, nil
 }
@@ -61,8 +73,8 @@ func (m *APIKeyManager) Create(ctx context.Context, name string, permissions []P
 	}
 
 	_, err = m.pool.Exec(ctx,
-		`INSERT INTO api_keys (id, name, key_hash, permissions, active, created_at, created_by)
-		 VALUES ($1, $2, $3, $4, true, $5, $6)`,
+		`INSERT INTO api_keys (id, name, key_hash, permissions, active, created_at, created_by, key_type)
+		 VALUES ($1, $2, $3, $4, true, $5, $6, 'admin')`,
 		id, name, hash, permStrs, now, createdBy)
 	if err != nil {
 		return "", nil, fmt.Errorf("creating API key: %w", err)
@@ -71,11 +83,98 @@ func (m *APIKeyManager) Create(ctx context.Context, name string, permissions []P
 	return key, &APIKey{
 		ID:          id,
 		Name:        name,
+		KeyType:     "admin",
 		Permissions: permissions,
 		Active:      true,
 		CreatedBy:   &createdBy,
 		CreatedAt:   now,
 	}, nil
+}
+
+const maxStoreKeysPerCustomer = 5
+
+func (m *APIKeyManager) CreateStoreKey(ctx context.Context, name string, permissions []Permission, customerID uuid.UUID) (string, *APIKey, error) {
+	for _, p := range permissions {
+		if !IsStorePermission(p) {
+			return "", nil, fmt.Errorf("permission %s is not a valid store permission", p)
+		}
+	}
+
+	key, hash, err := GenerateStoreAPIKey()
+	if err != nil {
+		return "", nil, err
+	}
+
+	id := uuid.New()
+	now := time.Now().UTC()
+
+	permStrs := make([]string, len(permissions))
+	for i, p := range permissions {
+		permStrs[i] = string(p)
+	}
+
+	_, err = m.pool.Exec(ctx,
+		`INSERT INTO api_keys (id, name, key_hash, permissions, active, created_at, key_type, customer_id)
+		 VALUES ($1, $2, $3, $4, true, $5, 'store', $6)`,
+		id, name, hash, permStrs, now, customerID)
+	if err != nil {
+		return "", nil, fmt.Errorf("creating store API key: %w", err)
+	}
+
+	return key, &APIKey{
+		ID:          id,
+		Name:        name,
+		KeyType:     "store",
+		Permissions: permissions,
+		Active:      true,
+		CustomerID:  &customerID,
+		CreatedAt:   now,
+	}, nil
+}
+
+func (m *APIKeyManager) ListByCustomer(ctx context.Context, customerID uuid.UUID) ([]APIKey, error) {
+	rows, err := m.pool.Query(ctx,
+		`SELECT id, name, permissions, active, last_used_at, created_at, key_type, customer_id
+		 FROM api_keys WHERE customer_id = $1 AND key_type = 'store' ORDER BY created_at DESC`, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("listing store API keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []APIKey
+	for rows.Next() {
+		var k APIKey
+		var permStrs []string
+		if err := rows.Scan(&k.ID, &k.Name, &permStrs, &k.Active, &k.LastUsedAt, &k.CreatedAt, &k.KeyType, &k.CustomerID); err != nil {
+			return nil, fmt.Errorf("scanning store API key: %w", err)
+		}
+		k.Permissions = make([]Permission, len(permStrs))
+		for i, s := range permStrs {
+			k.Permissions[i] = Permission(s)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
+func (m *APIKeyManager) CountActiveByCustomer(ctx context.Context, customerID uuid.UUID) (int, error) {
+	var count int
+	err := m.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM api_keys WHERE customer_id = $1 AND key_type = 'store' AND active = true`, customerID).
+		Scan(&count)
+	return count, err
+}
+
+func (m *APIKeyManager) RevokeByCustomer(ctx context.Context, keyID, customerID uuid.UUID) error {
+	tag, err := m.pool.Exec(ctx,
+		`UPDATE api_keys SET active = false WHERE id = $1 AND customer_id = $2 AND key_type = 'store'`, keyID, customerID)
+	if err != nil {
+		return fmt.Errorf("revoking store API key: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("store API key not found")
+	}
+	return nil
 }
 
 func (m *APIKeyManager) Validate(ctx context.Context, key string) (*APIKey, error) {
@@ -84,9 +183,9 @@ func (m *APIKeyManager) Validate(ctx context.Context, key string) (*APIKey, erro
 	var apiKey APIKey
 	var permStrs []string
 	err := m.pool.QueryRow(ctx,
-		`SELECT id, name, permissions, active, last_used_at, created_at, created_by
+		`SELECT id, name, permissions, active, last_used_at, created_at, created_by, key_type, customer_id
 		 FROM api_keys WHERE key_hash = $1`, hash).
-		Scan(&apiKey.ID, &apiKey.Name, &permStrs, &apiKey.Active, &apiKey.LastUsedAt, &apiKey.CreatedAt, &apiKey.CreatedBy)
+		Scan(&apiKey.ID, &apiKey.Name, &permStrs, &apiKey.Active, &apiKey.LastUsedAt, &apiKey.CreatedAt, &apiKey.CreatedBy, &apiKey.KeyType, &apiKey.CustomerID)
 	if err != nil {
 		return nil, fmt.Errorf("validating API key: %w", err)
 	}

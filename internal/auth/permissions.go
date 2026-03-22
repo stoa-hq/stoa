@@ -80,6 +80,14 @@ const (
 
 	// API Keys
 	PermAPIKeysManage Permission = "api_keys.manage"
+
+	// Store permissions (for customer API keys)
+	PermStoreProductRead   Permission = "store.products.read"
+	PermStoreCartManage    Permission = "store.cart.manage"
+	PermStoreCheckout      Permission = "store.checkout"
+	PermStoreAccountRead   Permission = "store.account.read"
+	PermStoreAccountUpdate Permission = "store.account.update"
+	PermStoreOrdersRead    Permission = "store.orders.read"
 )
 
 var rolePermissions = map[Role][]Permission{
@@ -120,6 +128,8 @@ func HasPermission(role Role, perm Permission) bool {
 
 // HasPermissionCtx checks permissions for API clients using context-stored
 // permissions, falling back to role-based permissions for other roles.
+// Store API keys (role=customer with context permissions) also use
+// context-stored permissions.
 func HasPermissionCtx(ctx context.Context, role Role, perm Permission) bool {
 	if role == RoleAPIClient {
 		for _, p := range UserPermissions(ctx) {
@@ -129,7 +139,41 @@ func HasPermissionCtx(ctx context.Context, role Role, perm Permission) bool {
 		}
 		return false
 	}
+	// Store API keys are authenticated as RoleCustomer but carry
+	// explicit permissions in context.
+	if role == RoleCustomer {
+		if ctxPerms := UserPermissions(ctx); len(ctxPerms) > 0 {
+			for _, p := range ctxPerms {
+				if p == perm {
+					return true
+				}
+			}
+			return false
+		}
+	}
 	return HasPermission(role, perm)
+}
+
+// AllStorePermissions returns all store-scoped permissions.
+func AllStorePermissions() []Permission {
+	return []Permission{
+		PermStoreProductRead,
+		PermStoreCartManage,
+		PermStoreCheckout,
+		PermStoreAccountRead,
+		PermStoreAccountUpdate,
+		PermStoreOrdersRead,
+	}
+}
+
+// IsStorePermission returns true if the permission is store-scoped.
+func IsStorePermission(p Permission) bool {
+	for _, sp := range AllStorePermissions() {
+		if p == sp {
+			return true
+		}
+	}
+	return false
 }
 
 func allPermissions() []Permission {

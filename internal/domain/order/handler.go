@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/internal/domain/warehouse"
 	"github.com/stoa-hq/stoa/internal/server"
 	"github.com/stoa-hq/stoa/pkg/sdk"
@@ -455,11 +456,8 @@ func (h *Handler) parseListFilter(r *http.Request) (OrderFilter, int, int) {
 // customerIDFromContext extracts the authenticated customer's UUID from the
 // request context. It writes a 401 and returns false when the ID is absent.
 func (h *Handler) customerIDFromContext(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	type contextKeyType string
-	const ctxKeyUserID contextKeyType = "user_id"
-
-	id, ok := r.Context().Value(ctxKeyUserID).(uuid.UUID)
-	if !ok || id == uuid.Nil {
+	id := auth.UserID(r.Context())
+	if id == uuid.Nil {
 		h.writeError(w, http.StatusUnauthorized, "unauthorized", "authentication required", "")
 		return uuid.Nil, false
 	}
@@ -469,11 +467,8 @@ func (h *Handler) customerIDFromContext(w http.ResponseWriter, r *http.Request) 
 // optionalCustomerID extracts the customer UUID from context without failing.
 // Returns nil when the user is unauthenticated (guest checkout).
 func (h *Handler) optionalCustomerID(r *http.Request) *uuid.UUID {
-	type contextKeyType string
-	const ctxKeyUserID contextKeyType = "user_id"
-
-	id, ok := r.Context().Value(ctxKeyUserID).(uuid.UUID)
-	if !ok || id == uuid.Nil {
+	id := auth.UserID(r.Context())
+	if id == uuid.Nil {
 		return nil
 	}
 	cp := id

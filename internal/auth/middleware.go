@@ -79,14 +79,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 				writeAuthError(w, http.StatusUnauthorized, "invalid API key")
 				return
 			}
-			userID := apiKey.ID
-			if apiKey.CreatedBy != nil {
-				userID = *apiKey.CreatedBy
-			}
-			ctx = context.WithValue(r.Context(), ctxKeyUserID, userID)
-			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
-			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
-			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
+			ctx = setAPIKeyContext(r.Context(), apiKey)
 
 		default:
 			writeAuthError(w, http.StatusUnauthorized, "unsupported authorization scheme")
@@ -95,6 +88,27 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// setAPIKeyContext sets context values based on the API key type.
+// Store keys (key_type="store") are treated as customer sessions;
+// admin keys use the existing api_client role.
+func setAPIKeyContext(ctx context.Context, apiKey *APIKey) context.Context {
+	if apiKey.KeyType == "store" && apiKey.CustomerID != nil {
+		ctx = context.WithValue(ctx, ctxKeyUserID, *apiKey.CustomerID)
+		ctx = context.WithValue(ctx, ctxKeyUserType, "customer")
+		ctx = context.WithValue(ctx, ctxKeyRole, RoleCustomer)
+	} else {
+		userID := apiKey.ID
+		if apiKey.CreatedBy != nil {
+			userID = *apiKey.CreatedBy
+		}
+		ctx = context.WithValue(ctx, ctxKeyUserID, userID)
+		ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
+		ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
+	}
+	ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
+	return ctx
 }
 
 // RequireRole checks that the user has a specific role.
@@ -182,14 +196,7 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			userID := apiKey.ID
-			if apiKey.CreatedBy != nil {
-				userID = *apiKey.CreatedBy
-			}
-			ctx := context.WithValue(r.Context(), ctxKeyUserID, userID)
-			ctx = context.WithValue(ctx, ctxKeyUserType, "api_key")
-			ctx = context.WithValue(ctx, ctxKeyRole, RoleAPIClient)
-			ctx = context.WithValue(ctx, ctxKeyPermissions, apiKey.Permissions)
+			ctx := setAPIKeyContext(r.Context(), apiKey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 
 		default:

@@ -1,0 +1,2 @@
+-- No safe automatic rollback — would need to re-NULL only previously-NULL rows.
+-- Intentionally left empty; data was corrected, not destructively changed.

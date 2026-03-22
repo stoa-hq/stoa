@@ -48,6 +48,20 @@ function createAuthStore() {
 			clearTokens();
 			set({ accessToken: null, refreshToken: null, user: null });
 		},
+		hydrate() {
+			const at = getAccessToken();
+			const rt = getRefreshToken();
+			if (at) {
+				const payload = parseJwtPayload(at);
+				if (payload && Date.now() / 1000 < (payload.exp as number)) {
+					set({ accessToken: at, refreshToken: rt, user: { email: (payload.email as string) ?? '' } });
+					return;
+				}
+			}
+			if (!at && !rt) return;
+			clearTokens();
+			set({ accessToken: null, refreshToken: null, user: null });
+		},
 		isAuthenticated(): boolean {
 			const at = getAccessToken();
 			if (!at) return false;

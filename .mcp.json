@@ -15,7 +15,7 @@
       "args": ["run", "./cmd/stoa-store-mcp", "--stdio"],
       "env": {
         "STOA_MCP_API_URL": "http://localhost:8080",
-        "STOA_MCP_API_KEY": "${STOA_MCP_API_KEY}"
+        "STOA_MCP_API_KEY": "${STOA_MCP_STORE_API_KEY}"
       }
     }
   }

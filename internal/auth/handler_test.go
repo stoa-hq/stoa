@@ -271,6 +271,14 @@ func withRole(ctx context.Context, uid uuid.UUID, role Role) context.Context {
 	return ctx
 }
 
+// withCustomer sets role, userID, and userType=customer in context for store API key tests.
+func withCustomer(ctx context.Context, uid uuid.UUID) context.Context {
+	ctx = context.WithValue(ctx, ctxKeyUserID, uid)
+	ctx = context.WithValue(ctx, ctxKeyUserType, "customer")
+	ctx = context.WithValue(ctx, ctxKeyRole, RoleCustomer)
+	return ctx
+}
+
 func TestHandleCreateAPIKey_MissingName(t *testing.T) {
 	logger := zerolog.Nop()
 	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
@@ -408,5 +416,128 @@ func TestRevokeAllForUser(t *testing.T) {
 	}
 	if store.records["tok-other"].Revoked {
 		t.Error("other user's token should NOT be revoked")
+	}
+}
+
+// --- Store API Key handler tests ---
+
+func TestHandleCreateStoreAPIKey_RejectsNonCustomer(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateStoreAPIKeyRequest{
+		Name:        "my-store-key",
+		Permissions: []string{"store.products.read"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	// Set as admin user (not customer).
+	ctx := withRole(req.Context(), uuid.New(), RoleAdmin)
+	ctx = context.WithValue(ctx, ctxKeyUserType, "admin")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleCreateStoreAPIKey(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-customer, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateStoreAPIKey_RejectsInvalidPermission(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateStoreAPIKeyRequest{
+		Name:        "my-store-key",
+		Permissions: []string{"products.read"}, // admin permission, not store
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := withCustomer(req.Context(), uuid.New())
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleCreateStoreAPIKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid store permission, got %d", w.Code)
+	}
+}
+
+func TestHandleCreateStoreAPIKey_MissingName(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	body, _ := json.Marshal(CreateStoreAPIKeyRequest{
+		Name:        "",
+		Permissions: []string{"store.products.read"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := withCustomer(req.Context(), uuid.New())
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleCreateStoreAPIKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing name, got %d", w.Code)
+	}
+}
+
+func TestHandleListStoreAPIKeys_RejectsNonCustomer(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	req := httptest.NewRequest(http.MethodGet, "/api-keys", nil)
+	ctx := withRole(req.Context(), uuid.New(), RoleAdmin)
+	ctx = context.WithValue(ctx, ctxKeyUserType, "admin")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleListStoreAPIKeys(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-customer, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeStoreAPIKey_RejectsNonCustomer(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api-keys/"+uuid.New().String(), nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", uuid.New().String())
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = withRole(ctx, uuid.New(), RoleAdmin)
+	ctx = context.WithValue(ctx, ctxKeyUserType, "admin")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleRevokeStoreAPIKey(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-customer, got %d", w.Code)
+	}
+}
+
+func TestHandleRevokeStoreAPIKey_InvalidID(t *testing.T) {
+	logger := zerolog.Nop()
+	h := NewHandler(nil, nil, NewAPIKeyManager(nil), nil, nil, nil, logger)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api-keys/not-a-uuid", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "not-a-uuid")
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = withCustomer(ctx, uuid.New())
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.handleRevokeStoreAPIKey(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid UUID, got %d", w.Code)
 	}
 }

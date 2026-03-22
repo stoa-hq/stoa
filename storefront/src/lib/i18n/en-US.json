@@ -4,6 +4,7 @@
 		"search": "Search",
 		"searchAriaLabel": "Search",
 		"myOrders": "My Orders",
+		"apiKeys": "API Keys",
 		"logout": "Sign Out",
 		"login": "Sign In"
 	},
@@ -139,5 +140,33 @@
 		"loading": "Loading...",
 		"error": "An error occurred.",
 		"language": "Language"
+	},
+	"apiKeys": {
+		"pageTitle": "API Keys – stoa",
+		"title": "API Keys",
+		"description": "Manage your API keys for AI agent and integration access.",
+		"createButton": "Create New Key",
+		"name": "Name",
+		"namePlaceholder": "e.g. My Shopping Agent",
+		"permissions": "Permissions",
+		"permProductRead": "View products",
+		"permCartManage": "Manage cart",
+		"permCheckout": "Checkout",
+		"permAccountRead": "View account",
+		"permAccountUpdate": "Update account",
+		"permOrdersRead": "View orders",
+		"create": "Create",
+		"cancel": "Cancel",
+		"revoke": "Revoke",
+		"revokeConfirm": "Really revoke this key?",
+		"createdAt": "Created",
+		"lastUsed": "Last used",
+		"lastUsedNever": "Never",
+		"keyCreated": "Key Created",
+		"keyCreatedHint": "Copy the key now — it won't be shown again.",
+		"copied": "Copied!",
+		"limitReached": "Maximum of 5 API keys reached.",
+		"empty": "You don't have any API keys yet.",
+		"emptyHint": "API keys let AI agents shop on your behalf."
 	}
 }

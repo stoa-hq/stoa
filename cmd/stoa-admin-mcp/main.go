@@ -20,13 +20,13 @@ func useStdio() bool {
 			return true
 		}
 	}
-	return os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
+	return os.Getenv("STOA_ADMIN_MCP_TRANSPORT") == "stdio" || os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
 }
 
 func main() {
-	cfg := stoamcp.LoadConfig()
+	cfg := stoamcp.LoadAdminConfig()
 	if cfg.APIKey == "" {
-		log.Println("WARNING: STOA_MCP_API_KEY is not set — all tool calls will fail with 401")
+		log.Println("WARNING: STOA_ADMIN_MCP_API_KEY is not set — all tool calls will fail with 401")
 	}
 	client := stoamcp.NewStoaClient(cfg)
 

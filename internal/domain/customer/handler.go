@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/internal/server"
 )
 
@@ -343,14 +344,8 @@ func (h *Handler) parseListFilter(r *http.Request) (CustomerFilter, int, int) {
 // customerIDFromContext extracts the authenticated customer's UUID from the
 // request context. It writes a 401 and returns false when the ID is absent.
 func (h *Handler) customerIDFromContext(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	// The auth middleware stores the user ID as a uuid.UUID under its private
-	// contextKeyType key.  We receive it here through the standard context
-	// value mechanism using the same string key ("user_id").
-	type contextKeyType string
-	const ctxKeyUserID contextKeyType = "user_id"
-
-	id, ok := r.Context().Value(ctxKeyUserID).(uuid.UUID)
-	if !ok || id == uuid.Nil {
+	id := auth.UserID(r.Context())
+	if id == uuid.Nil {
 		h.writeError(w, http.StatusUnauthorized, "unauthorized", "authentication required", "")
 		return uuid.Nil, false
 	}

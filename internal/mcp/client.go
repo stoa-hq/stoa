@@ -7,12 +7,15 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // StoaClient is an HTTP client wrapper for communicating with the Stoa API.
 type StoaClient struct {
 	baseURL    string
 	apiKey     string
+	sessionID  string
 	httpClient *http.Client
 }
 
@@ -24,6 +27,16 @@ func NewStoaClient(cfg *Config) *StoaClient {
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// NewStoaStoreClient creates a client for the Store MCP.
+// If no API key is configured, it generates a guest session ID.
+func NewStoaStoreClient(cfg *Config) *StoaClient {
+	c := NewStoaClient(cfg)
+	if c.apiKey == "" {
+		c.sessionID = uuid.New().String()
+	}
+	return c
 }
 
 func (c *StoaClient) Get(path string) ([]byte, error) {
@@ -43,10 +56,6 @@ func (c *StoaClient) Delete(path string) ([]byte, error) {
 }
 
 func (c *StoaClient) do(method, path string, body interface{}) ([]byte, error) {
-	if c.apiKey == "" {
-		return nil, fmt.Errorf("STOA_MCP_API_KEY is not configured — set the environment variable and restart the MCP server")
-	}
-
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -67,6 +76,9 @@ func (c *StoaClient) do(method, path string, body interface{}) ([]byte, error) {
 	}
 	if c.apiKey != "" {
 		req.Header.Set("Authorization", "ApiKey "+c.apiKey)
+	}
+	if c.sessionID != "" {
+		req.Header.Set("X-Session-ID", c.sessionID)
 	}
 
 	resp, err := c.httpClient.Do(req)

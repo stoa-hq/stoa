@@ -4,6 +4,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { cartStore } from '$lib/stores/cart';
+	import { authStore } from '$lib/stores/auth';
 	import { loadPluginManifest } from '$lib/stores/plugins';
 	import { loadStoreSettings, storeSettings } from '$lib/stores/settings';
 	import { onMount } from 'svelte';
@@ -15,6 +16,7 @@
 	let { children }: Props = $props();
 
 	onMount(() => {
+		authStore.hydrate();
 		cartStore.load();
 		loadPluginManifest();
 		loadStoreSettings();

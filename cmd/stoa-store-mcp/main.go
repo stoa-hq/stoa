@@ -35,15 +35,15 @@ func useStdio() bool {
 			return true
 		}
 	}
-	return os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
+	return os.Getenv("STOA_STORE_MCP_TRANSPORT") == "stdio" || os.Getenv("STOA_MCP_TRANSPORT") == "stdio"
 }
 
 func main() {
-	cfg := stoamcp.LoadConfig()
+	cfg := stoamcp.LoadStoreConfig()
 	if cfg.APIKey == "" {
-		log.Println("WARNING: STOA_MCP_API_KEY is not set — all tool calls will fail with 401")
+		log.Println("INFO: no API key configured — running in guest mode (browse products, guest cart & checkout)")
 	}
-	client := stoamcp.NewStoaClient(cfg)
+	client := stoamcp.NewStoaStoreClient(cfg)
 
 	s := server.NewMCPServer(
 		"stoa-store",
@@ -60,7 +60,13 @@ Typical workflow:
 5. Check shipping/payment options
 6. Complete with store_checkout
 
-Prices are in cents (e.g. 1999 = 19.99 EUR). Tax rates are in basis points (1900 = 19%).`),
+Prices are in cents (e.g. 1999 = 19.99 EUR). Tax rates are in basis points (1900 = 19%).
+
+When working with tool results, write down any important information you might need later in your response, as the original tool result may be cleared later.
+
+Authentication modes:
+- Store API key (sk_*): authenticated as a specific customer — cart ownership, order history, and account access work automatically.
+- Guest mode (no API key): browse products, create guest carts, and complete guest checkouts. No account or order history access.`),
 	)
 
 	store.RegisterTools(s, client)

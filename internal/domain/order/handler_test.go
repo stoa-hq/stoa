@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/internal/domain/warehouse"
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
@@ -563,5 +564,168 @@ func TestStoreCheckout_AuthenticatedUser_NoCookie(t *testing.T) {
 		if createdOrder.GuestToken != "" {
 			t.Error("authenticated orders must not have a guest token")
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// customerIDFromContext / optionalCustomerID — auth.UserID integration
+// ---------------------------------------------------------------------------
+
+func TestHandler_customerIDFromContext_WithValidID(t *testing.T) {
+	h := newTestHandler(&mockOrderRepo{}, nil, nil)
+	expectedID := uuid.New()
+
+	ctx := auth.WithUserID(t.Context(), expectedID)
+	r := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	id, ok := h.customerIDFromContext(w, r)
+	if !ok {
+		t.Fatal("expected ok=true, got false")
+	}
+	if id != expectedID {
+		t.Fatalf("expected %s, got %s", expectedID, id)
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+}
+
+func TestHandler_customerIDFromContext_WithoutID(t *testing.T) {
+	h := newTestHandler(&mockOrderRepo{}, nil, nil)
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+
+	id, ok := h.customerIDFromContext(w, r)
+	if ok {
+		t.Fatal("expected ok=false, got true")
+	}
+	if id != uuid.Nil {
+		t.Fatalf("expected uuid.Nil, got %s", id)
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", w.Code)
+	}
+}
+
+func TestHandler_optionalCustomerID_WithValidID(t *testing.T) {
+	h := newTestHandler(&mockOrderRepo{}, nil, nil)
+	expectedID := uuid.New()
+
+	ctx := auth.WithUserID(t.Context(), expectedID)
+	r := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+
+	result := h.optionalCustomerID(r)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if *result != expectedID {
+		t.Fatalf("expected %s, got %s", expectedID, *result)
+	}
+}
+
+func TestHandler_optionalCustomerID_WithoutID(t *testing.T) {
+	h := newTestHandler(&mockOrderRepo{}, nil, nil)
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	result := h.optionalCustomerID(r)
+	if result != nil {
+		t.Fatalf("expected nil, got %s", *result)
+	}
+}
+
+func TestStoreListOrders_ReturnsOrdersWithItems(t *testing.T) {
+	customerID := uuid.New()
+	orderID := uuid.New()
+	productID := uuid.New()
+
+	repo := &mockOrderRepo{
+		findByCustomerID: func(_ context.Context, id uuid.UUID) ([]Order, error) {
+			if id != customerID {
+				t.Errorf("unexpected customer ID: got %s, want %s", id, customerID)
+			}
+			return []Order{
+				{
+					ID:          orderID,
+					OrderNumber: "ORD-001",
+					CustomerID:  &customerID,
+					Status:      StatusPending,
+					Currency:    "EUR",
+					Total:       2380,
+					Items: []OrderItem{
+						{
+							ID:             uuid.New(),
+							OrderID:        orderID,
+							ProductID:      &productID,
+							Name:           "Test Product",
+							SKU:            "TST-001",
+							Quantity:       2,
+							UnitPriceNet:   1000,
+							UnitPriceGross: 1190,
+							TotalNet:       2000,
+							TotalGross:     2380,
+							TaxRate:        1900,
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	h := newTestHandler(repo, nil, nil)
+
+	router := chi.NewRouter()
+	router.Get("/account/orders", h.StoreListOrders)
+
+	req := httptest.NewRequest(http.MethodGet, "/account/orders", nil)
+	ctx := auth.WithUserID(req.Context(), customerID)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Data []struct {
+			ID    uuid.UUID `json:"id"`
+			Items []struct {
+				Name     string `json:"name"`
+				Quantity int    `json:"quantity"`
+				SKU      string `json:"sku"`
+			} `json:"items"`
+		} `json:"data"`
+		Meta struct {
+			Total int `json:"total"`
+		} `json:"meta"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+
+	if resp.Meta.Total != 1 {
+		t.Errorf("expected total=1, got %d", resp.Meta.Total)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 order, got %d", len(resp.Data))
+	}
+	if resp.Data[0].ID != orderID {
+		t.Errorf("expected order ID %s, got %s", orderID, resp.Data[0].ID)
+	}
+	if len(resp.Data[0].Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp.Data[0].Items))
+	}
+	item := resp.Data[0].Items[0]
+	if item.Name != "Test Product" {
+		t.Errorf("expected item name 'Test Product', got %q", item.Name)
+	}
+	if item.Quantity != 2 {
+		t.Errorf("expected item quantity 2, got %d", item.Quantity)
+	}
+	if item.SKU != "TST-001" {
+		t.Errorf("expected item SKU 'TST-001', got %q", item.SKU)
 	}
 }

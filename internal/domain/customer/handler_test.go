@@ -12,6 +12,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
 
+	"github.com/google/uuid"
+
+	"github.com/stoa-hq/stoa/internal/auth"
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
 
@@ -54,5 +57,47 @@ func TestHandler_AdminList_ErrorDoesNotLeakInternalDetails(t *testing.T) {
 	}
 	if strings.Contains(body, internalMsg) {
 		t.Errorf("response must NOT contain internal error detail %q, got: %s", internalMsg, body)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// customerIDFromContext — auth.UserID integration
+// ---------------------------------------------------------------------------
+
+func TestHandler_customerIDFromContext_WithValidID(t *testing.T) {
+	h := newTestCustomerHandler(&mockCustomerRepo{})
+	expectedID := uuid.New()
+
+	ctx := auth.WithUserID(t.Context(), expectedID)
+	r := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	id, ok := h.customerIDFromContext(w, r)
+	if !ok {
+		t.Fatal("expected ok=true, got false")
+	}
+	if id != expectedID {
+		t.Fatalf("expected %s, got %s", expectedID, id)
+	}
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+}
+
+func TestHandler_customerIDFromContext_WithoutID(t *testing.T) {
+	h := newTestCustomerHandler(&mockCustomerRepo{})
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+
+	id, ok := h.customerIDFromContext(w, r)
+	if ok {
+		t.Fatal("expected ok=false, got true")
+	}
+	if id != uuid.Nil {
+		t.Fatalf("expected uuid.Nil, got %s", id)
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", w.Code)
 	}
 }

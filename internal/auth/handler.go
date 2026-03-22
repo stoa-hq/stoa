@@ -435,6 +435,158 @@ func (h *Handler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// RegisterStoreAPIKeyRoutes mounts store API key management routes.
+// Requires an authenticated customer (JWT Bearer).
+func (h *Handler) RegisterStoreAPIKeyRoutes(r chi.Router) {
+	r.Post("/", h.handleCreateStoreAPIKey)
+	r.Get("/", h.handleListStoreAPIKeys)
+	r.Delete("/{id}", h.handleRevokeStoreAPIKey)
+}
+
+type CreateStoreAPIKeyRequest struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+}
+
+func (h *Handler) handleCreateStoreAPIKey(w http.ResponseWriter, r *http.Request) {
+	if UserType(r.Context()) != "customer" {
+		writeJSON(w, http.StatusForbidden, map[string]interface{}{
+			"errors": []map[string]string{{"code": "forbidden", "detail": "only customers can create store API keys"}},
+		})
+		return
+	}
+
+	var req CreateStoreAPIKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
+				"errors": []map[string]string{{"code": "body_too_large", "detail": "request body exceeds size limit"}},
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid request body"}},
+		})
+		return
+	}
+
+	if req.Name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "validation_error", "detail": "name is required"}},
+		})
+		return
+	}
+
+	customerID := UserID(r.Context())
+
+	perms := make([]Permission, len(req.Permissions))
+	for i, p := range req.Permissions {
+		perm := Permission(p)
+		if !IsStorePermission(perm) {
+			writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"errors": []map[string]string{{"code": "validation_error", "detail": "invalid store permission: " + p}},
+			})
+			return
+		}
+		perms[i] = perm
+	}
+
+	// Default to all store permissions if none specified.
+	if len(perms) == 0 {
+		perms = AllStorePermissions()
+	}
+
+	count, err := h.apiKeyManager.CountActiveByCustomer(r.Context(), customerID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("counting store API keys")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to create store API key"}},
+		})
+		return
+	}
+	if count >= maxStoreKeysPerCustomer {
+		writeJSON(w, http.StatusConflict, map[string]interface{}{
+			"errors": []map[string]string{{"code": "limit_exceeded", "detail": "maximum of 5 active store API keys reached"}},
+		})
+		return
+	}
+
+	rawKey, apiKey, err := h.apiKeyManager.CreateStoreKey(r.Context(), req.Name, perms, customerID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("creating store API key")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to create store API key"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"data": map[string]interface{}{
+			"id":          apiKey.ID,
+			"name":        apiKey.Name,
+			"key":         rawKey,
+			"permissions": apiKey.Permissions,
+			"customer_id": apiKey.CustomerID,
+			"created_at":  apiKey.CreatedAt,
+		},
+	})
+}
+
+func (h *Handler) handleListStoreAPIKeys(w http.ResponseWriter, r *http.Request) {
+	if UserType(r.Context()) != "customer" {
+		writeJSON(w, http.StatusForbidden, map[string]interface{}{
+			"errors": []map[string]string{{"code": "forbidden", "detail": "only customers can list store API keys"}},
+		})
+		return
+	}
+
+	customerID := UserID(r.Context())
+	keys, err := h.apiKeyManager.ListByCustomer(r.Context(), customerID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("listing store API keys")
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"errors": []map[string]string{{"code": "internal_error", "detail": "failed to list store API keys"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": keys,
+	})
+}
+
+func (h *Handler) handleRevokeStoreAPIKey(w http.ResponseWriter, r *http.Request) {
+	if UserType(r.Context()) != "customer" {
+		writeJSON(w, http.StatusForbidden, map[string]interface{}{
+			"errors": []map[string]string{{"code": "forbidden", "detail": "only customers can revoke store API keys"}},
+		})
+		return
+	}
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"errors": []map[string]string{{"code": "invalid_request", "detail": "invalid API key ID"}},
+		})
+		return
+	}
+
+	customerID := UserID(r.Context())
+	if err := h.apiKeyManager.RevokeByCustomer(r.Context(), id, customerID); err != nil {
+		h.logger.Error().Err(err).Msg("revoking store API key")
+		writeJSON(w, http.StatusNotFound, map[string]interface{}{
+			"errors": []map[string]string{{"code": "not_found", "detail": "store API key not found"}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": map[string]string{"message": "store API key revoked"},
+	})
+}
+
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// Blacklist the current access token so it cannot be reused.
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {

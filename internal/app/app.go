@@ -391,6 +391,11 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		r.Use(a.AuthMiddleware.OptionalAuth)
 		r.Use(audit.Middleware(auditSvc, log))
 
+		r.Route("/api-keys", func(r chi.Router) {
+			r.Use(a.AuthMiddleware.Authenticate)
+			authH.RegisterStoreAPIKeyRoutes(r)
+		})
+
 		productH.RegisterStoreRoutes(r)
 		r.Route("/categories", categoryH.RegisterStoreRoutes)
 		// Customer: /register with dedicated rate limit, /account without

@@ -77,6 +77,7 @@
 						</button>
 						<div class="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
 							<a href="/account/orders" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{$t('header.myOrders')}</a>
+							<a href="/account/api-keys" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{$t('header.apiKeys')}</a>
 							<button onclick={handleLogout} class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{$t('header.logout')}</button>
 						</div>
 					</div>
