@@ -16,14 +16,16 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockRepo struct {
-	findByID       func(ctx context.Context, id uuid.UUID) (*Product, error)
-	findBySKU      func(ctx context.Context, sku string) (*Product, error)
-	findAll        func(ctx context.Context, f ProductFilter) ([]Product, int, error)
-	findBySlug     func(ctx context.Context, slug, locale string) (*Product, error)
-	create         func(ctx context.Context, p *Product) error
-	update         func(ctx context.Context, p *Product) error
-	delete         func(ctx context.Context, id uuid.UUID) error
-	stockAvailable func(ctx context.Context, productID uuid.UUID, variantID *uuid.UUID, qty int) (bool, error)
+	findByID            func(ctx context.Context, id uuid.UUID) (*Product, error)
+	findBySKU           func(ctx context.Context, sku string) (*Product, error)
+	findAll             func(ctx context.Context, f ProductFilter) ([]Product, int, error)
+	findBySlug          func(ctx context.Context, slug, locale string) (*Product, error)
+	create              func(ctx context.Context, p *Product) error
+	update              func(ctx context.Context, p *Product) error
+	delete              func(ctx context.Context, id uuid.UUID) error
+	stockAvailable      func(ctx context.Context, productID uuid.UUID, variantID *uuid.UUID, qty int) (bool, error)
+	createPropGroup func(g *PropertyGroup) error
+	updatePropGroup func(g *PropertyGroup) error
 }
 
 func (m *mockRepo) FindByID(ctx context.Context, id uuid.UUID) (*Product, error) {
@@ -88,9 +90,22 @@ func (m *mockRepo) FindAllPropertyGroups(_ context.Context) ([]PropertyGroup, er
 func (m *mockRepo) FindPropertyGroupByID(_ context.Context, _ uuid.UUID) (*PropertyGroup, error) {
 	return nil, ErrNotFound
 }
-func (m *mockRepo) CreatePropertyGroup(_ context.Context, _ *PropertyGroup) error { return nil }
-func (m *mockRepo) UpdatePropertyGroup(_ context.Context, _ *PropertyGroup) error { return nil }
-func (m *mockRepo) DeletePropertyGroup(_ context.Context, _ uuid.UUID) error      { return nil }
+func (m *mockRepo) FindPropertyGroupByIdentifier(_ context.Context, _ string) (*PropertyGroup, error) {
+	return nil, ErrNotFound
+}
+func (m *mockRepo) CreatePropertyGroup(_ context.Context, g *PropertyGroup) error {
+	if m.createPropGroup != nil {
+		return m.createPropGroup(g)
+	}
+	return nil
+}
+func (m *mockRepo) UpdatePropertyGroup(_ context.Context, g *PropertyGroup) error {
+	if m.updatePropGroup != nil {
+		return m.updatePropGroup(g)
+	}
+	return nil
+}
+func (m *mockRepo) DeletePropertyGroup(_ context.Context, _ uuid.UUID) error { return nil }
 
 // PropertyOption stubs
 func (m *mockRepo) FindOptionsByGroupID(_ context.Context, _ uuid.UUID) ([]PropertyOption, error) {

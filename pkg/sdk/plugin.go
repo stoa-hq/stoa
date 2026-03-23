@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,6 +10,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 )
+
+// CheckoutFn performs a full store checkout programmatically.
+// Plugins use this to trigger order creation with all server-side
+// enforcement (price validation, tax, stock deduction, hooks).
+// customerID may be nil for guest checkouts.
+// req is a JSON-encoded CheckoutRequest, result is a JSON-encoded order response.
+type CheckoutFn func(ctx context.Context, customerID *uuid.UUID, req json.RawMessage) (json.RawMessage, error)
 
 // Plugin is the interface that all plugins must implement.
 type Plugin interface {
@@ -21,13 +29,15 @@ type Plugin interface {
 
 // AppContext provides plugins access to application resources.
 type AppContext struct {
-	DB          *pgxpool.Pool
-	Router      chi.Router
-	AssetRouter chi.Router // mounted under /plugins/{name}/assets/
-	Hooks       *HookRegistry
-	Config      map[string]interface{}
-	Logger      zerolog.Logger
-	Auth        *AuthHelper
+	DB           *pgxpool.Pool
+	Router       chi.Router
+	AssetRouter  chi.Router // mounted under /plugins/{name}/assets/
+	Hooks        *HookRegistry
+	Config       map[string]interface{}
+	Logger       zerolog.Logger
+	Auth         *AuthHelper
+	CheckoutFn   CheckoutFn
+	SecureCookie bool // true when running behind HTTPS; use for cookie Secure flag
 }
 
 // AuthHelper gives plugins access to authentication middleware and context

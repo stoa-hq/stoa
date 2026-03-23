@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/stoa-hq/stoa/pkg/sdk"
 )
+
+var identifierRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 // TaxRateFn looks up the integer basis-point tax rate for a given tax rule ID.
 // Returns an error if the rule is not found or unavailable.
@@ -369,9 +372,26 @@ func (s *Service) GetPropertyGroupByID(ctx context.Context, id uuid.UUID) (*Prop
 	return g, nil
 }
 
+// ErrInvalidIdentifier is returned when an identifier does not match the expected format.
+var ErrInvalidIdentifier = errors.New("product: invalid identifier format")
+
+// validateIdentifier checks that the identifier matches the allowed pattern.
+func validateIdentifier(id string) error {
+	if !identifierRe.MatchString(id) {
+		return ErrInvalidIdentifier
+	}
+	return nil
+}
+
 // CreatePropertyGroup creates a new property group.
 func (s *Service) CreatePropertyGroup(ctx context.Context, g *PropertyGroup) error {
+	if err := validateIdentifier(g.Identifier); err != nil {
+		return err
+	}
 	if err := s.repo.CreatePropertyGroup(ctx, g); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return ErrDuplicateIdentifier
+		}
 		return fmt.Errorf("service CreatePropertyGroup: %w", err)
 	}
 	return nil
@@ -379,10 +399,25 @@ func (s *Service) CreatePropertyGroup(ctx context.Context, g *PropertyGroup) err
 
 // UpdatePropertyGroup updates an existing property group.
 func (s *Service) UpdatePropertyGroup(ctx context.Context, g *PropertyGroup) error {
+	if err := validateIdentifier(g.Identifier); err != nil {
+		return err
+	}
 	if err := s.repo.UpdatePropertyGroup(ctx, g); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return ErrDuplicateIdentifier
+		}
 		return fmt.Errorf("service UpdatePropertyGroup: %w", err)
 	}
 	return nil
+}
+
+// GetPropertyGroupByIdentifier returns a single property group by its identifier.
+func (s *Service) GetPropertyGroupByIdentifier(ctx context.Context, identifier string) (*PropertyGroup, error) {
+	g, err := s.repo.FindPropertyGroupByIdentifier(ctx, identifier)
+	if err != nil {
+		return nil, fmt.Errorf("service GetPropertyGroupByIdentifier: %w", err)
+	}
+	return g, nil
 }
 
 // DeletePropertyGroup removes a property group (and cascades to options).

@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,6 +56,7 @@ type App struct {
 	TokenBlacklist  *auth.TokenBlacklist
 	PluginRegistry  *plugin.Registry
 	Logger          zerolog.Logger
+	checkoutFn      sdk.CheckoutFn
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -86,6 +89,16 @@ func New(cfg *config.Config) (*App, error) {
 
 	srv := server.New(cfg, db, logger)
 
+	// Late-binding checkout: plugins receive this closure during Init(),
+	// but the real implementation is set after setupDomains creates the order handler.
+	var checkoutImpl sdk.CheckoutFn
+	checkoutFn := sdk.CheckoutFn(func(ctx context.Context, customerID *uuid.UUID, req json.RawMessage) (json.RawMessage, error) {
+		if checkoutImpl == nil {
+			return nil, errors.New("checkout service not initialized")
+		}
+		return checkoutImpl(ctx, customerID, req)
+	})
+
 	// Auto-register plugins that called sdk.Register() in their init().
 	for _, p := range sdk.RegisteredPlugins() {
 		// Create a per-plugin asset router at /plugins/{name}/assets/*
@@ -95,11 +108,13 @@ func New(cfg *config.Config) (*App, error) {
 		srv.Router().Handle(assetPrefix+"/*", http.StripPrefix(assetPrefix, assetRouter))
 
 		pluginAppCtx := &plugin.AppContext{
-			DB:          db.Pool,
-			Router:      srv.Router(),
-			AssetRouter: assetRouter,
-			Config:      cfg.Plugins,
-			Logger:      logger,
+			DB:           db.Pool,
+			Router:       srv.Router(),
+			AssetRouter:  assetRouter,
+			Config:       cfg.Plugins,
+			Logger:       logger,
+			CheckoutFn:   checkoutFn,
+			SecureCookie: cfg.Security.CSRF.Secure,
 			Auth: &sdk.AuthHelper{
 				OptionalAuth: authMiddleware.OptionalAuth,
 				Required:     authMiddleware.Authenticate,
@@ -136,6 +151,9 @@ func New(cfg *config.Config) (*App, error) {
 	if err := a.setupDomains(cfg); err != nil {
 		return nil, fmt.Errorf("setting up domains: %w", err)
 	}
+
+	// Bind the real checkout implementation now that setupDomains has created the order handler.
+	checkoutImpl = a.checkoutFn
 
 	if err := a.migratePaymentEncryption(cfg); err != nil {
 		return nil, fmt.Errorf("migrating payment encryption: %w", err)
@@ -311,6 +329,7 @@ func (a *App) setupDomains(cfg *config.Config) error {
 		return hasActive, m.Active, m.Provider, nil
 	})
 	orderH    := order.NewHandler(orderSvc, shippingCostFn, checkoutTaxRateFn, productPriceFn, paymentMethodCheckFn, validate, log, cfg.Security.CSRF.Secure)
+	a.checkoutFn = orderH.ProgrammaticCheckout
 	cartH     := cart.NewHandler(cartSvc, log)
 	taxH      := tax.NewHandler(taxSvc, log)
 	shippingH := shipping.NewHandler(shippingSvc, log)

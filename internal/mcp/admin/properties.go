@@ -41,6 +41,7 @@ func adminGetPropertyGroup(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHan
 func adminCreatePropertyGroup(client *stoamcp.StoaClient) (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("admin_create_property_group",
 		mcp.WithDescription("Create a new property group (e.g. Color, Size)"),
+		mcp.WithString("identifier", mcp.Description("Unique identifier slug (lowercase, hyphens, underscores, e.g. 'color' or 'shoe-size')"), mcp.Required()),
 		mcp.WithString("name", mcp.Description("Property group name"), mcp.Required()),
 		mcp.WithNumber("position", mcp.Description("Sort position")),
 		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale, e.g. {\"de-DE\": {\"name\": \"Farbe\"}}")),
@@ -59,6 +60,7 @@ func adminUpdatePropertyGroup(client *stoamcp.StoaClient) (mcp.Tool, server.Tool
 	tool := mcp.NewTool("admin_update_property_group",
 		mcp.WithDescription("Update a property group"),
 		mcp.WithString("id", mcp.Description("Property group UUID"), mcp.Required()),
+		mcp.WithString("identifier", mcp.Description("Unique identifier slug")),
 		mcp.WithString("name", mcp.Description("Property group name")),
 		mcp.WithNumber("position", mcp.Description("Sort position")),
 		mcp.WithObject("translations", mcp.Description("Translation object keyed by locale")),

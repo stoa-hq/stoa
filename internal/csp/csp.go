@@ -26,7 +26,11 @@ func Apply(cspTemplate, nonce string) string {
 	return strings.ReplaceAll(cspTemplate, noncePlaceholder, nonce)
 }
 
-// InjectNonce adds a nonce attribute to every <script tag in the HTML.
+// InjectNonce adds a nonce attribute to every <script> and <style> tag in the HTML.
 func InjectNonce(html []byte, nonce string) []byte {
-	return []byte(strings.ReplaceAll(string(html), "<script", `<script nonce="`+nonce+`"`))
+	s := string(html)
+	attr := ` nonce="` + nonce + `"`
+	s = strings.ReplaceAll(s, "<script", "<script"+attr)
+	s = strings.ReplaceAll(s, "<style", "<style"+attr)
+	return []byte(s)
 }

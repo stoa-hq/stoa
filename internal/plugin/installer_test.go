@@ -182,6 +182,43 @@ func TestResolvePackageLocalPath(t *testing.T) {
 	}
 }
 
+func TestParseRequires(t *testing.T) {
+	tmp := t.TempDir()
+	gomod := `module github.com/example/test
+
+go 1.21
+
+require (
+	github.com/foo/bar v1.2.3
+	github.com/baz/qux v0.4.0 // indirect
+)
+
+require github.com/single/dep v2.0.0
+`
+	path := filepath.Join(tmp, "go.mod")
+	if err := os.WriteFile(path, []byte(gomod), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := parseRequires(path)
+	if err != nil {
+		t.Fatalf("parseRequires: %v", err)
+	}
+
+	want := []string{
+		"github.com/foo/bar@v1.2.3",
+		"github.com/baz/qux@v0.4.0",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d requires, want %d: %v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("requires[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStr(s, sub))
 }

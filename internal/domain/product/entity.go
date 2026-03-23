@@ -73,6 +73,7 @@ type ProductVariant struct {
 // PropertyGroup groups related property options together (e.g. "Size", "Color").
 type PropertyGroup struct {
 	ID           uuid.UUID                  `json:"id"`
+	Identifier   string                     `json:"identifier"`
 	Position     int                        `json:"position"`
 	CreatedAt    time.Time                  `json:"created_at"`
 	UpdatedAt    time.Time                  `json:"updated_at"`

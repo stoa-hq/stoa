@@ -357,7 +357,10 @@
     "optionAdded": "Ausprägung hinzugefügt.",
     "optionSaved": "Ausprägung gespeichert.",
     "optionDeleted": "Ausprägung gelöscht.",
-    "optionCreateFailed": "Ausprägung konnte nicht erstellt werden."
+    "optionCreateFailed": "Ausprägung konnte nicht erstellt werden.",
+    "identifier": "Kennung",
+    "identifierHint": "Eindeutige Kennung (Kleinbuchstaben, Bindestriche, Unterstriche)",
+    "duplicateIdentifier": "Diese Kennung wird bereits verwendet."
   },
   "media": {
     "title": "Medien",

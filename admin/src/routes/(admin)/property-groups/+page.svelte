@@ -62,6 +62,7 @@
         <thead>
           <tr>
             <th class="table-header">{$t('common.name')}</th>
+            <th class="table-header">{$t('propertyGroups.identifier')}</th>
             <th class="table-header">{$t('common.position')}</th>
             <th class="table-header">{$t('propertyGroups.optionCount')}</th>
             <th class="table-header"></th>
@@ -71,6 +72,9 @@
           {#each filtered as g}
             <tr class="table-row">
               <td class="table-cell font-medium text-[var(--text)]">{groupName(g)}</td>
+              <td class="table-cell">
+                <span class="font-mono text-xs bg-[var(--card-border)] text-[var(--text-muted)] px-1.5 py-0.5 rounded">{g.identifier}</span>
+              </td>
               <td class="table-cell text-[var(--text-muted)] tabular-nums">{g.position}</td>
               <td class="table-cell text-[var(--text-muted)] tabular-nums">{g.options?.length ?? 0}</td>
               <td class="table-cell text-right">
@@ -80,7 +84,7 @@
           {/each}
           {#if filtered.length === 0}
             <tr>
-              <td colspan="4" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('propertyGroups.noGroups')}</td>
+              <td colspan="5" class="table-cell text-center text-[var(--text-muted)] py-6">{$t('propertyGroups.noGroups')}</td>
             </tr>
           {/if}
         </tbody>

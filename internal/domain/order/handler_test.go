@@ -729,3 +729,136 @@ func TestStoreListOrders_ReturnsOrdersWithItems(t *testing.T) {
 		t.Errorf("expected item SKU 'TST-001', got %q", item.SKU)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ProgrammaticCheckout
+// ---------------------------------------------------------------------------
+
+func TestProgrammaticCheckout_Success_IncludesGuestToken(t *testing.T) {
+	repo := &mockOrderRepo{}
+	h := newTestHandler(repo, nil, nil)
+
+	pid := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items:           []CheckoutItemRequest{{ProductID: &pid, Quantity: 1}},
+	}
+	body, _ := json.Marshal(req)
+
+	out, err := h.ProgrammaticCheckout(t.Context(), nil, body)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// The response must contain guest_token (unlike StoreCheckout which strips it).
+	var resp struct {
+		Data struct {
+			GuestToken string `json:"guest_token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if resp.Data.GuestToken == "" {
+		t.Error("expected guest_token to be present in ProgrammaticCheckout response")
+	}
+	if len(resp.Data.GuestToken) != 64 {
+		t.Errorf("expected 64-char hex guest token, got %d chars", len(resp.Data.GuestToken))
+	}
+}
+
+func TestProgrammaticCheckout_WithCustomerID_NoGuestToken(t *testing.T) {
+	repo := &mockOrderRepo{}
+	h := newTestHandler(repo, nil, nil)
+
+	pid := uuid.New()
+	customerID := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items:           []CheckoutItemRequest{{ProductID: &pid, Quantity: 1}},
+	}
+	body, _ := json.Marshal(req)
+
+	out, err := h.ProgrammaticCheckout(t.Context(), &customerID, body)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	var resp struct {
+		Data struct {
+			GuestToken string    `json:"guest_token"`
+			CustomerID uuid.UUID `json:"customer_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if resp.Data.GuestToken != "" {
+		t.Errorf("expected no guest_token for authenticated checkout, got %q", resp.Data.GuestToken)
+	}
+	if resp.Data.CustomerID != customerID {
+		t.Errorf("expected customer_id %s, got %s", customerID, resp.Data.CustomerID)
+	}
+}
+
+func TestProgrammaticCheckout_InvalidBody_ReturnsError(t *testing.T) {
+	repo := &mockOrderRepo{}
+	h := newTestHandler(repo, nil, nil)
+
+	_, err := h.ProgrammaticCheckout(t.Context(), nil, json.RawMessage(`{not valid json`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid checkout request") {
+		t.Errorf("expected 'invalid checkout request' in error, got %q", err.Error())
+	}
+}
+
+func TestProgrammaticCheckout_ValidationError_ReturnsError(t *testing.T) {
+	repo := &mockOrderRepo{}
+	h := newTestHandler(repo, nil, nil)
+
+	// Missing required fields (currency, billing_address, shipping_address, items).
+	_, err := h.ProgrammaticCheckout(t.Context(), nil, json.RawMessage(`{}`))
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	if !strings.Contains(err.Error(), "validation") {
+		t.Errorf("expected 'validation' in error, got %q", err.Error())
+	}
+}
+
+func TestProgrammaticCheckout_InvalidPaymentMethod_ReturnsCheckoutValidationError(t *testing.T) {
+	repo := &mockOrderRepo{}
+	checkFn := PaymentMethodCheckFn(func(_ context.Context, _ *uuid.UUID) (bool, bool, string, error) {
+		return true, false, "", nil // active methods exist but none selected
+	})
+	hooks := sdk.NewHookRegistry()
+	svc := NewService(repo, nil, hooks, zerolog.Nop())
+	h := NewHandler(svc, nil, nil, defaultProductPriceFn(), checkFn, validator.New(), zerolog.Nop(), false)
+
+	pid := uuid.New()
+	req := CheckoutRequest{
+		Currency:        "EUR",
+		BillingAddress:  map[string]interface{}{"city": "Berlin"},
+		ShippingAddress: map[string]interface{}{"city": "Berlin"},
+		Items:           []CheckoutItemRequest{{ProductID: &pid, Quantity: 1}},
+	}
+	body, _ := json.Marshal(req)
+
+	_, err := h.ProgrammaticCheckout(t.Context(), nil, body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var ve *checkoutValidationError
+	if !errors.As(err, &ve) {
+		t.Errorf("expected *checkoutValidationError, got %T: %v", err, err)
+	}
+	if ve != nil && ve.code != "payment_method_required" {
+		t.Errorf("expected code 'payment_method_required', got %q", ve.code)
+	}
+}

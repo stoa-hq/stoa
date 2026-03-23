@@ -97,6 +97,8 @@ func (i *Installer) ensurePluginsModFile() error {
 		if err := os.WriteFile(dstMod, src, 0644); err != nil {
 			return fmt.Errorf("writing %s: %w", pluginsModFile, err)
 		}
+	} else if err := i.syncPluginsModFile(); err != nil {
+		return err
 	}
 
 	pluginsSumFile := strings.TrimSuffix(pluginsModFile, ".mod") + ".sum"
@@ -112,6 +114,54 @@ func (i *Installer) ensurePluginsModFile() error {
 	}
 
 	return nil
+}
+
+// syncPluginsModFile updates go.plugins.mod so that all shared dependency
+// versions match go.mod. Plugin-specific entries (replace directives, extra
+// requires) are preserved. This prevents version drift when go.mod is updated
+// independently of go.plugins.mod.
+func (i *Installer) syncPluginsModFile() error {
+	requires, err := parseRequires(filepath.Join(i.moduleRoot, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("parsing go.mod requires: %w", err)
+	}
+	modfile := "-modfile=" + pluginsModFile
+	for _, req := range requires {
+		if err := i.run("go", "mod", "edit", modfile, "-require="+req); err != nil {
+			return fmt.Errorf("syncing require %s: %w", req, err)
+		}
+	}
+	return nil
+}
+
+// parseRequires extracts "module@version" pairs from a go.mod file.
+func parseRequires(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var requires []string
+	inRequire := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "require (" {
+			inRequire = true
+			continue
+		}
+		if line == ")" {
+			inRequire = false
+			continue
+		}
+		if !inRequire {
+			continue
+		}
+		// Lines look like: github.com/foo/bar v1.2.3 // indirect
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			requires = append(requires, parts[0]+"@"+parts[1])
+		}
+	}
+	return requires, nil
 }
 
 // Install fetches the plugin package, adds it to the generated imports file,

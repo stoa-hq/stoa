@@ -357,7 +357,10 @@
     "optionAdded": "Option added.",
     "optionSaved": "Option saved.",
     "optionDeleted": "Option deleted.",
-    "optionCreateFailed": "Option could not be created."
+    "optionCreateFailed": "Option could not be created.",
+    "identifier": "Identifier",
+    "identifierHint": "Unique identifier (lowercase, hyphens, underscores)",
+    "duplicateIdentifier": "This identifier is already in use."
   },
   "media": {
     "title": "Media",

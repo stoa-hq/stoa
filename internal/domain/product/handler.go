@@ -437,7 +437,7 @@ func (h *Handler) adminCreatePropertyGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	g := &PropertyGroup{Position: req.Position}
+	g := &PropertyGroup{Identifier: req.Identifier, Position: req.Position}
 	for _, t := range req.Translations {
 		g.Translations = append(g.Translations, PropertyGroupTranslation{
 			Locale: t.Locale,
@@ -446,6 +446,14 @@ func (h *Handler) adminCreatePropertyGroup(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := h.service.CreatePropertyGroup(r.Context(), g); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			h.writeError(w, http.StatusConflict, "duplicate_identifier", "a property group with this identifier already exists", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidIdentifier) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_identifier", "identifier must match pattern: lowercase alphanumeric, hyphens, underscores", "identifier")
+			return
+		}
 		h.serverError(w, r, err)
 		return
 	}
@@ -467,7 +475,7 @@ func (h *Handler) adminUpdatePropertyGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	g := &PropertyGroup{ID: id, Position: req.Position}
+	g := &PropertyGroup{ID: id, Identifier: req.Identifier, Position: req.Position}
 	for _, t := range req.Translations {
 		g.Translations = append(g.Translations, PropertyGroupTranslation{
 			GroupID: id,
@@ -479,6 +487,14 @@ func (h *Handler) adminUpdatePropertyGroup(w http.ResponseWriter, r *http.Reques
 	if err := h.service.UpdatePropertyGroup(r.Context(), g); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			h.notFound(w, "property group not found")
+			return
+		}
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			h.writeError(w, http.StatusConflict, "duplicate_identifier", "a property group with this identifier already exists", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidIdentifier) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_identifier", "identifier must match pattern: lowercase alphanumeric, hyphens, underscores", "identifier")
 			return
 		}
 		h.serverError(w, r, err)

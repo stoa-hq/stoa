@@ -45,6 +45,7 @@ type ProductRepository interface {
 	// Property Groups
 	FindAllPropertyGroups(ctx context.Context) ([]PropertyGroup, error)
 	FindPropertyGroupByID(ctx context.Context, id uuid.UUID) (*PropertyGroup, error)
+	FindPropertyGroupByIdentifier(ctx context.Context, identifier string) (*PropertyGroup, error)
 	CreatePropertyGroup(ctx context.Context, g *PropertyGroup) error
 	UpdatePropertyGroup(ctx context.Context, g *PropertyGroup) error
 	DeletePropertyGroup(ctx context.Context, id uuid.UUID) error

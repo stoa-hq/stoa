@@ -100,7 +100,7 @@ func newCSRFToken() string {
 	return hex.EncodeToString(b)
 }
 
-// isPluginWebhookPath returns true for paths matching /plugins/{name}/webhooks/*.
+// isPluginWebhookPath returns true for paths matching /plugins/{name}/webhook* (singular or plural).
 // Only webhook endpoints are exempt from CSRF because they authenticate via
 // provider-specific signatures (e.g. Stripe HMAC).
 func isPluginWebhookPath(path string) bool {
@@ -112,7 +112,7 @@ func isPluginWebhookPath(path string) bool {
 	if len(parts) < 2 {
 		return false
 	}
-	return strings.HasPrefix(parts[1], "webhooks")
+	return strings.HasPrefix(parts[1], "webhook")
 }
 
 func requiresCSRFCheck(method string) bool {

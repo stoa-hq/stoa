@@ -1035,7 +1035,7 @@ func (r *postgresRepository) DeleteVariant(ctx context.Context, id uuid.UUID) er
 // --------------------------------------------------------------------------
 
 func (r *postgresRepository) FindAllPropertyGroups(ctx context.Context) ([]PropertyGroup, error) {
-	const query = `SELECT id, position, created_at, updated_at FROM property_groups ORDER BY position`
+	const query = `SELECT id, identifier, position, created_at, updated_at FROM property_groups ORDER BY position`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -1046,7 +1046,7 @@ func (r *postgresRepository) FindAllPropertyGroups(ctx context.Context) ([]Prope
 	var groups []PropertyGroup
 	for rows.Next() {
 		var g PropertyGroup
-		if err := rows.Scan(&g.ID, &g.Position, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Identifier, &g.Position, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("FindAllPropertyGroups scan: %w", err)
 		}
 		groups = append(groups, g)
@@ -1075,14 +1075,44 @@ func (r *postgresRepository) FindAllPropertyGroups(ctx context.Context) ([]Prope
 // --------------------------------------------------------------------------
 
 func (r *postgresRepository) FindPropertyGroupByID(ctx context.Context, id uuid.UUID) (*PropertyGroup, error) {
-	const query = `SELECT id, position, created_at, updated_at FROM property_groups WHERE id = $1`
+	const query = `SELECT id, identifier, position, created_at, updated_at FROM property_groups WHERE id = $1`
 
 	g := &PropertyGroup{}
-	if err := r.db.QueryRow(ctx, query, id).Scan(&g.ID, &g.Position, &g.CreatedAt, &g.UpdatedAt); err != nil {
+	if err := r.db.QueryRow(ctx, query, id).Scan(&g.ID, &g.Identifier, &g.Position, &g.CreatedAt, &g.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("FindPropertyGroupByID: %w", err)
+	}
+
+	translations, err := r.loadGroupTranslations(ctx, g.ID)
+	if err != nil {
+		return nil, err
+	}
+	g.Translations = translations
+
+	opts, err := r.FindOptionsByGroupID(ctx, g.ID)
+	if err != nil {
+		return nil, err
+	}
+	g.Options = opts
+
+	return g, nil
+}
+
+// --------------------------------------------------------------------------
+// FindPropertyGroupByIdentifier
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindPropertyGroupByIdentifier(ctx context.Context, identifier string) (*PropertyGroup, error) {
+	const query = `SELECT id, identifier, position, created_at, updated_at FROM property_groups WHERE identifier = $1`
+
+	g := &PropertyGroup{}
+	if err := r.db.QueryRow(ctx, query, identifier).Scan(&g.ID, &g.Identifier, &g.Position, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("FindPropertyGroupByIdentifier: %w", err)
 	}
 
 	translations, err := r.loadGroupTranslations(ctx, g.ID)
@@ -1119,9 +1149,12 @@ func (r *postgresRepository) CreatePropertyGroup(ctx context.Context, g *Propert
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO property_groups (id, position, created_at, updated_at) VALUES ($1, $2, $3, $4)`,
-		g.ID, g.Position, g.CreatedAt, g.UpdatedAt,
+		`INSERT INTO property_groups (id, identifier, position, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`,
+		g.ID, g.Identifier, g.Position, g.CreatedAt, g.UpdatedAt,
 	); err != nil {
+		if strings.Contains(err.Error(), "property_groups_identifier_key") {
+			return ErrDuplicateIdentifier
+		}
 		return fmt.Errorf("CreatePropertyGroup insert: %w", err)
 	}
 
@@ -1154,10 +1187,13 @@ func (r *postgresRepository) UpdatePropertyGroup(ctx context.Context, g *Propert
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	tag, err := tx.Exec(ctx,
-		`UPDATE property_groups SET position = $2, updated_at = $3 WHERE id = $1`,
-		g.ID, g.Position, g.UpdatedAt,
+		`UPDATE property_groups SET identifier = $2, position = $3, updated_at = $4 WHERE id = $1`,
+		g.ID, g.Identifier, g.Position, g.UpdatedAt,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "property_groups_identifier_key") {
+			return ErrDuplicateIdentifier
+		}
 		return fmt.Errorf("UpdatePropertyGroup exec: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
@@ -1342,14 +1378,14 @@ func (r *postgresRepository) DeletePropertyOption(ctx context.Context, id uuid.U
 // creates one if it does not exist yet. Used during CSV/bulk import.
 func (r *postgresRepository) FindOrCreatePropertyGroup(ctx context.Context, locale, name string) (*PropertyGroup, error) {
 	const findQuery = `
-		SELECT pg.id, pg.position, pg.created_at, pg.updated_at
+		SELECT pg.id, pg.identifier, pg.position, pg.created_at, pg.updated_at
 		FROM property_groups pg
 		JOIN property_group_translations pgt ON pgt.property_group_id = pg.id
 		WHERE pgt.locale = $1 AND pgt.name = $2
 		LIMIT 1`
 
 	g := &PropertyGroup{}
-	err := r.db.QueryRow(ctx, findQuery, locale, name).Scan(&g.ID, &g.Position, &g.CreatedAt, &g.UpdatedAt)
+	err := r.db.QueryRow(ctx, findQuery, locale, name).Scan(&g.ID, &g.Identifier, &g.Position, &g.CreatedAt, &g.UpdatedAt)
 	if err == nil {
 		g.Translations = []PropertyGroupTranslation{{GroupID: g.ID, Locale: locale, Name: name}}
 		return g, nil
@@ -1358,8 +1394,9 @@ func (r *postgresRepository) FindOrCreatePropertyGroup(ctx context.Context, loca
 		return nil, fmt.Errorf("FindOrCreatePropertyGroup find: %w", err)
 	}
 
-	// Not found – create a new group.
+	// Not found – create a new group with auto-generated identifier.
 	g = &PropertyGroup{
+		Identifier:   slugify(name),
 		Translations: []PropertyGroupTranslation{{Locale: locale, Name: name}},
 	}
 	if err := r.CreatePropertyGroup(ctx, g); err != nil {
@@ -1568,5 +1605,32 @@ func (r *postgresRepository) StockAvailable(ctx context.Context, productID uuid.
 	return stock >= quantity, nil
 }
 
+// slugify converts a string to a lowercase slug suitable for use as an identifier.
+func slugify(s string) string {
+	// Replace common German umlauts.
+	r := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "Ä", "Ae", "Ö", "Oe", "Ü", "Ue", "ß", "ss")
+	s = r.Replace(s)
+	s = strings.ToLower(s)
+
+	// Replace non-alphanumeric characters with hyphens.
+	var b strings.Builder
+	prevDash := false
+	for _, ch := range s {
+		if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
+			b.WriteRune(ch)
+			prevDash = false
+		} else if !prevDash {
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+
+	// Trim leading/trailing hyphens.
+	return strings.Trim(b.String(), "-")
+}
+
 // ErrNotFound is returned when a requested product does not exist.
 var ErrNotFound = errors.New("product: not found")
+
+// ErrDuplicateIdentifier is returned when a property group identifier already exists.
+var ErrDuplicateIdentifier = errors.New("product: duplicate identifier")

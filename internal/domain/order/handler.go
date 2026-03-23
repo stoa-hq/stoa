@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -222,49 +223,70 @@ func (h *Handler) adminUpdateStatus(w http.ResponseWriter, r *http.Request) {
 // Store handlers
 // ---------------------------------------------------------------------------
 
-// storeCheckout handles POST /checkout
-func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
-	var req CheckoutRequest
-	if !h.decodeJSON(w, r, &req) {
-		return
-	}
-	if !h.validate(w, &req) {
-		return
-	}
+// checkoutValidationError is a structured error returned by checkoutCore for
+// validation failures. It carries the HTTP error code, human-readable detail,
+// and optional field name so the HTTP wrapper can produce the correct response.
+type checkoutValidationError struct {
+	code   string
+	detail string
+	field  string
+}
 
+func (e *checkoutValidationError) Error() string {
+	return e.code + ": " + e.detail
+}
+
+// newCheckoutValidationError constructs a checkoutValidationError.
+func newCheckoutValidationError(code, detail, field string) *checkoutValidationError {
+	return &checkoutValidationError{code: code, detail: detail, field: field}
+}
+
+// checkoutCore contains the shared checkout logic used by both StoreCheckout
+// and ProgrammaticCheckout. It validates the payment method, enforces
+// server-side prices, generates a guest token when customerID is nil, applies
+// shipping cost, looks up tax rates, fires the before/after checkout hooks and
+// calls service.Create. On success it returns the persisted Order.
+//
+// Returned errors:
+//   - *checkoutValidationError — a structured validation failure (payment method, product, etc.)
+//   - warehouse.ErrInsufficientStock — stock check failed; caller should map to HTTP 422
+//   - hookError (from before-checkout hook) — caller should use code "checkout_rejected"
+//   - any other error — internal / unexpected
+func (h *Handler) checkoutCore(ctx context.Context, req *CheckoutRequest, customerID *uuid.UUID) (*Order, error) {
 	// Validate payment method selection against active payment methods.
 	var provider string
 	if h.paymentMethodCheckFn != nil {
-		hasActive, methodValid, prov, err := h.paymentMethodCheckFn(r.Context(), req.PaymentMethodID)
+		hasActive, methodValid, prov, err := h.paymentMethodCheckFn(ctx, req.PaymentMethodID)
 		if err != nil {
-			h.serverError(w, r, err)
-			return
+			return nil, err
 		}
 		if hasActive && req.PaymentMethodID == nil {
-			h.writeError(w, http.StatusUnprocessableEntity, "payment_method_required",
-				"a payment method must be selected", "payment_method_id")
-			return
+			return nil, newCheckoutValidationError(
+				"payment_method_required",
+				"a payment method must be selected",
+				"payment_method_id",
+			)
 		}
 		if req.PaymentMethodID != nil && !methodValid {
-			h.writeError(w, http.StatusUnprocessableEntity, "invalid_payment_method",
-				"the selected payment method is not available", "payment_method_id")
-			return
+			return nil, newCheckoutValidationError(
+				"invalid_payment_method",
+				"the selected payment method is not available",
+				"payment_method_id",
+			)
 		}
 		provider = prov
 	}
 
 	// Provider-based payment methods require a payment reference (e.g. Stripe PaymentIntent ID).
 	if provider != "" && req.PaymentReference == "" {
-		h.writeError(w, http.StatusUnprocessableEntity, "payment_reference_required",
-			"payment_reference is required for provider-based payment methods", "payment_reference")
-		return
+		return nil, newCheckoutValidationError(
+			"payment_reference_required",
+			"payment_reference is required for provider-based payment methods",
+			"payment_reference",
+		)
 	}
 
-	// Attach the authenticated customer when present; guest checkout is
-	// supported, so a missing customer ID is not an error.
-	customerID := h.optionalCustomerID(r)
-
-	o := FromCheckoutRequest(&req, customerID)
+	o := FromCheckoutRequest(req, customerID)
 
 	// ── Server-side price enforcement ────────────────────────────────────
 	// Override client-supplied prices with authoritative values from the
@@ -272,15 +294,19 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 	if h.productPriceFn != nil {
 		for i := range o.Items {
 			if o.Items[i].ProductID == nil {
-				h.writeError(w, http.StatusUnprocessableEntity, "missing_product_id",
-					"product_id is required for every line item", "items")
-				return
+				return nil, newCheckoutValidationError(
+					"missing_product_id",
+					"product_id is required for every line item",
+					"items",
+				)
 			}
-			priceNet, priceGross, name, sku, err := h.productPriceFn(r.Context(), *o.Items[i].ProductID, o.Items[i].VariantID)
+			priceNet, priceGross, name, sku, err := h.productPriceFn(ctx, *o.Items[i].ProductID, o.Items[i].VariantID)
 			if err != nil {
-				h.writeError(w, http.StatusUnprocessableEntity, "invalid_product",
-					"product or variant not found", "items")
-				return
+				return nil, newCheckoutValidationError(
+					"invalid_product",
+					"product or variant not found",
+					"items",
+				)
 			}
 			o.Items[i].UnitPriceNet = priceNet
 			o.Items[i].UnitPriceGross = priceGross
@@ -303,15 +329,14 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 	if customerID == nil {
 		token, err := generateGuestToken()
 		if err != nil {
-			h.serverError(w, r, err)
-			return
+			return nil, err
 		}
 		o.GuestToken = token
 	}
 
 	// Look up the shipping method price and apply it to the order.
 	if req.ShippingMethodID != nil && h.shippingCostFn != nil {
-		if cost, err := h.shippingCostFn(r.Context(), *req.ShippingMethodID); err == nil {
+		if cost, err := h.shippingCostFn(ctx, *req.ShippingMethodID); err == nil {
 			o.ShippingCost = cost
 			o.Total = o.SubtotalGross + o.ShippingCost
 		}
@@ -322,7 +347,7 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 	if h.productTaxRateFn != nil {
 		for i := range o.Items {
 			if o.Items[i].ProductID != nil {
-				if rate, err := h.productTaxRateFn(r.Context(), *o.Items[i].ProductID); err == nil && rate > 0 {
+				if rate, err := h.productTaxRateFn(ctx, *o.Items[i].ProductID); err == nil && rate > 0 {
 					o.Items[i].TaxRate = rate
 					if o.Items[i].UnitPriceGross > 0 && o.Items[i].UnitPriceNet == 0 {
 						o.Items[i].UnitPriceNet = calcNetFromGross(o.Items[i].UnitPriceGross, rate)
@@ -344,27 +369,69 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 		"provider":          provider,
 		"payment_reference": req.PaymentReference,
 	}
-	if err := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookBeforeCheckout, o, hookMeta); err != nil {
-		h.writeError(w, http.StatusUnprocessableEntity, "checkout_rejected", err.Error(), "")
+	if err := h.service.DispatchHookWithMetadata(ctx, sdk.HookBeforeCheckout, o, hookMeta); err != nil {
+		return nil, &hookRejectionError{cause: err}
+	}
+
+	if err := h.service.Create(ctx, o); err != nil {
+		if errors.Is(err, warehouse.ErrInsufficientStock) {
+			// Dispatch non-fatal: plugins can cancel the payment.
+			if hookErr := h.service.DispatchHookWithMetadata(ctx, sdk.HookAfterCheckoutFailed, o, hookMeta); hookErr != nil {
+				h.logger.Warn().Err(hookErr).Str("order_id", o.ID.String()).Msg("after_checkout_failed hook returned error")
+			}
+			return nil, warehouse.ErrInsufficientStock
+		}
+		return nil, err
+	}
+
+	// Dispatch checkout after-hook — non-fatal, log errors.
+	if err := h.service.DispatchHookWithMetadata(ctx, sdk.HookAfterCheckout, o, hookMeta); err != nil {
+		h.logger.Warn().Err(err).Str("order_id", o.ID.String()).Msg("after_checkout hook returned error")
+	}
+
+	return o, nil
+}
+
+// hookRejectionError wraps an error returned by the before-checkout hook so
+// the HTTP wrapper can distinguish it from internal errors and produce the
+// correct "checkout_rejected" error code.
+type hookRejectionError struct {
+	cause error
+}
+
+func (e *hookRejectionError) Error() string { return e.cause.Error() }
+func (e *hookRejectionError) Unwrap() error { return e.cause }
+
+// StoreCheckout handles POST /checkout.
+func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
+	var req CheckoutRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
 		return
 	}
 
-	if err := h.service.Create(r.Context(), o); err != nil {
+	customerID := h.optionalCustomerID(r)
+
+	o, err := h.checkoutCore(r.Context(), &req, customerID)
+	if err != nil {
+		var ve *checkoutValidationError
+		if errors.As(err, &ve) {
+			h.writeError(w, http.StatusUnprocessableEntity, ve.code, ve.detail, ve.field)
+			return
+		}
 		if errors.Is(err, warehouse.ErrInsufficientStock) {
-			// Dispatch non-fatal: Plugins können Zahlung stornieren.
-			if hookErr := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookAfterCheckoutFailed, o, hookMeta); hookErr != nil {
-				h.logger.Warn().Err(hookErr).Str("order_id", o.ID.String()).Msg("after_checkout_failed hook returned error")
-			}
 			h.writeError(w, http.StatusUnprocessableEntity, "insufficient_stock", "one or more items are out of stock", "")
+			return
+		}
+		var hookRej *hookRejectionError
+		if errors.As(err, &hookRej) {
+			h.writeError(w, http.StatusUnprocessableEntity, "checkout_rejected", err.Error(), "")
 			return
 		}
 		h.serverError(w, r, err)
 		return
-	}
-
-	// Dispatch checkout after-hook — non-fatal, log errors.
-	if err := h.service.DispatchHookWithMetadata(r.Context(), sdk.HookAfterCheckout, o, hookMeta); err != nil {
-		h.logger.Warn().Err(err).Str("order_id", o.ID.String()).Msg("after_checkout hook returned error")
 	}
 
 	// Set guest token as HTTP-only cookie instead of exposing it in the response body.
@@ -381,6 +448,30 @@ func (h *Handler) StoreCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusCreated, apiResponse{Data: ToStoreResponse(o)})
+}
+
+// ProgrammaticCheckout is the SDK-facing entry point for creating an order
+// without an HTTP request. It is intended to be called by payment plugins or
+// other internal callers that have already validated the customer identity.
+//
+// reqBody must be a JSON-encoded CheckoutRequest. customerID may be nil for
+// guest checkouts. The returned JSON includes the guest_token field (unlike the
+// store HTTP response, which delivers it via a cookie).
+func (h *Handler) ProgrammaticCheckout(ctx context.Context, customerID *uuid.UUID, reqBody json.RawMessage) (json.RawMessage, error) {
+	var req CheckoutRequest
+	if err := json.Unmarshal(reqBody, &req); err != nil {
+		return nil, fmt.Errorf("invalid checkout request: %w", err)
+	}
+	if err := h.validator.Struct(&req); err != nil {
+		return nil, fmt.Errorf("validation: %w", err)
+	}
+	o, err := h.checkoutCore(ctx, &req, customerID)
+	if err != nil {
+		return nil, err
+	}
+	// Use ToResponse (not ToStoreResponse) so that the guest_token is included
+	// in the JSON for programmatic callers that cannot read cookies.
+	return json.Marshal(apiResponse{Data: ToResponse(o)})
 }
 
 // storeListOrders handles GET /account/orders

@@ -84,6 +84,7 @@ type PropertyGroupTranslationInput struct {
 
 // CreatePropertyGroupRequest is the body for creating a property group.
 type CreatePropertyGroupRequest struct {
+	Identifier   string                           `json:"identifier"   validate:"required,min=1,max=255"`
 	Position     int                              `json:"position"`
 	Translations []PropertyGroupTranslationInput `json:"translations" validate:"required,min=1,dive"`
 }
@@ -203,6 +204,7 @@ type PropertyGroupTranslationResponse struct {
 // PropertyGroupResponse is the full property group projection in API responses.
 type PropertyGroupResponse struct {
 	ID           uuid.UUID                           `json:"id"`
+	Identifier   string                              `json:"identifier"`
 	Position     int                                 `json:"position"`
 	CreatedAt    time.Time                           `json:"created_at"`
 	UpdatedAt    time.Time                           `json:"updated_at"`
@@ -394,10 +396,11 @@ func propertyOptionToResponse(o PropertyOption) PropertyOptionResponse {
 // PropertyGroupToResponse maps a PropertyGroup entity to its response DTO.
 func PropertyGroupToResponse(g PropertyGroup) PropertyGroupResponse {
 	resp := PropertyGroupResponse{
-		ID:        g.ID,
-		Position:  g.Position,
-		CreatedAt: g.CreatedAt,
-		UpdatedAt: g.UpdatedAt,
+		ID:         g.ID,
+		Identifier: g.Identifier,
+		Position:   g.Position,
+		CreatedAt:  g.CreatedAt,
+		UpdatedAt:  g.UpdatedAt,
 	}
 	for _, t := range g.Translations {
 		resp.Translations = append(resp.Translations, PropertyGroupTranslationResponse{

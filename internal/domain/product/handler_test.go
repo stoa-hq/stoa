@@ -269,6 +269,108 @@ func TestHandler_AdminList_ErrorDoesNotLeakInternalDetails(t *testing.T) {
 // parseLocale helper
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// POST /property-groups  (admin create property group)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminCreatePropertyGroup_Success(t *testing.T) {
+	repo := &mockRepo{}
+	body, _ := json.Marshal(CreatePropertyGroupRequest{
+		Identifier:   "color",
+		Translations: []PropertyGroupTranslationInput{{Locale: "en-US", Name: "Color"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/property-groups", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminCreatePropertyGroup(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("status: got %d, want 201; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_AdminCreatePropertyGroup_MissingIdentifier(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"translations": []map[string]string{{"locale": "en-US", "name": "Color"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/property-groups", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreatePropertyGroup(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status: got %d, want 422; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_AdminCreatePropertyGroup_DuplicateIdentifier(t *testing.T) {
+	repo := &mockRepo{
+		createPropGroup: func(_ *PropertyGroup) error {
+			return ErrDuplicateIdentifier
+		},
+	}
+	body, _ := json.Marshal(CreatePropertyGroupRequest{
+		Identifier:   "color",
+		Translations: []PropertyGroupTranslationInput{{Locale: "en-US", Name: "Color"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/property-groups", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminCreatePropertyGroup(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("status: got %d, want 409; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_AdminCreatePropertyGroup_InvalidIdentifier(t *testing.T) {
+	body, _ := json.Marshal(CreatePropertyGroupRequest{
+		Identifier:   "INVALID ID!",
+		Translations: []PropertyGroupTranslationInput{{Locale: "en-US", Name: "Color"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/property-groups", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreatePropertyGroup(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status: got %d, want 422; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PUT /property-groups/{id}  (admin update property group)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminUpdatePropertyGroup_DuplicateIdentifier(t *testing.T) {
+	id := uuid.New()
+	repo := &mockRepo{
+		updatePropGroup: func(_ *PropertyGroup) error {
+			return ErrDuplicateIdentifier
+		},
+	}
+	body, _ := json.Marshal(CreatePropertyGroupRequest{
+		Identifier:   "color",
+		Translations: []PropertyGroupTranslationInput{{Locale: "en-US", Name: "Color"}},
+	})
+	req := withChiParam(
+		httptest.NewRequest(http.MethodPut, "/property-groups/"+id.String(), bytes.NewReader(body)),
+		"id", id.String(),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminUpdatePropertyGroup(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("status: got %d, want 409; body: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestParseLocale_AcceptLanguageHeader(t *testing.T) {
 	tests := []struct {
 		header string

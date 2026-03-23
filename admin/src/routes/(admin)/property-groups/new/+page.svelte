@@ -3,6 +3,7 @@
   import { base } from '$app/paths';
   import { t } from 'svelte-i18n';
   import { propertyGroupsApi } from '$lib/api/property-groups';
+  import { ApiClientError } from '$lib/api/client';
   import { notifications } from '$lib/stores/notifications';
   import TranslationsInput from '$lib/components/TranslationsInput.svelte';
   import {
@@ -15,6 +16,7 @@
 
   const FIELDS = ['name'];
 
+  let identifier = $state('');
   let position = $state(0);
   let translations = $state(emptyTranslations(FIELDS));
   let submitting = $state(false);
@@ -28,13 +30,18 @@
     submitting = true;
     try {
       await propertyGroupsApi.create({
+        identifier,
         position: Number(position),
         translations: translationsToArray(translations),
       });
       notifications.success($t('propertyGroups.created'));
       goto(`${base}/property-groups`);
-    } catch {
-      notifications.error($t('common.createFailed'));
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.status === 409) {
+        notifications.error($t('propertyGroups.duplicateIdentifier'));
+      } else {
+        notifications.error($t('common.createFailed'));
+      }
     } finally {
       submitting = false;
     }
@@ -49,6 +56,20 @@
   <h1 class="text-xl font-bold text-[var(--text)] mb-6">{$t('propertyGroups.newGroup')}</h1>
 
   <form onsubmit={handleSubmit} class="space-y-4">
+    <div>
+      <label class="label" for="identifier">{$t('propertyGroups.identifier')}</label>
+      <input
+        id="identifier"
+        class="input font-mono"
+        type="text"
+        bind:value={identifier}
+        required
+        pattern="^[a-z0-9][a-z0-9_-]*$"
+        placeholder="e.g. color-group"
+      />
+      <p class="text-xs text-[var(--text-muted)] mt-1">{$t('propertyGroups.identifierHint')}</p>
+    </div>
+
     <div>
       <label class="label" for="position">{$t('common.position')}</label>
       <input id="position" class="input" type="number" min="0" bind:value={position} />

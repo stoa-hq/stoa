@@ -50,24 +50,33 @@ func TestApplyNoPlaceholder(t *testing.T) {
 }
 
 func TestInjectNonce(t *testing.T) {
-	html := []byte(`<!DOCTYPE html><html><head><script type="module" src="/app.js"></script></head><body><script>console.log("hi")</script></body></html>`)
+	html := []byte(`<!DOCTYPE html><html><head><style>body{}</style><script type="module" src="/app.js"></script></head><body><script>console.log("hi")</script></body></html>`)
 	result := InjectNonce(html, "test-nonce")
 
 	resultStr := string(result)
-	count := strings.Count(resultStr, `nonce="test-nonce"`)
-	if count != 2 {
-		t.Errorf("expected 2 nonce attributes, got %d in: %s", count, resultStr)
+
+	scriptCount := strings.Count(resultStr, `<script nonce="test-nonce"`)
+	if scriptCount != 2 {
+		t.Errorf("expected 2 script nonce attributes, got %d in: %s", scriptCount, resultStr)
+	}
+
+	styleCount := strings.Count(resultStr, `<style nonce="test-nonce"`)
+	if styleCount != 1 {
+		t.Errorf("expected 1 style nonce attribute, got %d in: %s", styleCount, resultStr)
 	}
 
 	if strings.Contains(resultStr, "<script type") {
 		t.Error("original <script without nonce still present")
 	}
+	if strings.Contains(resultStr, "<style>") {
+		t.Error("original <style without nonce still present")
+	}
 }
 
-func TestInjectNonceNoScripts(t *testing.T) {
+func TestInjectNonceNoTags(t *testing.T) {
 	html := []byte(`<!DOCTYPE html><html><head></head><body></body></html>`)
 	result := InjectNonce(html, "test-nonce")
 	if string(result) != string(html) {
-		t.Error("InjectNonce modified HTML without script tags")
+		t.Error("InjectNonce modified HTML without script/style tags")
 	}
 }

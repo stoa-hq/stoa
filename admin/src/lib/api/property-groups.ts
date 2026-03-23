@@ -7,6 +7,7 @@ export interface PropertyGroupTranslationInput {
 }
 
 export interface CreatePropertyGroupRequest {
+	identifier: string;
 	position?: number;
 	translations: PropertyGroupTranslationInput[];
 }
@@ -42,6 +43,7 @@ export interface PropertyGroupTranslation {
 
 export interface PropertyGroup {
 	id: string;
+	identifier: string;
 	position: number;
 	created_at: string;
 	updated_at: string;

@@ -197,6 +197,7 @@ func TestCSRF_NonExemptPathStillChecked(t *testing.T) {
 
 func TestCSRF_PluginWebhookPathExempt(t *testing.T) {
 	for _, path := range []string{
+		"/plugins/stripe/webhook",
 		"/plugins/stripe/webhooks/event",
 		"/plugins/n8n/webhooks/trigger",
 		"/plugins/paypal/webhooks",
