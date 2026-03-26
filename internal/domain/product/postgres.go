@@ -108,6 +108,54 @@ func (r *postgresRepository) FindBySKU(ctx context.Context, sku string) (*Produc
 }
 
 // --------------------------------------------------------------------------
+// buildProductFilterConditions – pure helper used by FindAll and tests
+// --------------------------------------------------------------------------
+
+// buildProductFilterConditions returns the SQL condition fragments and their
+// corresponding argument values for the given filter.  argIdx is the 1-based
+// position of the first placeholder ($1, $2, …).  The caller is responsible
+// for continuing the sequence after the returned slice.
+func buildProductFilterConditions(filter ProductFilter, argIdx int) (conditions []string, args []interface{}) {
+	if filter.Active != nil {
+		conditions = append(conditions, fmt.Sprintf("p.active = $%d", argIdx))
+		args = append(args, *filter.Active)
+		argIdx++
+	}
+
+	if filter.CategoryID != nil {
+		conditions = append(conditions, fmt.Sprintf(
+			`EXISTS (
+            SELECT 1 FROM product_categories pc
+            WHERE pc.product_id = p.id
+            AND pc.category_id IN (
+                WITH RECURSIVE cat_descendants AS (
+                    SELECT id FROM categories WHERE id = $%d
+                    UNION ALL
+                    SELECT c.id FROM categories c
+                    INNER JOIN cat_descendants cd ON c.parent_id = cd.id
+                    WHERE c.active = true
+                )
+                SELECT id FROM cat_descendants
+            )
+        )`, argIdx,
+		))
+		args = append(args, *filter.CategoryID)
+		argIdx++
+	}
+
+	if filter.Search != "" {
+		conditions = append(conditions, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM product_translations pt WHERE pt.product_id = p.id AND to_tsvector('german', coalesce(pt.name, '') || ' ' || coalesce(pt.description, '')) @@ plainto_tsquery('german', $%d))",
+			argIdx,
+		))
+		args = append(args, filter.Search)
+		// argIdx++ — not needed; this is the last possible condition
+	}
+
+	return conditions, args
+}
+
+// --------------------------------------------------------------------------
 // FindAll
 // --------------------------------------------------------------------------
 
@@ -139,35 +187,8 @@ func (r *postgresRepository) FindAll(ctx context.Context, filter ProductFilter) 
 		sortDir = "ASC"
 	}
 
-	// Build WHERE clauses dynamically.
-	var (
-		conditions []string
-		args       []interface{}
-		argIdx     = 1
-	)
-
-	if filter.Active != nil {
-		conditions = append(conditions, fmt.Sprintf("p.active = $%d", argIdx))
-		args = append(args, *filter.Active)
-		argIdx++
-	}
-
-	if filter.CategoryID != nil {
-		conditions = append(conditions, fmt.Sprintf(
-			"EXISTS (SELECT 1 FROM product_categories pc WHERE pc.product_id = p.id AND pc.category_id = $%d)", argIdx,
-		))
-		args = append(args, *filter.CategoryID)
-		argIdx++
-	}
-
-	if filter.Search != "" {
-		conditions = append(conditions, fmt.Sprintf(
-			"EXISTS (SELECT 1 FROM product_translations pt WHERE pt.product_id = p.id AND to_tsvector('german', coalesce(pt.name, '') || ' ' || coalesce(pt.description, '')) @@ plainto_tsquery('german', $%d))",
-			argIdx,
-		))
-		args = append(args, filter.Search)
-		argIdx++
-	}
+	conditions, args := buildProductFilterConditions(filter, 1)
+	argIdx := len(args) + 1
 
 	where := ""
 	if len(conditions) > 0 {

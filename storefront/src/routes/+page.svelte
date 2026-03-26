@@ -93,16 +93,28 @@
 								{$t('products.allProducts')}
 							</button>
 						</li>
-						{#each categories as cat}
+						{#snippet categoryItem(cat: Category, depth: number)}
 							<li>
 								<button
 									onclick={() => selectCategory(cat.id)}
-									class="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors
+									class="w-full text-left py-2 rounded-lg text-sm transition-colors
 										{selectedCategory === cat.id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}"
+									style="padding-left: {0.75 + depth * 1}rem; padding-right: 0.75rem;"
 								>
 									{getCategoryName(cat, $locale ?? 'de-DE')}
 								</button>
+								{#if cat.children && cat.children.length > 0}
+									<ul class="space-y-0.5">
+										{#each cat.children as child}
+											{@render categoryItem(child, depth + 1)}
+										{/each}
+									</ul>
+								{/if}
 							</li>
+						{/snippet}
+
+						{#each categories as cat}
+							{@render categoryItem(cat, 0)}
 						{/each}
 					</ul>
 				</div>
