@@ -16,7 +16,8 @@
     "audit": "Audit Log",
     "apiKeys": "API Keys",
     "settings": "Settings",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "attributes": "Attributes"
   },
   "common": {
     "save": "Save",
@@ -169,7 +170,13 @@
     "jsonDescription": "Paste a JSON array of product objects. Each object follows the {schema} schema and may optionally include a {variants} array.",
     "jsonExpectsArray": "Expected a JSON array of products.",
     "jsonInvalid": "Invalid JSON.",
-    "noProductsFound": "No products found."
+    "noProductsFound": "No products found.",
+    "attributes": "Attributes",
+    "attributesSave": "Save attributes",
+    "attributesSaved": "Attributes saved.",
+    "attributesSaveFailed": "Attributes could not be saved.",
+    "noAttributesDefined": "No attributes defined.",
+    "attributeNotSet": "Not set"
   },
   "categories": {
     "title": "Categories",
@@ -482,6 +489,48 @@
     "noKeys": "No API keys created yet.",
     "active": "Active",
     "revokedStatus": "Revoked"
+  },
+  "attributes": {
+    "title": "Attributes",
+    "newAttribute": "New attribute",
+    "editAttribute": "Edit attribute",
+    "newAttributeButton": "+ New attribute",
+    "identifier": "Identifier",
+    "identifierHint": "Unique identifier (lowercase, hyphens, underscores)",
+    "type": "Type",
+    "unit": "Unit",
+    "unitHint": "Physical unit (e.g. kg, cm, l)",
+    "filterable": "Filterable",
+    "required": "Required",
+    "position": "Position",
+    "options": "Options",
+    "optionCount": "Options",
+    "addOption": "+ Add option",
+    "addOptionTitle": "Add option",
+    "editOption": "Edit option",
+    "deleteOptionTitle": "Delete option",
+    "deleteOptionMessage": "Do you really want to delete this option?",
+    "noOptions": "No options available yet.",
+    "noAttributes": "No attributes available yet.",
+    "loadFailed": "Attributes could not be loaded.",
+    "loadOneFailed": "Attribute could not be loaded.",
+    "saved": "Attribute saved.",
+    "created": "Attribute created.",
+    "deleted": "Attribute deleted.",
+    "deleteTitle": "Delete attribute",
+    "deleteMessage": "Do you really want to delete this attribute? All associated options will also be deleted.",
+    "optionAdded": "Option added.",
+    "optionSaved": "Option saved.",
+    "optionDeleted": "Option deleted.",
+    "optionCreateFailed": "Option could not be created.",
+    "duplicateIdentifier": "This identifier is already in use.",
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "select": "Select",
+      "multi_select": "Multi-select",
+      "boolean": "Yes / No"
+    }
   },
   "modal": {
     "closeLabel": "Close modal"

@@ -92,6 +92,26 @@ func (h *Handler) RegisterAdminRoutes(r chi.Router) {
 	r.Post("/property-groups/{id}/options", h.adminCreatePropertyOption)
 	r.Put("/property-groups/{id}/options/{optId}", h.adminUpdatePropertyOption)
 	r.Delete("/property-groups/{id}/options/{optId}", h.adminDeletePropertyOption)
+
+	// Attributes
+	r.Get("/attributes", h.adminListAttributes)
+	r.Post("/attributes", h.adminCreateAttribute)
+	r.Get("/attributes/{id}", h.adminGetAttribute)
+	r.Put("/attributes/{id}", h.adminUpdateAttribute)
+	r.Delete("/attributes/{id}", h.adminDeleteAttribute)
+
+	// Attribute Options
+	r.Post("/attributes/{id}/options", h.adminCreateAttributeOption)
+	r.Put("/attributes/{id}/options/{optId}", h.adminUpdateAttributeOption)
+	r.Delete("/attributes/{id}/options/{optId}", h.adminDeleteAttributeOption)
+
+	// Product Attribute Values
+	r.Put("/products/{id}/attributes", h.adminSetProductAttributes)
+	r.Delete("/products/{id}/attributes/{attrId}", h.adminDeleteProductAttribute)
+
+	// Variant Attribute Values
+	r.Put("/products/{id}/variants/{variantId}/attributes", h.adminSetVariantAttributes)
+	r.Delete("/products/{id}/variants/{variantId}/attributes/{attrId}", h.adminDeleteVariantAttribute)
 }
 
 // RegisterStoreRoutes mounts the public/customer-facing read endpoints.
@@ -611,6 +631,390 @@ func (h *Handler) adminDeletePropertyOption(w http.ResponseWriter, r *http.Reque
 	if err := h.service.DeletePropertyOption(r.Context(), optID); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			h.notFound(w, "property option not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---------------------------------------------------------------------------
+// Attribute handlers
+// ---------------------------------------------------------------------------
+
+// adminListAttributes handles GET /attributes
+func (h *Handler) adminListAttributes(w http.ResponseWriter, r *http.Request) {
+	attrs, err := h.service.ListAttributes(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	resp := make([]AttributeResponse, len(attrs))
+	for i, a := range attrs {
+		resp[i] = AttributeToResponse(a)
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: resp})
+}
+
+// adminGetAttribute handles GET /attributes/{id}
+func (h *Handler) adminGetAttribute(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	a, err := h.service.GetAttributeByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: AttributeToResponse(*a)})
+}
+
+// adminCreateAttribute handles POST /attributes
+func (h *Handler) adminCreateAttribute(w http.ResponseWriter, r *http.Request) {
+	var req CreateAttributeRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	a := &Attribute{
+		Identifier: req.Identifier,
+		Type:       req.Type,
+		Unit:       req.Unit,
+		Position:   req.Position,
+		Filterable: req.Filterable,
+		Required:   req.Required,
+	}
+	for _, t := range req.Translations {
+		a.Translations = append(a.Translations, AttributeTranslation{
+			Locale:      t.Locale,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+
+	if err := h.service.CreateAttribute(r.Context(), a); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			h.writeError(w, http.StatusConflict, "duplicate_identifier", "an attribute with this identifier already exists", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidIdentifier) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_identifier", "identifier must match pattern: lowercase alphanumeric, hyphens, underscores", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidAttributeType) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_type", "type must be one of: text, number, select, multi_select, boolean", "type")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusCreated, apiResponse{Data: AttributeToResponse(*a)})
+}
+
+// adminUpdateAttribute handles PUT /attributes/{id}
+func (h *Handler) adminUpdateAttribute(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var req UpdateAttributeRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	a := &Attribute{
+		ID:         id,
+		Identifier: req.Identifier,
+		Type:       req.Type,
+		Unit:       req.Unit,
+		Position:   req.Position,
+		Filterable: req.Filterable,
+		Required:   req.Required,
+	}
+	for _, t := range req.Translations {
+		a.Translations = append(a.Translations, AttributeTranslation{
+			AttributeID: id,
+			Locale:      t.Locale,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+
+	if err := h.service.UpdateAttribute(r.Context(), a); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute not found")
+			return
+		}
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			h.writeError(w, http.StatusConflict, "duplicate_identifier", "an attribute with this identifier already exists", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidIdentifier) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_identifier", "identifier must match pattern: lowercase alphanumeric, hyphens, underscores", "identifier")
+			return
+		}
+		if errors.Is(err, ErrInvalidAttributeType) {
+			h.writeError(w, http.StatusUnprocessableEntity, "invalid_type", "type must be one of: text, number, select, multi_select, boolean", "type")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: AttributeToResponse(*a)})
+}
+
+// adminDeleteAttribute handles DELETE /attributes/{id}
+func (h *Handler) adminDeleteAttribute(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteAttribute(r.Context(), id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// adminCreateAttributeOption handles POST /attributes/{id}/options
+func (h *Handler) adminCreateAttributeOption(w http.ResponseWriter, r *http.Request) {
+	attrID, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var req CreateAttributeOptionRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	o := &AttributeOption{
+		AttributeID: attrID,
+		Position:    req.Position,
+	}
+	for _, t := range req.Translations {
+		o.Translations = append(o.Translations, AttributeOptionTranslation{
+			Locale: t.Locale,
+			Name:   t.Name,
+		})
+	}
+
+	if err := h.service.CreateAttributeOption(r.Context(), o); err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusCreated, apiResponse{Data: attributeOptionToDetailResponse(*o)})
+}
+
+// adminUpdateAttributeOption handles PUT /attributes/{id}/options/{optId}
+func (h *Handler) adminUpdateAttributeOption(w http.ResponseWriter, r *http.Request) {
+	attrID, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	optID, ok := h.parseUUID(w, r, "optId")
+	if !ok {
+		return
+	}
+
+	var req UpdateAttributeOptionRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	o := &AttributeOption{
+		ID:          optID,
+		AttributeID: attrID,
+		Position:    req.Position,
+	}
+	for _, t := range req.Translations {
+		o.Translations = append(o.Translations, AttributeOptionTranslation{
+			OptionID: optID,
+			Locale:   t.Locale,
+			Name:     t.Name,
+		})
+	}
+
+	if err := h.service.UpdateAttributeOption(r.Context(), o); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute option not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: attributeOptionToDetailResponse(*o)})
+}
+
+// adminDeleteAttributeOption handles DELETE /attributes/{id}/options/{optId}
+func (h *Handler) adminDeleteAttributeOption(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	optID, ok := h.parseUUID(w, r, "optId")
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteAttributeOption(r.Context(), optID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute option not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// adminSetProductAttributes handles PUT /products/{id}/attributes
+func (h *Handler) adminSetProductAttributes(w http.ResponseWriter, r *http.Request) {
+	productID, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var req SetAttributesRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	values := make([]AttributeValue, len(req.Attributes))
+	for i, a := range req.Attributes {
+		values[i] = AttributeValue{
+			AttributeID:  a.AttributeID,
+			ValueText:    a.ValueText,
+			ValueNumeric: a.ValueNumeric,
+			ValueBoolean: a.ValueBoolean,
+			OptionID:     a.OptionID,
+			OptionIDs:    a.OptionIDs,
+		}
+	}
+
+	if err := h.service.SetProductAttributes(r.Context(), productID, values); err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+
+	// Re-read to return the full product.
+	p, err := h.service.GetByID(r.Context(), productID)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: ToResponse(p)})
+}
+
+// adminDeleteProductAttribute handles DELETE /products/{id}/attributes/{attrId}
+func (h *Handler) adminDeleteProductAttribute(w http.ResponseWriter, r *http.Request) {
+	productID, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	attrID, ok := h.parseUUID(w, r, "attrId")
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteProductAttributeValue(r.Context(), productID, attrID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute value not found")
+			return
+		}
+		h.serverError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// adminSetVariantAttributes handles PUT /products/{id}/variants/{variantId}/attributes
+func (h *Handler) adminSetVariantAttributes(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	variantID, ok := h.parseUUID(w, r, "variantId")
+	if !ok {
+		return
+	}
+
+	var req SetAttributesRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	if !h.validate(w, &req) {
+		return
+	}
+
+	values := make([]AttributeValue, len(req.Attributes))
+	for i, a := range req.Attributes {
+		values[i] = AttributeValue{
+			AttributeID:  a.AttributeID,
+			ValueText:    a.ValueText,
+			ValueNumeric: a.ValueNumeric,
+			ValueBoolean: a.ValueBoolean,
+			OptionID:     a.OptionID,
+			OptionIDs:    a.OptionIDs,
+		}
+	}
+
+	if err := h.service.SetVariantAttributes(r.Context(), variantID, values); err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+
+	v, err := h.service.GetVariantByID(r.Context(), variantID)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, apiResponse{Data: v})
+}
+
+// adminDeleteVariantAttribute handles DELETE /products/{id}/variants/{variantId}/attributes/{attrId}
+func (h *Handler) adminDeleteVariantAttribute(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.parseUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	variantID, ok := h.parseUUID(w, r, "variantId")
+	if !ok {
+		return
+	}
+	attrID, ok := h.parseUUID(w, r, "attrId")
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteVariantAttributeValue(r.Context(), variantID, attrID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			h.notFound(w, "attribute value not found")
 			return
 		}
 		h.serverError(w, r, err)

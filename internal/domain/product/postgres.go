@@ -502,6 +502,9 @@ func (r *postgresRepository) loadRelations(ctx context.Context, p *Product) erro
 	if err := r.loadVariants(ctx, p); err != nil {
 		return err
 	}
+	if err := r.loadProductAttributes(ctx, p); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -759,13 +762,16 @@ func (r *postgresRepository) loadVariants(ctx context.Context, p *Product) error
 		return fmt.Errorf("loadVariants rows: %w", err)
 	}
 
-	// Load options for each variant.
+	// Load options and attributes for each variant.
 	for i := range variants {
 		opts, err := r.loadVariantOptions(ctx, variants[i].ID)
 		if err != nil {
 			return err
 		}
 		variants[i].Options = opts
+		if err := r.loadVariantAttributes(ctx, &variants[i]); err != nil {
+			return err
+		}
 	}
 
 	p.Variants = variants
@@ -1648,6 +1654,771 @@ func slugify(s string) string {
 
 	// Trim leading/trailing hyphens.
 	return strings.Trim(b.String(), "-")
+}
+
+// --------------------------------------------------------------------------
+// Attributes – CRUD
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindAllAttributes(ctx context.Context) ([]Attribute, error) {
+	const query = `SELECT id, identifier, type, COALESCE(unit,''), position, filterable, required, created_at, updated_at FROM attributes ORDER BY position`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("FindAllAttributes query: %w", err)
+	}
+	defer rows.Close()
+
+	var attrs []Attribute
+	for rows.Next() {
+		var a Attribute
+		if err := rows.Scan(&a.ID, &a.Identifier, &a.Type, &a.Unit, &a.Position, &a.Filterable, &a.Required, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("FindAllAttributes scan: %w", err)
+		}
+		attrs = append(attrs, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("FindAllAttributes rows: %w", err)
+	}
+
+	if len(attrs) == 0 {
+		return attrs, nil
+	}
+
+	if err := r.loadAttrTranslationsForMany(ctx, attrs); err != nil {
+		return nil, err
+	}
+	if err := r.loadAttrOptionsForMany(ctx, attrs); err != nil {
+		return nil, err
+	}
+
+	return attrs, nil
+}
+
+func (r *postgresRepository) FindAttributeByID(ctx context.Context, id uuid.UUID) (*Attribute, error) {
+	const query = `SELECT id, identifier, type, COALESCE(unit,''), position, filterable, required, created_at, updated_at FROM attributes WHERE id = $1`
+
+	a := &Attribute{}
+	if err := r.db.QueryRow(ctx, query, id).Scan(&a.ID, &a.Identifier, &a.Type, &a.Unit, &a.Position, &a.Filterable, &a.Required, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("FindAttributeByID: %w", err)
+	}
+
+	translations, err := r.loadAttrTranslations(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	a.Translations = translations
+
+	opts, err := r.FindAttributeOptionsByAttributeID(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	a.Options = opts
+
+	return a, nil
+}
+
+func (r *postgresRepository) FindAttributeByIdentifier(ctx context.Context, identifier string) (*Attribute, error) {
+	const query = `SELECT id, identifier, type, COALESCE(unit,''), position, filterable, required, created_at, updated_at FROM attributes WHERE identifier = $1`
+
+	a := &Attribute{}
+	if err := r.db.QueryRow(ctx, query, identifier).Scan(&a.ID, &a.Identifier, &a.Type, &a.Unit, &a.Position, &a.Filterable, &a.Required, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("FindAttributeByIdentifier: %w", err)
+	}
+
+	translations, err := r.loadAttrTranslations(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	a.Translations = translations
+
+	opts, err := r.FindAttributeOptionsByAttributeID(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	a.Options = opts
+
+	return a, nil
+}
+
+func (r *postgresRepository) CreateAttribute(ctx context.Context, a *Attribute) error {
+	if a.ID == uuid.Nil {
+		a.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	a.CreatedAt = now
+	a.UpdatedAt = now
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateAttribute begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO attributes (id, identifier, type, unit, position, filterable, required, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		a.ID, a.Identifier, a.Type, nilIfEmpty(a.Unit), a.Position, a.Filterable, a.Required, a.CreatedAt, a.UpdatedAt,
+	); err != nil {
+		if strings.Contains(err.Error(), "attributes_identifier_key") {
+			return ErrDuplicateIdentifier
+		}
+		return fmt.Errorf("CreateAttribute insert: %w", err)
+	}
+
+	for _, t := range a.Translations {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO attribute_translations (attribute_id, locale, name, description) VALUES ($1, $2, $3, $4)`,
+			a.ID, t.Locale, t.Name, t.Description,
+		); err != nil {
+			return fmt.Errorf("CreateAttribute insert translation (locale=%s): %w", t.Locale, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("CreateAttribute commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) UpdateAttribute(ctx context.Context, a *Attribute) error {
+	a.UpdatedAt = time.Now().UTC()
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("UpdateAttribute begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	tag, err := tx.Exec(ctx,
+		`UPDATE attributes SET identifier = $2, type = $3, unit = $4, position = $5, filterable = $6, required = $7, updated_at = $8 WHERE id = $1`,
+		a.ID, a.Identifier, a.Type, nilIfEmpty(a.Unit), a.Position, a.Filterable, a.Required, a.UpdatedAt,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "attributes_identifier_key") {
+			return ErrDuplicateIdentifier
+		}
+		return fmt.Errorf("UpdateAttribute exec: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM attribute_translations WHERE attribute_id = $1`, a.ID); err != nil {
+		return fmt.Errorf("UpdateAttribute delete translations: %w", err)
+	}
+	for _, t := range a.Translations {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO attribute_translations (attribute_id, locale, name, description) VALUES ($1, $2, $3, $4)`,
+			a.ID, t.Locale, t.Name, t.Description,
+		); err != nil {
+			return fmt.Errorf("UpdateAttribute insert translation (locale=%s): %w", t.Locale, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("UpdateAttribute commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) DeleteAttribute(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM attributes WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("DeleteAttribute: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// Attribute Options – CRUD
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindAttributeOptionsByAttributeID(ctx context.Context, attrID uuid.UUID) ([]AttributeOption, error) {
+	const query = `
+		SELECT id, attribute_id, position, created_at, updated_at
+		FROM attribute_options
+		WHERE attribute_id = $1
+		ORDER BY position`
+
+	rows, err := r.db.Query(ctx, query, attrID)
+	if err != nil {
+		return nil, fmt.Errorf("FindAttributeOptionsByAttributeID query: %w", err)
+	}
+	defer rows.Close()
+
+	var options []AttributeOption
+	for rows.Next() {
+		var o AttributeOption
+		if err := rows.Scan(&o.ID, &o.AttributeID, &o.Position, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("FindAttributeOptionsByAttributeID scan: %w", err)
+		}
+		options = append(options, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("FindAttributeOptionsByAttributeID rows: %w", err)
+	}
+
+	for i := range options {
+		translations, err := r.loadAttrOptionTranslations(ctx, options[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		options[i].Translations = translations
+	}
+
+	return options, nil
+}
+
+func (r *postgresRepository) CreateAttributeOption(ctx context.Context, o *AttributeOption) error {
+	if o.ID == uuid.Nil {
+		o.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	o.CreatedAt = now
+	o.UpdatedAt = now
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("CreateAttributeOption begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO attribute_options (id, attribute_id, position, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`,
+		o.ID, o.AttributeID, o.Position, o.CreatedAt, o.UpdatedAt,
+	); err != nil {
+		return fmt.Errorf("CreateAttributeOption insert: %w", err)
+	}
+
+	for _, t := range o.Translations {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO attribute_option_translations (option_id, locale, name) VALUES ($1, $2, $3)`,
+			o.ID, t.Locale, t.Name,
+		); err != nil {
+			return fmt.Errorf("CreateAttributeOption insert translation (locale=%s): %w", t.Locale, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("CreateAttributeOption commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) UpdateAttributeOption(ctx context.Context, o *AttributeOption) error {
+	o.UpdatedAt = time.Now().UTC()
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("UpdateAttributeOption begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	tag, err := tx.Exec(ctx,
+		`UPDATE attribute_options SET position = $2, updated_at = $3 WHERE id = $1`,
+		o.ID, o.Position, o.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("UpdateAttributeOption exec: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM attribute_option_translations WHERE option_id = $1`, o.ID); err != nil {
+		return fmt.Errorf("UpdateAttributeOption delete translations: %w", err)
+	}
+	for _, t := range o.Translations {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO attribute_option_translations (option_id, locale, name) VALUES ($1, $2, $3)`,
+			o.ID, t.Locale, t.Name,
+		); err != nil {
+			return fmt.Errorf("UpdateAttributeOption insert translation (locale=%s): %w", t.Locale, err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("UpdateAttributeOption commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) DeleteAttributeOption(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM attribute_options WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("DeleteAttributeOption: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// Product Attribute Values
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindProductAttributeValues(ctx context.Context, productID uuid.UUID) ([]AttributeValue, error) {
+	const query = `
+		SELECT pav.id, pav.attribute_id, pav.value_text, pav.value_numeric, pav.value_boolean, pav.option_id, pav.created_at, pav.updated_at,
+		       a.identifier, a.type, COALESCE(a.unit,'')
+		FROM product_attribute_values pav
+		JOIN attributes a ON a.id = pav.attribute_id
+		WHERE pav.product_id = $1
+		ORDER BY a.position`
+
+	rows, err := r.db.Query(ctx, query, productID)
+	if err != nil {
+		return nil, fmt.Errorf("FindProductAttributeValues query: %w", err)
+	}
+	defer rows.Close()
+
+	var values []AttributeValue
+	for rows.Next() {
+		var v AttributeValue
+		var attrIdent, attrType, attrUnit string
+		if err := rows.Scan(&v.ID, &v.AttributeID, &v.ValueText, &v.ValueNumeric, &v.ValueBoolean, &v.OptionID, &v.CreatedAt, &v.UpdatedAt,
+			&attrIdent, &attrType, &attrUnit); err != nil {
+			return nil, fmt.Errorf("FindProductAttributeValues scan: %w", err)
+		}
+		v.Attribute = &Attribute{ID: v.AttributeID, Identifier: attrIdent, Type: attrType, Unit: attrUnit}
+		values = append(values, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("FindProductAttributeValues rows: %w", err)
+	}
+
+	// Load multi_select option IDs and attribute translations.
+	if err := r.enrichAttributeValues(ctx, values, "product_attribute_value_options"); err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
+func (r *postgresRepository) SetProductAttributeValue(ctx context.Context, productID uuid.UUID, val *AttributeValue) error {
+	now := time.Now().UTC()
+	if val.ID == uuid.Nil {
+		val.ID = uuid.New()
+	}
+	val.CreatedAt = now
+	val.UpdatedAt = now
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("SetProductAttributeValue begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO product_attribute_values (id, product_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (product_id, attribute_id) DO UPDATE SET
+			value_text    = EXCLUDED.value_text,
+			value_numeric = EXCLUDED.value_numeric,
+			value_boolean = EXCLUDED.value_boolean,
+			option_id     = EXCLUDED.option_id,
+			updated_at    = EXCLUDED.updated_at`,
+		val.ID, productID, val.AttributeID, val.ValueText, val.ValueNumeric, val.ValueBoolean, val.OptionID, val.CreatedAt, val.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("SetProductAttributeValue upsert: %w", err)
+	}
+
+	// Re-read the actual row ID (in case of conflict the ID stays the same).
+	if err := tx.QueryRow(ctx,
+		`SELECT id FROM product_attribute_values WHERE product_id = $1 AND attribute_id = $2`,
+		productID, val.AttributeID,
+	).Scan(&val.ID); err != nil {
+		return fmt.Errorf("SetProductAttributeValue read id: %w", err)
+	}
+
+	// Replace multi_select options.
+	if _, err := tx.Exec(ctx, `DELETE FROM product_attribute_value_options WHERE value_id = $1`, val.ID); err != nil {
+		return fmt.Errorf("SetProductAttributeValue delete options: %w", err)
+	}
+	for _, optID := range val.OptionIDs {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO product_attribute_value_options (value_id, option_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			val.ID, optID,
+		); err != nil {
+			return fmt.Errorf("SetProductAttributeValue insert option: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("SetProductAttributeValue commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) DeleteProductAttributeValue(ctx context.Context, productID, attributeID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM product_attribute_values WHERE product_id = $1 AND attribute_id = $2`, productID, attributeID)
+	if err != nil {
+		return fmt.Errorf("DeleteProductAttributeValue: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// Variant Attribute Values
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) FindVariantAttributeValues(ctx context.Context, variantID uuid.UUID) ([]AttributeValue, error) {
+	const query = `
+		SELECT vav.id, vav.attribute_id, vav.value_text, vav.value_numeric, vav.value_boolean, vav.option_id, vav.created_at, vav.updated_at,
+		       a.identifier, a.type, COALESCE(a.unit,'')
+		FROM variant_attribute_values vav
+		JOIN attributes a ON a.id = vav.attribute_id
+		WHERE vav.variant_id = $1
+		ORDER BY a.position`
+
+	rows, err := r.db.Query(ctx, query, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("FindVariantAttributeValues query: %w", err)
+	}
+	defer rows.Close()
+
+	var values []AttributeValue
+	for rows.Next() {
+		var v AttributeValue
+		var attrIdent, attrType, attrUnit string
+		if err := rows.Scan(&v.ID, &v.AttributeID, &v.ValueText, &v.ValueNumeric, &v.ValueBoolean, &v.OptionID, &v.CreatedAt, &v.UpdatedAt,
+			&attrIdent, &attrType, &attrUnit); err != nil {
+			return nil, fmt.Errorf("FindVariantAttributeValues scan: %w", err)
+		}
+		v.Attribute = &Attribute{ID: v.AttributeID, Identifier: attrIdent, Type: attrType, Unit: attrUnit}
+		values = append(values, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("FindVariantAttributeValues rows: %w", err)
+	}
+
+	if err := r.enrichAttributeValues(ctx, values, "variant_attribute_value_options"); err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
+func (r *postgresRepository) SetVariantAttributeValue(ctx context.Context, variantID uuid.UUID, val *AttributeValue) error {
+	now := time.Now().UTC()
+	if val.ID == uuid.Nil {
+		val.ID = uuid.New()
+	}
+	val.CreatedAt = now
+	val.UpdatedAt = now
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("SetVariantAttributeValue begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO variant_attribute_values (id, variant_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (variant_id, attribute_id) DO UPDATE SET
+			value_text    = EXCLUDED.value_text,
+			value_numeric = EXCLUDED.value_numeric,
+			value_boolean = EXCLUDED.value_boolean,
+			option_id     = EXCLUDED.option_id,
+			updated_at    = EXCLUDED.updated_at`,
+		val.ID, variantID, val.AttributeID, val.ValueText, val.ValueNumeric, val.ValueBoolean, val.OptionID, val.CreatedAt, val.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("SetVariantAttributeValue upsert: %w", err)
+	}
+
+	if err := tx.QueryRow(ctx,
+		`SELECT id FROM variant_attribute_values WHERE variant_id = $1 AND attribute_id = $2`,
+		variantID, val.AttributeID,
+	).Scan(&val.ID); err != nil {
+		return fmt.Errorf("SetVariantAttributeValue read id: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM variant_attribute_value_options WHERE value_id = $1`, val.ID); err != nil {
+		return fmt.Errorf("SetVariantAttributeValue delete options: %w", err)
+	}
+	for _, optID := range val.OptionIDs {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO variant_attribute_value_options (value_id, option_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			val.ID, optID,
+		); err != nil {
+			return fmt.Errorf("SetVariantAttributeValue insert option: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("SetVariantAttributeValue commit: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresRepository) DeleteVariantAttributeValue(ctx context.Context, variantID, attributeID uuid.UUID) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM variant_attribute_values WHERE variant_id = $1 AND attribute_id = $2`, variantID, attributeID)
+	if err != nil {
+		return fmt.Errorf("DeleteVariantAttributeValue: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// Helpers – Attribute loading
+// --------------------------------------------------------------------------
+
+func (r *postgresRepository) loadAttrTranslations(ctx context.Context, attrID uuid.UUID) ([]AttributeTranslation, error) {
+	const query = `SELECT attribute_id, locale, name, COALESCE(description,'') FROM attribute_translations WHERE attribute_id = $1`
+
+	rows, err := r.db.Query(ctx, query, attrID)
+	if err != nil {
+		return nil, fmt.Errorf("loadAttrTranslations query: %w", err)
+	}
+	defer rows.Close()
+
+	var translations []AttributeTranslation
+	for rows.Next() {
+		var t AttributeTranslation
+		if err := rows.Scan(&t.AttributeID, &t.Locale, &t.Name, &t.Description); err != nil {
+			return nil, fmt.Errorf("loadAttrTranslations scan: %w", err)
+		}
+		translations = append(translations, t)
+	}
+	return translations, rows.Err()
+}
+
+func (r *postgresRepository) loadAttrTranslationsForMany(ctx context.Context, attrs []Attribute) error {
+	ids := make([]uuid.UUID, len(attrs))
+	idx := make(map[uuid.UUID]int, len(attrs))
+	for i := range attrs {
+		ids[i] = attrs[i].ID
+		idx[attrs[i].ID] = i
+	}
+
+	const query = `SELECT attribute_id, locale, name, COALESCE(description,'') FROM attribute_translations WHERE attribute_id = ANY($1)`
+	rows, err := r.db.Query(ctx, query, ids)
+	if err != nil {
+		return fmt.Errorf("loadAttrTranslationsForMany query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t AttributeTranslation
+		if err := rows.Scan(&t.AttributeID, &t.Locale, &t.Name, &t.Description); err != nil {
+			return fmt.Errorf("loadAttrTranslationsForMany scan: %w", err)
+		}
+		if i, ok := idx[t.AttributeID]; ok {
+			attrs[i].Translations = append(attrs[i].Translations, t)
+		}
+	}
+	return rows.Err()
+}
+
+func (r *postgresRepository) loadAttrOptionsForMany(ctx context.Context, attrs []Attribute) error {
+	ids := make([]uuid.UUID, len(attrs))
+	idx := make(map[uuid.UUID]int, len(attrs))
+	for i := range attrs {
+		ids[i] = attrs[i].ID
+		idx[attrs[i].ID] = i
+	}
+
+	const query = `
+		SELECT id, attribute_id, position, created_at, updated_at
+		FROM attribute_options
+		WHERE attribute_id = ANY($1)
+		ORDER BY attribute_id, position`
+
+	rows, err := r.db.Query(ctx, query, ids)
+	if err != nil {
+		return fmt.Errorf("loadAttrOptionsForMany query: %w", err)
+	}
+	defer rows.Close()
+
+	var allOpts []AttributeOption
+	optIdx := make(map[uuid.UUID]int)
+
+	for rows.Next() {
+		var o AttributeOption
+		if err := rows.Scan(&o.ID, &o.AttributeID, &o.Position, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return fmt.Errorf("loadAttrOptionsForMany scan: %w", err)
+		}
+		optIdx[o.ID] = len(allOpts)
+		allOpts = append(allOpts, o)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("loadAttrOptionsForMany rows: %w", err)
+	}
+
+	if len(allOpts) == 0 {
+		return nil
+	}
+
+	// Bulk-load option translations.
+	optIDs := make([]uuid.UUID, len(allOpts))
+	for i := range allOpts {
+		optIDs[i] = allOpts[i].ID
+	}
+	const tQuery = `SELECT option_id, locale, name FROM attribute_option_translations WHERE option_id = ANY($1)`
+	tRows, err := r.db.Query(ctx, tQuery, optIDs)
+	if err != nil {
+		return fmt.Errorf("loadAttrOptionsForMany translations query: %w", err)
+	}
+	defer tRows.Close()
+
+	for tRows.Next() {
+		var t AttributeOptionTranslation
+		if err := tRows.Scan(&t.OptionID, &t.Locale, &t.Name); err != nil {
+			return fmt.Errorf("loadAttrOptionsForMany translations scan: %w", err)
+		}
+		if i, ok := optIdx[t.OptionID]; ok {
+			allOpts[i].Translations = append(allOpts[i].Translations, t)
+		}
+	}
+	if err := tRows.Err(); err != nil {
+		return fmt.Errorf("loadAttrOptionsForMany translations rows: %w", err)
+	}
+
+	for _, o := range allOpts {
+		if ai, ok := idx[o.AttributeID]; ok {
+			attrs[ai].Options = append(attrs[ai].Options, o)
+		}
+	}
+
+	return nil
+}
+
+func (r *postgresRepository) loadAttrOptionTranslations(ctx context.Context, optionID uuid.UUID) ([]AttributeOptionTranslation, error) {
+	const query = `SELECT option_id, locale, name FROM attribute_option_translations WHERE option_id = $1`
+
+	rows, err := r.db.Query(ctx, query, optionID)
+	if err != nil {
+		return nil, fmt.Errorf("loadAttrOptionTranslations query: %w", err)
+	}
+	defer rows.Close()
+
+	var translations []AttributeOptionTranslation
+	for rows.Next() {
+		var t AttributeOptionTranslation
+		if err := rows.Scan(&t.OptionID, &t.Locale, &t.Name); err != nil {
+			return nil, fmt.Errorf("loadAttrOptionTranslations scan: %w", err)
+		}
+		translations = append(translations, t)
+	}
+	return translations, rows.Err()
+}
+
+// enrichAttributeValues loads multi_select option IDs and attribute translations for a slice of values.
+// junctionTable is either "product_attribute_value_options" or "variant_attribute_value_options".
+func (r *postgresRepository) enrichAttributeValues(ctx context.Context, values []AttributeValue, junctionTable string) error {
+	if len(values) == 0 {
+		return nil
+	}
+
+	// Collect value IDs and attribute IDs.
+	valueIDs := make([]uuid.UUID, len(values))
+	attrIDs := make([]uuid.UUID, 0, len(values))
+	attrIDSet := make(map[uuid.UUID]bool)
+	valIdx := make(map[uuid.UUID]int, len(values))
+	for i := range values {
+		valueIDs[i] = values[i].ID
+		valIdx[values[i].ID] = i
+		if !attrIDSet[values[i].AttributeID] {
+			attrIDs = append(attrIDs, values[i].AttributeID)
+			attrIDSet[values[i].AttributeID] = true
+		}
+	}
+
+	// Load multi_select option IDs.
+	optQuery := fmt.Sprintf(`SELECT value_id, option_id FROM %s WHERE value_id = ANY($1)`, junctionTable)
+	rows, err := r.db.Query(ctx, optQuery, valueIDs)
+	if err != nil {
+		return fmt.Errorf("enrichAttributeValues options query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var valueID, optionID uuid.UUID
+		if err := rows.Scan(&valueID, &optionID); err != nil {
+			return fmt.Errorf("enrichAttributeValues options scan: %w", err)
+		}
+		if i, ok := valIdx[valueID]; ok {
+			values[i].OptionIDs = append(values[i].OptionIDs, optionID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("enrichAttributeValues options rows: %w", err)
+	}
+
+	// Load attribute translations.
+	const tQuery = `SELECT attribute_id, locale, name, COALESCE(description,'') FROM attribute_translations WHERE attribute_id = ANY($1)`
+	tRows, err := r.db.Query(ctx, tQuery, attrIDs)
+	if err != nil {
+		return fmt.Errorf("enrichAttributeValues translations query: %w", err)
+	}
+	defer tRows.Close()
+
+	attrTranslations := make(map[uuid.UUID][]AttributeTranslation)
+	for tRows.Next() {
+		var t AttributeTranslation
+		if err := tRows.Scan(&t.AttributeID, &t.Locale, &t.Name, &t.Description); err != nil {
+			return fmt.Errorf("enrichAttributeValues translations scan: %w", err)
+		}
+		attrTranslations[t.AttributeID] = append(attrTranslations[t.AttributeID], t)
+	}
+	if err := tRows.Err(); err != nil {
+		return fmt.Errorf("enrichAttributeValues translations rows: %w", err)
+	}
+
+	for i := range values {
+		if values[i].Attribute != nil {
+			values[i].Attribute.Translations = attrTranslations[values[i].AttributeID]
+		}
+	}
+
+	return nil
+}
+
+// loadProductAttributes loads attribute values for a single product.
+func (r *postgresRepository) loadProductAttributes(ctx context.Context, p *Product) error {
+	values, err := r.FindProductAttributeValues(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	p.Attributes = values
+	return nil
+}
+
+// loadVariantAttributes loads attribute values for a single variant.
+func (r *postgresRepository) loadVariantAttributes(ctx context.Context, v *ProductVariant) error {
+	values, err := r.FindVariantAttributeValues(ctx, v.ID)
+	if err != nil {
+		return err
+	}
+	v.Attributes = values
+	return nil
+}
+
+// nilIfEmpty returns nil if s is empty, otherwise *s.
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // ErrNotFound is returned when a requested product does not exist.

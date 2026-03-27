@@ -417,6 +417,190 @@ func (s *Seeder) seed(ctx context.Context, tx pgx.Tx) error {
 		return fmt.Errorf("product_tags coffee: %w", err)
 	}
 
+	// ── Attributes ──────────────────────────────────────────────────────────
+	s.step("attributes")
+
+	attrBrandID := uuid.New()
+	attrMaterialID := uuid.New()
+	attrWeightID := uuid.New()
+	attrWaterproofID := uuid.New()
+	attrFeaturesID := uuid.New()
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attributes (id, identifier, type, unit, position, filterable, required, created_at, updated_at) VALUES
+		($1, 'brand',       'text',         NULL, 0, true,  false, $6, $6),
+		($2, 'material',    'select',       NULL, 1, true,  false, $6, $6),
+		($3, 'weight',      'number',       'g',  2, false, false, $6, $6),
+		($4, 'waterproof',  'boolean',      NULL, 3, true,  false, $6, $6),
+		($5, 'features',    'multi_select', NULL, 4, true,  false, $6, $6)`,
+		attrBrandID, attrMaterialID, attrWeightID, attrWaterproofID, attrFeaturesID, now,
+	); err != nil {
+		return fmt.Errorf("attributes: %w", err)
+	}
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attribute_translations (attribute_id, locale, name, description) VALUES
+		($1, 'de-DE', 'Marke',        'Hersteller oder Markenname'),
+		($1, 'en-US', 'Brand',        'Manufacturer or brand name'),
+		($2, 'de-DE', 'Material',     'Hauptmaterial des Produkts'),
+		($2, 'en-US', 'Material',     'Primary product material'),
+		($3, 'de-DE', 'Gewicht',      'Gewicht in Gramm'),
+		($3, 'en-US', 'Weight',       'Weight in grams'),
+		($4, 'de-DE', 'Wasserdicht',  'Ist das Produkt wasserdicht?'),
+		($4, 'en-US', 'Waterproof',   'Is the product waterproof?'),
+		($5, 'de-DE', 'Merkmale',     'Besondere Produktmerkmale'),
+		($5, 'en-US', 'Features',     'Special product features')`,
+		attrBrandID, attrMaterialID, attrWeightID, attrWaterproofID, attrFeaturesID,
+	); err != nil {
+		return fmt.Errorf("attribute_translations: %w", err)
+	}
+
+	// Attribute options for Material (select)
+	s.step("attribute_options")
+	aoKottonID := uuid.New()
+	aoPolyesterID := uuid.New()
+	aoLederID := uuid.New()
+	aoMetallID := uuid.New()
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attribute_options (id, attribute_id, position, created_at, updated_at) VALUES
+		($1, $5, 0, $6, $6),
+		($2, $5, 1, $6, $6),
+		($3, $5, 2, $6, $6),
+		($4, $5, 3, $6, $6)`,
+		aoKottonID, aoPolyesterID, aoLederID, aoMetallID, attrMaterialID, now,
+	); err != nil {
+		return fmt.Errorf("attribute_options (material): %w", err)
+	}
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attribute_option_translations (option_id, locale, name) VALUES
+		($1, 'de-DE', 'Baumwolle'),  ($1, 'en-US', 'Cotton'),
+		($2, 'de-DE', 'Polyester'),   ($2, 'en-US', 'Polyester'),
+		($3, 'de-DE', 'Leder'),       ($3, 'en-US', 'Leather'),
+		($4, 'de-DE', 'Metall'),      ($4, 'en-US', 'Metal')`,
+		aoKottonID, aoPolyesterID, aoLederID, aoMetallID,
+	); err != nil {
+		return fmt.Errorf("attribute_option_translations (material): %w", err)
+	}
+
+	// Attribute options for Features (multi_select)
+	aoStreetID := uuid.New()
+	aoSneakerID := uuid.New()
+	aoLeichtID := uuid.New()
+	aoPremiumID := uuid.New()
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attribute_options (id, attribute_id, position, created_at, updated_at) VALUES
+		($1, $5, 0, $6, $6),
+		($2, $5, 1, $6, $6),
+		($3, $5, 2, $6, $6),
+		($4, $5, 3, $6, $6)`,
+		aoStreetID, aoSneakerID, aoLeichtID, aoPremiumID, attrFeaturesID, now,
+	); err != nil {
+		return fmt.Errorf("attribute_options (features): %w", err)
+	}
+
+	if err := exec(ctx, tx, `
+		INSERT INTO attribute_option_translations (option_id, locale, name) VALUES
+		($1, 'de-DE', 'Street Style'),   ($1, 'en-US', 'Street Style'),
+		($2, 'de-DE', 'Sneaker'),         ($2, 'en-US', 'Sneaker'),
+		($3, 'de-DE', 'Leichtgewicht'),   ($3, 'en-US', 'Lightweight'),
+		($4, 'de-DE', 'Premium'),          ($4, 'en-US', 'Premium')`,
+		aoStreetID, aoSneakerID, aoLeichtID, aoPremiumID,
+	); err != nil {
+		return fmt.Errorf("attribute_option_translations (features): %w", err)
+	}
+
+	// Assign attribute values to products
+	s.step("product_attribute_values")
+
+	// Phone: brand=TechMaster, weight=195, waterproof=true
+	pavPhoneBrandID := uuid.New()
+	pavPhoneWeightID := uuid.New()
+	pavPhoneWaterproofID := uuid.New()
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_values (id, product_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at) VALUES
+		($1, $4, $7, 'TechMaster', NULL, NULL, NULL, $10, $10),
+		($2, $4, $8, NULL, 195.0, NULL, NULL, $10, $10),
+		($3, $4, $9, NULL, NULL, true, NULL, $10, $10)`,
+		pavPhoneBrandID, pavPhoneWeightID, pavPhoneWaterproofID,
+		prodPhoneID, /* $4 */
+		nil, nil, /* unused */
+		attrBrandID, attrWeightID, attrWaterproofID, /* $7-$9 */
+		now, /* $10 */
+	); err != nil {
+		return fmt.Errorf("product_attribute_values (phone): %w", err)
+	}
+
+	// Shirt: brand=StyleWear, material=Cotton, weight=200, features=Street Style+Lightweight
+	pavShirtBrandID := uuid.New()
+	pavShirtMaterialID := uuid.New()
+	pavShirtWeightID := uuid.New()
+	pavShirtFeaturesID := uuid.New()
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_values (id, product_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at) VALUES
+		($1, $5, $9,  'StyleWear', NULL,  NULL, NULL, $13, $13),
+		($2, $5, $10, NULL,        NULL,  NULL, $14,  $13, $13),
+		($3, $5, $11, NULL,        200.0, NULL, NULL,  $13, $13),
+		($4, $5, $12, NULL,        NULL,  NULL, NULL,  $13, $13)`,
+		pavShirtBrandID, pavShirtMaterialID, pavShirtWeightID, pavShirtFeaturesID, /* $1-$4 */
+		prodShirtID, /* $5 */
+		nil, nil, nil, /* unused $6-$8 */
+		attrBrandID, attrMaterialID, attrWeightID, attrFeaturesID, /* $9-$12 */
+		now,       /* $13 */
+		aoKottonID, /* $14 */
+	); err != nil {
+		return fmt.Errorf("product_attribute_values (shirt): %w", err)
+	}
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_value_options (value_id, option_id) VALUES ($1, $2), ($1, $3)`,
+		pavShirtFeaturesID, aoStreetID, aoLeichtID,
+	); err != nil {
+		return fmt.Errorf("product_attribute_value_options (shirt features): %w", err)
+	}
+
+	// Bag: material=Leather, weight=500, features=Premium
+	pavBagMaterialID := uuid.New()
+	pavBagWeightID := uuid.New()
+	pavBagFeaturesID := uuid.New()
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_values (id, product_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at) VALUES
+		($1, $4, $7, NULL, NULL,  NULL, $10, $11, $11),
+		($2, $4, $8, NULL, 500.0, NULL, NULL, $11, $11),
+		($3, $4, $9, NULL, NULL,  NULL, NULL, $11, $11)`,
+		pavBagMaterialID, pavBagWeightID, pavBagFeaturesID, /* $1-$3 */
+		prodBagID,        /* $4 */
+		nil, nil,         /* unused $5-$6 */
+		attrMaterialID, attrWeightID, attrFeaturesID, /* $7-$9 */
+		aoLederID,        /* $10 */
+		now,              /* $11 */
+	); err != nil {
+		return fmt.Errorf("product_attribute_values (bag): %w", err)
+	}
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_value_options (value_id, option_id) VALUES ($1, $2)`,
+		pavBagFeaturesID, aoPremiumID,
+	); err != nil {
+		return fmt.Errorf("product_attribute_value_options (bag features): %w", err)
+	}
+
+	// Coffee: brand=BrewMaster, weight=3500
+	pavCoffeeBrandID := uuid.New()
+	pavCoffeeWeightID := uuid.New()
+	if err := exec(ctx, tx, `
+		INSERT INTO product_attribute_values (id, product_id, attribute_id, value_text, value_numeric, value_boolean, option_id, created_at, updated_at) VALUES
+		($1, $3, $5, 'BrewMaster', NULL,   NULL, NULL, $7, $7),
+		($2, $3, $6, NULL,         3500.0, NULL, NULL, $7, $7)`,
+		pavCoffeeBrandID, pavCoffeeWeightID, /* $1-$2 */
+		prodCoffeeID,    /* $3 */
+		nil,             /* unused $4 */
+		attrBrandID, attrWeightID, /* $5-$6 */
+		now,             /* $7 */
+	); err != nil {
+		return fmt.Errorf("product_attribute_values (coffee): %w", err)
+	}
+
 	// ── Shipping Methods ─────────────────────────────────────────────────────
 	s.step("shipping_methods")
 	shipStandardID := uuid.New() // 3.99 € gross

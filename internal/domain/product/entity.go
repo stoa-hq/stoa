@@ -28,6 +28,7 @@ type Product struct {
 	Tags         []uuid.UUID          `json:"tags,omitempty"`
 	Media        []ProductMedia       `json:"media,omitempty"`
 	Variants     []ProductVariant     `json:"variants,omitempty"`
+	Attributes   []AttributeValue    `json:"attributes,omitempty"`
 
 	// HasVariants is true if at least one active variant exists.
 	// Populated by FindAll (list queries) via a lightweight EXISTS sub-query.
@@ -67,7 +68,8 @@ type ProductVariant struct {
 	UpdatedAt    time.Time              `json:"updated_at"`
 
 	// The property options that define this variant (e.g. Size=L, Color=Red).
-	Options []PropertyOption `json:"options,omitempty"`
+	Options    []PropertyOption `json:"options,omitempty"`
+	Attributes []AttributeValue `json:"attributes,omitempty"`
 }
 
 // PropertyGroup groups related property options together (e.g. "Size", "Color").
@@ -104,4 +106,64 @@ type PropertyOptionTranslation struct {
 	OptionID uuid.UUID `json:"option_id"`
 	Locale   string    `json:"locale"`
 	Name     string    `json:"name"`
+}
+
+// --------------------------------------------------------------------------
+// Product Attributes (generic classification, NOT variant-defining)
+// --------------------------------------------------------------------------
+
+// Attribute defines a custom attribute that admins can assign to products/variants.
+type Attribute struct {
+	ID           uuid.UUID              `json:"id"`
+	Identifier   string                 `json:"identifier"`
+	Type         string                 `json:"type"` // text, number, select, multi_select, boolean
+	Unit         string                 `json:"unit,omitempty"`
+	Position     int                    `json:"position"`
+	Filterable   bool                   `json:"filterable"`
+	Required     bool                   `json:"required"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	Translations []AttributeTranslation `json:"translations,omitempty"`
+	Options      []AttributeOption      `json:"options,omitempty"`
+}
+
+// AttributeTranslation provides locale-specific name and description for an attribute.
+type AttributeTranslation struct {
+	AttributeID uuid.UUID `json:"attribute_id"`
+	Locale      string    `json:"locale"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+}
+
+// AttributeOption is a predefined value for select / multi_select attributes.
+type AttributeOption struct {
+	ID           uuid.UUID                    `json:"id"`
+	AttributeID  uuid.UUID                    `json:"attribute_id"`
+	Position     int                          `json:"position"`
+	CreatedAt    time.Time                    `json:"created_at"`
+	UpdatedAt    time.Time                    `json:"updated_at"`
+	Translations []AttributeOptionTranslation `json:"translations,omitempty"`
+}
+
+// AttributeOptionTranslation provides locale-specific names for an attribute option.
+type AttributeOptionTranslation struct {
+	OptionID uuid.UUID `json:"option_id"`
+	Locale   string    `json:"locale"`
+	Name     string    `json:"name"`
+}
+
+// AttributeValue holds a value assignment for a product or variant attribute.
+type AttributeValue struct {
+	ID           uuid.UUID   `json:"id"`
+	AttributeID  uuid.UUID   `json:"attribute_id"`
+	ValueText    *string     `json:"value_text,omitempty"`
+	ValueNumeric *float64    `json:"value_numeric,omitempty"`
+	ValueBoolean *bool       `json:"value_boolean,omitempty"`
+	OptionID     *uuid.UUID  `json:"option_id,omitempty"`
+	OptionIDs    []uuid.UUID `json:"option_ids,omitempty"` // for multi_select
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+
+	// Populated for responses – the full attribute definition.
+	Attribute *Attribute `json:"attribute,omitempty"`
 }

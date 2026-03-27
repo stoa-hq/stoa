@@ -10,6 +10,7 @@
   import { mediaApi } from '$lib/api/media';
   import { taxApi } from '$lib/api/tax';
   import { propertyGroupsApi, type PropertyGroup } from '$lib/api/property-groups';
+  import { attributesApi, type Attribute } from '$lib/api/attributes';
   import { notifications } from '$lib/stores/notifications';
   import type { Media } from '$lib/types';
   import Modal from '$lib/components/Modal.svelte';
@@ -84,6 +85,12 @@
   let warehouseStockEdits = $state<Record<string, number>>({});
   let savingWarehouseStock = $state(false);
 
+  // Attributes
+  let allAttributes = $state<Attribute[]>([]);
+  let attributeValues = $state<Record<string, any>>({});
+  let savingAttributes = $state(false);
+  let editVariantAttrValues = $state<Record<string, any>>({});
+
   let allTaxRules = $state<any[]>([]);
   let selectedTaxRuleId = $state('');
   let priceMode = $state<'gross' | 'net'>('gross');
@@ -100,13 +107,14 @@
 
   onMount(async () => {
     try {
-      const [res, catRes, tagRes, mediaRes, taxRes, pgRes] = await Promise.all([
+      const [res, catRes, tagRes, mediaRes, taxRes, pgRes, attrRes] = await Promise.all([
         productsApi.get(id),
         categoriesApi.list({ limit: 200 }),
         tagsApi.list({ limit: 200 }),
         mediaApi.list({ limit: 200 }),
         taxApi.list({ limit: 200 }),
         propertyGroupsApi.list(),
+        attributesApi.list(),
       ]);
       const product = res.data;
       form = {
@@ -124,6 +132,18 @@
       allTaxRules = (taxRes as any).data ?? [];
       selectedTaxRuleId = product.tax_rule_id ?? '';
       allPropertyGroups = pgRes.data ?? [];
+      allAttributes = attrRes.data ?? [];
+      // Initialize attribute values from product
+      attributeValues = {};
+      for (const av of (product as any).attributes ?? []) {
+        const attr = allAttributes.find((a) => a.id === av.attribute_id);
+        if (!attr) continue;
+        if (attr.type === 'text') attributeValues[av.attribute_id] = av.value_text ?? '';
+        else if (attr.type === 'number') attributeValues[av.attribute_id] = av.value_numeric ?? '';
+        else if (attr.type === 'boolean') attributeValues[av.attribute_id] = av.value_boolean ?? false;
+        else if (attr.type === 'select') attributeValues[av.attribute_id] = av.option_id ?? '';
+        else if (attr.type === 'multi_select') attributeValues[av.attribute_id] = av.option_ids ?? [];
+      }
       // Load warehouse stock (non-fatal).
       try {
         const whRes = await warehousesApi.getProductStock(id);
@@ -265,6 +285,17 @@
     for (const o of v.options ?? []) {
       editVariantOptions[o.group_id] = o.id;
     }
+    // Populate variant attribute values
+    editVariantAttrValues = {};
+    for (const av of v.attributes ?? []) {
+      const attr = allAttributes.find((a) => a.id === av.attribute_id);
+      if (!attr) continue;
+      if (attr.type === 'text') editVariantAttrValues[av.attribute_id] = av.value_text ?? '';
+      else if (attr.type === 'number') editVariantAttrValues[av.attribute_id] = av.value_numeric ?? '';
+      else if (attr.type === 'boolean') editVariantAttrValues[av.attribute_id] = av.value_boolean ?? false;
+      else if (attr.type === 'select') editVariantAttrValues[av.attribute_id] = av.option_id ?? '';
+      else if (attr.type === 'multi_select') editVariantAttrValues[av.attribute_id] = av.option_ids ?? [];
+    }
   }
 
   async function handleEditVariantSubmit(e: SubmitEvent) {
@@ -278,6 +309,23 @@
         stock: Number(editVariantForm.stock),
         option_ids: Object.values(editVariantOptions).filter(Boolean),
       } as any);
+      // Save variant attributes
+      const varAttrs: any[] = [];
+      for (const attr of allAttributes) {
+        const val = editVariantAttrValues[attr.id];
+        if (val === undefined || val === '' || val === null) continue;
+        const entry: any = { attribute_id: attr.id };
+        if (attr.type === 'text') entry.value_text = val;
+        else if (attr.type === 'number') entry.value_numeric = Number(val);
+        else if (attr.type === 'boolean') entry.value_boolean = val;
+        else if (attr.type === 'select') entry.option_id = val;
+        else if (attr.type === 'multi_select' && (val as string[]).length > 0) entry.option_ids = val;
+        else continue;
+        varAttrs.push(entry);
+      }
+      if (varAttrs.length > 0) {
+        await productsApi.setVariantAttributes(id, editVariant.id, { attributes: varAttrs });
+      }
       notifications.success($t('products.variantSaved'));
       editVariant = null;
       const product = await productsApi.get(id);
@@ -346,6 +394,31 @@
   function cancelEditWarehouseStock() {
     editingWarehouseStock = false;
     warehouseStockEdits = {};
+  }
+
+  async function handleSaveAttributes() {
+    savingAttributes = true;
+    try {
+      const attrs: any[] = [];
+      for (const attr of allAttributes) {
+        const val = attributeValues[attr.id];
+        if (val === undefined || val === '' || val === null) continue;
+        const entry: any = { attribute_id: attr.id };
+        if (attr.type === 'text') entry.value_text = val;
+        else if (attr.type === 'number') entry.value_numeric = Number(val);
+        else if (attr.type === 'boolean') entry.value_boolean = val;
+        else if (attr.type === 'select') entry.option_id = val;
+        else if (attr.type === 'multi_select' && (val as string[]).length > 0) entry.option_ids = val;
+        else continue;
+        attrs.push(entry);
+      }
+      await productsApi.setAttributes(id, { attributes: attrs });
+      notifications.success($t('products.attributesSaved'));
+    } catch {
+      notifications.error($t('products.attributesSaveFailed'));
+    } finally {
+      savingAttributes = false;
+    }
   }
 
   async function saveWarehouseStock() {
@@ -585,6 +658,89 @@
     {/if}
   </div>
 
+  <!-- Attributes -->
+  <div class="card p-6 max-w-2xl mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-[var(--text)]">{$t('products.attributes')}</h2>
+    </div>
+
+    {#if allAttributes.length === 0}
+      <p class="text-sm text-[var(--text-muted)]">{$t('products.noAttributesDefined')}</p>
+    {:else}
+      <div class="space-y-4">
+        {#each allAttributes as attr}
+          {@const attrName = tr(attr.translations, 'name', $locale) || attr.identifier}
+          <div>
+            <label class="label" for="attr-{attr.id}">
+              {attrName}{attr.required ? ' *' : ''}
+              {#if attr.unit}
+                <span class="text-xs text-[var(--text-muted)] ml-1">({attr.unit})</span>
+              {/if}
+            </label>
+
+            {#if attr.type === 'text'}
+              <input id="attr-{attr.id}" class="input" type="text"
+                bind:value={attributeValues[attr.id]}
+                placeholder={attrName} />
+
+            {:else if attr.type === 'number'}
+              <div class="flex items-center gap-2">
+                <input id="attr-{attr.id}" class="input flex-1" type="number" step="any"
+                  bind:value={attributeValues[attr.id]} />
+                {#if attr.unit}
+                  <span class="text-sm text-[var(--text-muted)]">{attr.unit}</span>
+                {/if}
+              </div>
+
+            {:else if attr.type === 'boolean'}
+              <div class="flex items-center gap-2">
+                <input id="attr-{attr.id}" type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-primary-600"
+                  bind:checked={attributeValues[attr.id]} />
+                <span class="text-sm text-[var(--text-muted)]">{attrName}</span>
+              </div>
+
+            {:else if attr.type === 'select'}
+              <select id="attr-{attr.id}" class="input" bind:value={attributeValues[attr.id]}>
+                <option value="">{$t('products.attributeNotSet')}</option>
+                {#each attr.options ?? [] as opt}
+                  <option value={opt.id}>{tr(opt.translations, 'name', $locale) || opt.id}</option>
+                {/each}
+              </select>
+
+            {:else if attr.type === 'multi_select'}
+              <div class="border border-[var(--card-border)] rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
+                {#each attr.options ?? [] as opt}
+                  {@const optName = tr(opt.translations, 'name', $locale) || opt.id}
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox"
+                      class="h-4 w-4 rounded border-gray-300 text-primary-600"
+                      checked={(attributeValues[attr.id] ?? []).includes(opt.id)}
+                      onchange={() => {
+                        const current: string[] = attributeValues[attr.id] ?? [];
+                        if (current.includes(opt.id)) {
+                          attributeValues[attr.id] = current.filter((o: string) => o !== opt.id);
+                        } else {
+                          attributeValues[attr.id] = [...current, opt.id];
+                        }
+                      }} />
+                    <span class="text-sm text-[var(--text)]">{optName}</span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
+      <div class="flex gap-3 pt-4">
+        <button type="button" class="btn btn-primary" disabled={savingAttributes} onclick={handleSaveAttributes}>
+          {savingAttributes ? $t('common.saving') : $t('products.attributesSave')}
+        </button>
+      </div>
+    {/if}
+  </div>
+
   <!-- Variants -->
   <div class="card p-6 max-w-2xl">
     <div class="flex items-center justify-between mb-4">
@@ -747,6 +903,78 @@
         <input id="edit-v-active" type="checkbox" bind:checked={editVariantForm.active} class="h-4 w-4 rounded border-gray-300 text-primary-600" />
         <label for="edit-v-active" class="text-sm text-[var(--text-muted)]">{$t('common.active')}</label>
       </div>
+
+      {#if allAttributes.length > 0}
+        <div class="border-t border-[var(--card-border)] pt-4 mt-4">
+          <p class="text-sm font-medium text-[var(--text-muted)] mb-3">{$t('products.attributes')}</p>
+          <div class="space-y-3">
+            {#each allAttributes as attr}
+              {@const attrName = tr(attr.translations, 'name', $locale) || attr.identifier}
+              <div>
+                <label class="label" for="ev-attr-{attr.id}">
+                  {attrName}{attr.required ? ' *' : ''}
+                  {#if attr.unit}
+                    <span class="text-xs text-[var(--text-muted)] ml-1">({attr.unit})</span>
+                  {/if}
+                </label>
+
+                {#if attr.type === 'text'}
+                  <input id="ev-attr-{attr.id}" class="input" type="text"
+                    bind:value={editVariantAttrValues[attr.id]}
+                    placeholder={attrName} />
+
+                {:else if attr.type === 'number'}
+                  <div class="flex items-center gap-2">
+                    <input id="ev-attr-{attr.id}" class="input flex-1" type="number" step="any"
+                      bind:value={editVariantAttrValues[attr.id]} />
+                    {#if attr.unit}
+                      <span class="text-sm text-[var(--text-muted)]">{attr.unit}</span>
+                    {/if}
+                  </div>
+
+                {:else if attr.type === 'boolean'}
+                  <div class="flex items-center gap-2">
+                    <input id="ev-attr-{attr.id}" type="checkbox"
+                      class="h-4 w-4 rounded border-gray-300 text-primary-600"
+                      bind:checked={editVariantAttrValues[attr.id]} />
+                    <span class="text-sm text-[var(--text-muted)]">{attrName}</span>
+                  </div>
+
+                {:else if attr.type === 'select'}
+                  <select id="ev-attr-{attr.id}" class="input" bind:value={editVariantAttrValues[attr.id]}>
+                    <option value="">{$t('products.attributeNotSet')}</option>
+                    {#each attr.options ?? [] as opt}
+                      <option value={opt.id}>{tr(opt.translations, 'name', $locale) || opt.id}</option>
+                    {/each}
+                  </select>
+
+                {:else if attr.type === 'multi_select'}
+                  <div class="border border-[var(--card-border)] rounded-md p-3 space-y-1 max-h-48 overflow-y-auto">
+                    {#each attr.options ?? [] as opt}
+                      {@const optName = tr(opt.translations, 'name', $locale) || opt.id}
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox"
+                          class="h-4 w-4 rounded border-gray-300 text-primary-600"
+                          checked={(editVariantAttrValues[attr.id] ?? []).includes(opt.id)}
+                          onchange={() => {
+                            const current: string[] = editVariantAttrValues[attr.id] ?? [];
+                            if (current.includes(opt.id)) {
+                              editVariantAttrValues[attr.id] = current.filter((o: string) => o !== opt.id);
+                            } else {
+                              editVariantAttrValues[attr.id] = [...current, opt.id];
+                            }
+                          }} />
+                        <span class="text-sm text-[var(--text)]">{optName}</span>
+                      </label>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <div class="flex gap-3 pt-2">
         <button type="submit" class="btn btn-primary" disabled={editVariantSubmitting}>
           {editVariantSubmitting ? $t('common.saving') : $t('common.save')}

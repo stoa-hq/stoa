@@ -342,6 +342,15 @@ func (s *Service) UpdateVariant(ctx context.Context, variantID uuid.UUID, req Up
 // DeleteVariant
 // --------------------------------------------------------------------------
 
+// GetVariantByID returns a single variant by its ID.
+func (s *Service) GetVariantByID(ctx context.Context, variantID uuid.UUID) (*ProductVariant, error) {
+	v, err := s.repo.FindVariantByID(ctx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("service GetVariantByID: %w", err)
+	}
+	return v, nil
+}
+
 // DeleteVariant removes a product variant by its ID.
 func (s *Service) DeleteVariant(ctx context.Context, variantID uuid.UUID) error {
 	if err := s.repo.DeleteVariant(ctx, variantID); err != nil {
@@ -452,6 +461,141 @@ func (s *Service) UpdatePropertyOption(ctx context.Context, o *PropertyOption) e
 func (s *Service) DeletePropertyOption(ctx context.Context, id uuid.UUID) error {
 	if err := s.repo.DeletePropertyOption(ctx, id); err != nil {
 		return fmt.Errorf("service DeletePropertyOption: %w", err)
+	}
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// Attributes
+// --------------------------------------------------------------------------
+
+// validAttributeTypes is the set of allowed attribute type values.
+var validAttributeTypes = map[string]bool{
+	"text": true, "number": true, "select": true, "multi_select": true, "boolean": true,
+}
+
+// ErrInvalidAttributeType is returned when an attribute type is not one of the allowed values.
+var ErrInvalidAttributeType = errors.New("product: invalid attribute type")
+
+// ErrInvalidAttributeValue is returned when a value does not match the attribute type.
+var ErrInvalidAttributeValue = errors.New("product: invalid attribute value for type")
+
+// ListAttributes returns all attribute definitions.
+func (s *Service) ListAttributes(ctx context.Context) ([]Attribute, error) {
+	attrs, err := s.repo.FindAllAttributes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("service ListAttributes: %w", err)
+	}
+	return attrs, nil
+}
+
+// GetAttributeByID returns a single attribute with its options.
+func (s *Service) GetAttributeByID(ctx context.Context, id uuid.UUID) (*Attribute, error) {
+	a, err := s.repo.FindAttributeByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("service GetAttributeByID: %w", err)
+	}
+	return a, nil
+}
+
+// CreateAttribute creates a new attribute definition.
+func (s *Service) CreateAttribute(ctx context.Context, a *Attribute) error {
+	if err := validateIdentifier(a.Identifier); err != nil {
+		return err
+	}
+	if !validAttributeTypes[a.Type] {
+		return ErrInvalidAttributeType
+	}
+	if err := s.repo.CreateAttribute(ctx, a); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return ErrDuplicateIdentifier
+		}
+		return fmt.Errorf("service CreateAttribute: %w", err)
+	}
+	return nil
+}
+
+// UpdateAttribute updates an existing attribute definition.
+func (s *Service) UpdateAttribute(ctx context.Context, a *Attribute) error {
+	if err := validateIdentifier(a.Identifier); err != nil {
+		return err
+	}
+	if !validAttributeTypes[a.Type] {
+		return ErrInvalidAttributeType
+	}
+	if err := s.repo.UpdateAttribute(ctx, a); err != nil {
+		if errors.Is(err, ErrDuplicateIdentifier) {
+			return ErrDuplicateIdentifier
+		}
+		return fmt.Errorf("service UpdateAttribute: %w", err)
+	}
+	return nil
+}
+
+// DeleteAttribute removes an attribute and all associated values.
+func (s *Service) DeleteAttribute(ctx context.Context, id uuid.UUID) error {
+	if err := s.repo.DeleteAttribute(ctx, id); err != nil {
+		return fmt.Errorf("service DeleteAttribute: %w", err)
+	}
+	return nil
+}
+
+// CreateAttributeOption adds an option to a select/multi_select attribute.
+func (s *Service) CreateAttributeOption(ctx context.Context, o *AttributeOption) error {
+	if err := s.repo.CreateAttributeOption(ctx, o); err != nil {
+		return fmt.Errorf("service CreateAttributeOption: %w", err)
+	}
+	return nil
+}
+
+// UpdateAttributeOption updates an existing attribute option.
+func (s *Service) UpdateAttributeOption(ctx context.Context, o *AttributeOption) error {
+	if err := s.repo.UpdateAttributeOption(ctx, o); err != nil {
+		return fmt.Errorf("service UpdateAttributeOption: %w", err)
+	}
+	return nil
+}
+
+// DeleteAttributeOption removes an attribute option.
+func (s *Service) DeleteAttributeOption(ctx context.Context, id uuid.UUID) error {
+	if err := s.repo.DeleteAttributeOption(ctx, id); err != nil {
+		return fmt.Errorf("service DeleteAttributeOption: %w", err)
+	}
+	return nil
+}
+
+// SetProductAttributes sets attribute values on a product.
+func (s *Service) SetProductAttributes(ctx context.Context, productID uuid.UUID, values []AttributeValue) error {
+	for i := range values {
+		if err := s.repo.SetProductAttributeValue(ctx, productID, &values[i]); err != nil {
+			return fmt.Errorf("service SetProductAttributes (attr=%s): %w", values[i].AttributeID, err)
+		}
+	}
+	return nil
+}
+
+// DeleteProductAttributeValue removes a single attribute value from a product.
+func (s *Service) DeleteProductAttributeValue(ctx context.Context, productID, attributeID uuid.UUID) error {
+	if err := s.repo.DeleteProductAttributeValue(ctx, productID, attributeID); err != nil {
+		return fmt.Errorf("service DeleteProductAttributeValue: %w", err)
+	}
+	return nil
+}
+
+// SetVariantAttributes sets attribute values on a variant.
+func (s *Service) SetVariantAttributes(ctx context.Context, variantID uuid.UUID, values []AttributeValue) error {
+	for i := range values {
+		if err := s.repo.SetVariantAttributeValue(ctx, variantID, &values[i]); err != nil {
+			return fmt.Errorf("service SetVariantAttributes (attr=%s): %w", values[i].AttributeID, err)
+		}
+	}
+	return nil
+}
+
+// DeleteVariantAttributeValue removes a single attribute value from a variant.
+func (s *Service) DeleteVariantAttributeValue(ctx context.Context, variantID, attributeID uuid.UUID) error {
+	if err := s.repo.DeleteVariantAttributeValue(ctx, variantID, attributeID); err != nil {
+		return fmt.Errorf("service DeleteVariantAttributeValue: %w", err)
 	}
 	return nil
 }

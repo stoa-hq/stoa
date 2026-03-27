@@ -160,6 +160,61 @@ type BulkResponse struct {
 }
 
 // --------------------------------------------------------------------------
+// Attribute DTOs
+// --------------------------------------------------------------------------
+
+// AttributeTranslationInput carries a single locale translation for an attribute.
+type AttributeTranslationInput struct {
+	Locale      string `json:"locale"      validate:"required"`
+	Name        string `json:"name"        validate:"required,min=1,max=255"`
+	Description string `json:"description"`
+}
+
+// CreateAttributeRequest is the body for creating an attribute definition.
+type CreateAttributeRequest struct {
+	Identifier   string                       `json:"identifier"   validate:"required,min=1,max=255"`
+	Type         string                       `json:"type"         validate:"required,oneof=text number select multi_select boolean"`
+	Unit         string                       `json:"unit"         validate:"max=20"`
+	Position     int                          `json:"position"`
+	Filterable   bool                         `json:"filterable"`
+	Required     bool                         `json:"required"`
+	Translations []AttributeTranslationInput  `json:"translations" validate:"required,min=1,dive"`
+}
+
+// UpdateAttributeRequest is the body for updating an attribute definition.
+type UpdateAttributeRequest = CreateAttributeRequest
+
+// AttributeOptionTranslationInput carries a single locale translation for an attribute option.
+type AttributeOptionTranslationInput struct {
+	Locale string `json:"locale" validate:"required"`
+	Name   string `json:"name"   validate:"required,min=1,max=255"`
+}
+
+// CreateAttributeOptionRequest is the body for creating an attribute option.
+type CreateAttributeOptionRequest struct {
+	Position     int                                `json:"position"`
+	Translations []AttributeOptionTranslationInput  `json:"translations" validate:"required,min=1,dive"`
+}
+
+// UpdateAttributeOptionRequest is the body for updating an attribute option.
+type UpdateAttributeOptionRequest = CreateAttributeOptionRequest
+
+// SetAttributeValueInput describes a single attribute value assignment.
+type SetAttributeValueInput struct {
+	AttributeID  uuid.UUID   `json:"attribute_id"  validate:"required"`
+	ValueText    *string     `json:"value_text"`
+	ValueNumeric *float64    `json:"value_numeric"`
+	ValueBoolean *bool       `json:"value_boolean"`
+	OptionID     *uuid.UUID  `json:"option_id"`
+	OptionIDs    []uuid.UUID `json:"option_ids"`
+}
+
+// SetAttributesRequest is the body for setting attribute values on a product or variant.
+type SetAttributesRequest struct {
+	Attributes []SetAttributeValueInput `json:"attributes" validate:"required,min=1,dive"`
+}
+
+// --------------------------------------------------------------------------
 // Response DTOs
 // --------------------------------------------------------------------------
 
@@ -212,6 +267,56 @@ type PropertyGroupResponse struct {
 	Options      []PropertyOptionResponse            `json:"options,omitempty"`
 }
 
+// AttributeTranslationResponse is a locale-specific attribute name/description in API responses.
+type AttributeTranslationResponse struct {
+	Locale      string `json:"locale"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// AttributeOptionTranslationResponse is a locale-specific option name in API responses.
+type AttributeOptionTranslationResponse struct {
+	Locale string `json:"locale"`
+	Name   string `json:"name"`
+}
+
+// AttributeOptionDetailResponse is an attribute option in API responses.
+type AttributeOptionDetailResponse struct {
+	ID           uuid.UUID                            `json:"id"`
+	AttributeID  uuid.UUID                            `json:"attribute_id"`
+	Position     int                                  `json:"position"`
+	Translations []AttributeOptionTranslationResponse `json:"translations,omitempty"`
+}
+
+// AttributeResponse is the full attribute definition projection in API responses.
+type AttributeResponse struct {
+	ID           uuid.UUID                        `json:"id"`
+	Identifier   string                           `json:"identifier"`
+	Type         string                           `json:"type"`
+	Unit         string                           `json:"unit,omitempty"`
+	Position     int                              `json:"position"`
+	Filterable   bool                             `json:"filterable"`
+	Required     bool                             `json:"required"`
+	CreatedAt    time.Time                        `json:"created_at"`
+	UpdatedAt    time.Time                        `json:"updated_at"`
+	Translations []AttributeTranslationResponse   `json:"translations,omitempty"`
+	Options      []AttributeOptionDetailResponse  `json:"options,omitempty"`
+}
+
+// AttributeValueResponse represents an attribute value assignment in product/variant responses.
+type AttributeValueResponse struct {
+	AttributeID         uuid.UUID                          `json:"attribute_id"`
+	AttributeIdentifier string                             `json:"attribute_identifier"`
+	Type                string                             `json:"type"`
+	Unit                string                             `json:"unit,omitempty"`
+	ValueText           *string                            `json:"value_text,omitempty"`
+	ValueNumeric        *float64                           `json:"value_numeric,omitempty"`
+	ValueBoolean        *bool                              `json:"value_boolean,omitempty"`
+	OptionID            *uuid.UUID                         `json:"option_id,omitempty"`
+	OptionIDs           []uuid.UUID                        `json:"option_ids,omitempty"`
+	Translations        []AttributeTranslationResponse     `json:"translations,omitempty"`
+}
+
 // ProductVariantResponse is the variant projection in API responses.
 type ProductVariantResponse struct {
 	ID           uuid.UUID              `json:"id"`
@@ -220,11 +325,12 @@ type ProductVariantResponse struct {
 	PriceNet     *int                   `json:"price_net,omitempty"`
 	PriceGross   *int                   `json:"price_gross,omitempty"`
 	Stock        int                    `json:"stock"`
-	Active       bool                   `json:"active"`
-	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
-	Options      []PropertyOptionResponse `json:"options,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
+	Active       bool                       `json:"active"`
+	CustomFields map[string]interface{}     `json:"custom_fields,omitempty"`
+	Options      []PropertyOptionResponse   `json:"options,omitempty"`
+	Attributes   []AttributeValueResponse   `json:"attributes,omitempty"`
+	CreatedAt    time.Time                  `json:"created_at"`
+	UpdatedAt    time.Time                  `json:"updated_at"`
 }
 
 // ProductResponse is the full product projection returned by the API.
@@ -248,6 +354,7 @@ type ProductResponse struct {
 	Tags         []uuid.UUID                  `json:"tags,omitempty"`
 	Media        []ProductMediaResponse       `json:"media,omitempty"`
 	Variants     []ProductVariantResponse     `json:"variants,omitempty"`
+	Attributes   []AttributeValueResponse     `json:"attributes,omitempty"`
 }
 
 // ProductListResponse wraps a page of ProductResponse values.
@@ -326,7 +433,14 @@ func ToResponse(p *Product) ProductResponse {
 		for _, o := range v.Options {
 			vr.Options = append(vr.Options, propertyOptionToResponse(o))
 		}
+		for _, av := range v.Attributes {
+			vr.Attributes = append(vr.Attributes, attributeValueToResponse(av))
+		}
 		resp.Variants = append(resp.Variants, vr)
+	}
+
+	for _, av := range p.Attributes {
+		resp.Attributes = append(resp.Attributes, attributeValueToResponse(av))
 	}
 
 	return resp
@@ -410,6 +524,73 @@ func PropertyGroupToResponse(g PropertyGroup) PropertyGroupResponse {
 	}
 	for _, o := range g.Options {
 		resp.Options = append(resp.Options, propertyOptionToResponse(o))
+	}
+	return resp
+}
+
+// AttributeToResponse maps an Attribute entity to its response DTO.
+func AttributeToResponse(a Attribute) AttributeResponse {
+	resp := AttributeResponse{
+		ID:         a.ID,
+		Identifier: a.Identifier,
+		Type:       a.Type,
+		Unit:       a.Unit,
+		Position:   a.Position,
+		Filterable: a.Filterable,
+		Required:   a.Required,
+		CreatedAt:  a.CreatedAt,
+		UpdatedAt:  a.UpdatedAt,
+	}
+	for _, t := range a.Translations {
+		resp.Translations = append(resp.Translations, AttributeTranslationResponse{
+			Locale:      t.Locale,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+	for _, o := range a.Options {
+		resp.Options = append(resp.Options, attributeOptionToDetailResponse(o))
+	}
+	return resp
+}
+
+func attributeOptionToDetailResponse(o AttributeOption) AttributeOptionDetailResponse {
+	resp := AttributeOptionDetailResponse{
+		ID:          o.ID,
+		AttributeID: o.AttributeID,
+		Position:    o.Position,
+	}
+	for _, t := range o.Translations {
+		resp.Translations = append(resp.Translations, AttributeOptionTranslationResponse{
+			Locale: t.Locale,
+			Name:   t.Name,
+		})
+	}
+	return resp
+}
+
+func attributeValueToResponse(v AttributeValue) AttributeValueResponse {
+	resp := AttributeValueResponse{
+		AttributeID:  v.AttributeID,
+		ValueText:    v.ValueText,
+		ValueNumeric: v.ValueNumeric,
+		ValueBoolean: v.ValueBoolean,
+		OptionID:     v.OptionID,
+	}
+	if len(v.OptionIDs) > 0 {
+		resp.OptionIDs = v.OptionIDs
+	}
+	if v.Attribute != nil {
+		resp.AttributeIdentifier = v.Attribute.Identifier
+		resp.Type = v.Attribute.Type
+		resp.Unit = v.Attribute.Unit
+		for _, t := range v.Attribute.Translations {
+			resp.Translations = append(resp.Translations, AttributeTranslationResponse{
+				Locale:      t.Locale,
+				Name:        t.Name,
+				Description: t.Description,
+			})
+		}
 	}
 	return resp
 }

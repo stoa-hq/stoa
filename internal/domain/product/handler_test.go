@@ -393,3 +393,207 @@ func TestParseLocale_AcceptLanguageHeader(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// GET /attributes  (admin list attributes)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminListAttributes_Success(t *testing.T) {
+	repo := &mockRepo{
+		findAllAttributes: func() ([]Attribute, error) {
+			return []Attribute{
+				{ID: uuid.New(), Identifier: "material", Type: "text"},
+				{ID: uuid.New(), Identifier: "weight-kg", Type: "number"},
+			}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/attributes", nil)
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminListAttributes(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	var resp apiResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Data == nil {
+		t.Error("expected data in response")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /attributes  (admin create attribute)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminCreateAttribute_Success(t *testing.T) {
+	body, _ := json.Marshal(CreateAttributeRequest{
+		Identifier:   "material",
+		Type:         "text",
+		Translations: []AttributeTranslationInput{{Locale: "en-US", Name: "Material"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/attributes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreateAttribute(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("status: got %d, want 201; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_AdminCreateAttribute_InvalidJSON(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/attributes", bytes.NewBufferString("not-json"))
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreateAttribute(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}
+
+func TestHandler_AdminCreateAttribute_MissingTranslations(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"identifier": "material",
+		"type":       "text",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/attributes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreateAttribute(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status: got %d, want 422; body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_AdminCreateAttribute_InvalidIdentifier(t *testing.T) {
+	body, _ := json.Marshal(CreateAttributeRequest{
+		Identifier:   "INVALID ID!",
+		Type:         "text",
+		Translations: []AttributeTranslationInput{{Locale: "en-US", Name: "Material"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/attributes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminCreateAttribute(w, req)
+
+	// validator rejects the identifier format at the handler level (min=1,max=255 passes,
+	// but service rejects the format pattern — the handler maps ErrInvalidIdentifier to 422).
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status: got %d, want 422; body: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GET /attributes/{id}  (admin get attribute)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminGetAttribute_NotFound(t *testing.T) {
+	id := uuid.New()
+	req := withChiParam(
+		httptest.NewRequest(http.MethodGet, "/attributes/"+id.String(), nil),
+		"id", id.String(),
+	)
+	w := httptest.NewRecorder()
+
+	// mockRepo.FindAttributeByID returns ErrNotFound by default.
+	newTestHandler(&mockRepo{}).adminGetAttribute(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status: got %d, want 404", w.Code)
+	}
+}
+
+func TestHandler_AdminGetAttribute_Success(t *testing.T) {
+	id := uuid.New()
+	repo := &mockRepo{
+		findAttributeByID: func(got uuid.UUID) (*Attribute, error) {
+			return &Attribute{ID: got, Identifier: "material", Type: "text"}, nil
+		},
+	}
+
+	req := withChiParam(
+		httptest.NewRequest(http.MethodGet, "/attributes/"+id.String(), nil),
+		"id", id.String(),
+	)
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminGetAttribute(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	var resp apiResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Data == nil {
+		t.Error("expected data in response")
+	}
+}
+
+func TestHandler_AdminGetAttribute_InvalidUUID(t *testing.T) {
+	req := withChiParam(
+		httptest.NewRequest(http.MethodGet, "/attributes/bad-id", nil),
+		"id", "bad-id",
+	)
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminGetAttribute(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /attributes/{id}  (admin delete attribute)
+// ---------------------------------------------------------------------------
+
+func TestHandler_AdminDeleteAttribute_Success(t *testing.T) {
+	id := uuid.New()
+	deleted := false
+	repo := &mockRepo{
+		deleteAttribute: func(_ uuid.UUID) error {
+			deleted = true
+			return nil
+		},
+	}
+
+	req := withChiParam(
+		httptest.NewRequest(http.MethodDelete, "/attributes/"+id.String(), nil),
+		"id", id.String(),
+	)
+	w := httptest.NewRecorder()
+
+	newTestHandler(repo).adminDeleteAttribute(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status: got %d, want 204; body: %s", w.Code, w.Body.String())
+	}
+	if !deleted {
+		t.Error("expected repo.DeleteAttribute to be called")
+	}
+}
+
+func TestHandler_AdminDeleteAttribute_InvalidUUID(t *testing.T) {
+	req := withChiParam(
+		httptest.NewRequest(http.MethodDelete, "/attributes/bad-id", nil),
+		"id", "bad-id",
+	)
+	w := httptest.NewRecorder()
+
+	newTestHandler(&mockRepo{}).adminDeleteAttribute(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}

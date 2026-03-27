@@ -59,6 +59,30 @@ type ProductRepository interface {
 	// Bulk / Import helpers
 	FindOrCreatePropertyGroup(ctx context.Context, locale, name string) (*PropertyGroup, error)
 	FindOrCreatePropertyOption(ctx context.Context, groupID uuid.UUID, locale, name string) (*PropertyOption, error)
+
+	// Attributes
+	FindAllAttributes(ctx context.Context) ([]Attribute, error)
+	FindAttributeByID(ctx context.Context, id uuid.UUID) (*Attribute, error)
+	FindAttributeByIdentifier(ctx context.Context, identifier string) (*Attribute, error)
+	CreateAttribute(ctx context.Context, a *Attribute) error
+	UpdateAttribute(ctx context.Context, a *Attribute) error
+	DeleteAttribute(ctx context.Context, id uuid.UUID) error
+
+	// Attribute Options
+	FindAttributeOptionsByAttributeID(ctx context.Context, attrID uuid.UUID) ([]AttributeOption, error)
+	CreateAttributeOption(ctx context.Context, o *AttributeOption) error
+	UpdateAttributeOption(ctx context.Context, o *AttributeOption) error
+	DeleteAttributeOption(ctx context.Context, id uuid.UUID) error
+
+	// Product Attribute Values
+	FindProductAttributeValues(ctx context.Context, productID uuid.UUID) ([]AttributeValue, error)
+	SetProductAttributeValue(ctx context.Context, productID uuid.UUID, val *AttributeValue) error
+	DeleteProductAttributeValue(ctx context.Context, productID, attributeID uuid.UUID) error
+
+	// Variant Attribute Values
+	FindVariantAttributeValues(ctx context.Context, variantID uuid.UUID) ([]AttributeValue, error)
+	SetVariantAttributeValue(ctx context.Context, variantID uuid.UUID, val *AttributeValue) error
+	DeleteVariantAttributeValue(ctx context.Context, variantID, attributeID uuid.UUID) error
 }
 
 // ProductFilter controls the result set returned by FindAll.

@@ -6,7 +6,7 @@
 	import {
 		LayoutDashboard, Package, FolderTree, Wrench, Users, ShoppingCart,
 		Image, Tag, Bookmark, Receipt, Truck, CreditCard, ClipboardList,
-		Warehouse, Settings, KeyRound,
+		Warehouse, Settings, KeyRound, Tags,
 		PanelLeftClose, PanelLeftOpen
 	} from 'lucide-svelte';
 
@@ -21,6 +21,7 @@
 		{ href: '/products', labelKey: 'nav.products', icon: Package },
 		{ href: '/categories', labelKey: 'nav.categories', icon: FolderTree },
 		{ href: '/property-groups', labelKey: 'nav.propertyGroups', icon: Wrench },
+		{ href: '/attributes', labelKey: 'nav.attributes', icon: Tags },
 		{ href: '/customers', labelKey: 'nav.customers', icon: Users },
 		{ href: '/orders', labelKey: 'nav.orders', icon: ShoppingCart },
 		{ href: '/media', labelKey: 'nav.media', icon: Image },

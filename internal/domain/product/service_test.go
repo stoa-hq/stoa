@@ -24,8 +24,12 @@ type mockRepo struct {
 	update              func(ctx context.Context, p *Product) error
 	delete              func(ctx context.Context, id uuid.UUID) error
 	stockAvailable      func(ctx context.Context, productID uuid.UUID, variantID *uuid.UUID, qty int) (bool, error)
-	createPropGroup func(g *PropertyGroup) error
-	updatePropGroup func(g *PropertyGroup) error
+	createPropGroup     func(g *PropertyGroup) error
+	updatePropGroup     func(g *PropertyGroup) error
+	updateAttribute     func(a *Attribute) error
+	deleteAttribute     func(id uuid.UUID) error
+	findAllAttributes   func() ([]Attribute, error)
+	findAttributeByID   func(id uuid.UUID) (*Attribute, error)
 }
 
 func (m *mockRepo) FindByID(ctx context.Context, id uuid.UUID) (*Product, error) {
@@ -119,6 +123,66 @@ func (m *mockRepo) CreatePropertyOption(_ context.Context, o *PropertyOption) er
 }
 func (m *mockRepo) UpdatePropertyOption(_ context.Context, _ *PropertyOption) error { return nil }
 func (m *mockRepo) DeletePropertyOption(_ context.Context, _ uuid.UUID) error       { return nil }
+
+// Attribute stubs
+func (m *mockRepo) FindAllAttributes(_ context.Context) ([]Attribute, error) {
+	if m.findAllAttributes != nil {
+		return m.findAllAttributes()
+	}
+	return nil, nil
+}
+func (m *mockRepo) FindAttributeByID(_ context.Context, id uuid.UUID) (*Attribute, error) {
+	if m.findAttributeByID != nil {
+		return m.findAttributeByID(id)
+	}
+	return nil, ErrNotFound
+}
+func (m *mockRepo) FindAttributeByIdentifier(_ context.Context, _ string) (*Attribute, error) {
+	return nil, ErrNotFound
+}
+func (m *mockRepo) CreateAttribute(_ context.Context, a *Attribute) error {
+	if a.ID == uuid.Nil {
+		a.ID = uuid.New()
+	}
+	return nil
+}
+func (m *mockRepo) UpdateAttribute(_ context.Context, a *Attribute) error {
+	if m.updateAttribute != nil {
+		return m.updateAttribute(a)
+	}
+	return nil
+}
+func (m *mockRepo) DeleteAttribute(_ context.Context, id uuid.UUID) error {
+	if m.deleteAttribute != nil {
+		return m.deleteAttribute(id)
+	}
+	return nil
+}
+func (m *mockRepo) FindAttributeOptionsByAttributeID(_ context.Context, _ uuid.UUID) ([]AttributeOption, error) {
+	return nil, nil
+}
+func (m *mockRepo) CreateAttributeOption(_ context.Context, o *AttributeOption) error {
+	if o.ID == uuid.Nil {
+		o.ID = uuid.New()
+	}
+	return nil
+}
+func (m *mockRepo) UpdateAttributeOption(_ context.Context, _ *AttributeOption) error { return nil }
+func (m *mockRepo) DeleteAttributeOption(_ context.Context, _ uuid.UUID) error        { return nil }
+func (m *mockRepo) FindProductAttributeValues(_ context.Context, _ uuid.UUID) ([]AttributeValue, error) {
+	return nil, nil
+}
+func (m *mockRepo) SetProductAttributeValue(_ context.Context, _ uuid.UUID, _ *AttributeValue) error {
+	return nil
+}
+func (m *mockRepo) DeleteProductAttributeValue(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (m *mockRepo) FindVariantAttributeValues(_ context.Context, _ uuid.UUID) ([]AttributeValue, error) {
+	return nil, nil
+}
+func (m *mockRepo) SetVariantAttributeValue(_ context.Context, _ uuid.UUID, _ *AttributeValue) error {
+	return nil
+}
+func (m *mockRepo) DeleteVariantAttributeValue(_ context.Context, _, _ uuid.UUID) error { return nil }
 
 // Bulk / Import stubs
 func (m *mockRepo) FindOrCreatePropertyGroup(_ context.Context, _, name string) (*PropertyGroup, error) {
@@ -284,5 +348,126 @@ func TestService_List_ReturnsPaginatedResults(t *testing.T) {
 	}
 	if total != 42 {
 		t.Errorf("total: got %d, want 42", total)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CreateAttribute
+// ---------------------------------------------------------------------------
+
+func TestService_CreateAttribute_Success(t *testing.T) {
+	repo := &mockRepo{}
+	a := &Attribute{
+		Identifier: "material",
+		Type:       "text",
+	}
+	if err := newTestService(repo).CreateAttribute(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.ID == uuid.Nil {
+		t.Error("expected attribute ID to be assigned by repo stub")
+	}
+}
+
+func TestService_CreateAttribute_InvalidIdentifier(t *testing.T) {
+	repo := &mockRepo{}
+	a := &Attribute{
+		Identifier: "INVALID ID!",
+		Type:       "text",
+	}
+	err := newTestService(repo).CreateAttribute(context.Background(), a)
+	if !errors.Is(err, ErrInvalidIdentifier) {
+		t.Errorf("expected ErrInvalidIdentifier, got %v", err)
+	}
+}
+
+func TestService_CreateAttribute_InvalidType(t *testing.T) {
+	repo := &mockRepo{}
+	a := &Attribute{
+		Identifier: "material",
+		Type:       "unknown_type",
+	}
+	err := newTestService(repo).CreateAttribute(context.Background(), a)
+	if !errors.Is(err, ErrInvalidAttributeType) {
+		t.Errorf("expected ErrInvalidAttributeType, got %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// UpdateAttribute
+// ---------------------------------------------------------------------------
+
+func TestService_UpdateAttribute_Success(t *testing.T) {
+	updated := false
+	repo := &mockRepo{
+		updateAttribute: func(_ *Attribute) error {
+			updated = true
+			return nil
+		},
+	}
+	a := &Attribute{
+		ID:         uuid.New(),
+		Identifier: "material",
+		Type:       "text",
+	}
+	if err := newTestService(repo).UpdateAttribute(context.Background(), a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !updated {
+		t.Error("expected repo.UpdateAttribute to be called")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DeleteAttribute
+// ---------------------------------------------------------------------------
+
+func TestService_DeleteAttribute_Success(t *testing.T) {
+	deleted := false
+	repo := &mockRepo{
+		deleteAttribute: func(_ uuid.UUID) error {
+			deleted = true
+			return nil
+		},
+	}
+	if err := newTestService(repo).DeleteAttribute(context.Background(), uuid.New()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !deleted {
+		t.Error("expected repo.DeleteAttribute to be called")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// CreateAttributeOption
+// ---------------------------------------------------------------------------
+
+func TestService_CreateAttributeOption_Success(t *testing.T) {
+	attrID := uuid.New()
+	o := &AttributeOption{
+		AttributeID: attrID,
+		Position:    1,
+	}
+	if err := newTestService(&mockRepo{}).CreateAttributeOption(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if o.ID == uuid.Nil {
+		t.Error("expected option ID to be assigned by repo stub")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SetProductAttributes
+// ---------------------------------------------------------------------------
+
+func TestService_SetProductAttributes_Success(t *testing.T) {
+	productID := uuid.New()
+	attrID := uuid.New()
+	text := "cotton"
+	values := []AttributeValue{
+		{AttributeID: attrID, ValueText: &text},
+	}
+	if err := newTestService(&mockRepo{}).SetProductAttributes(context.Background(), productID, values); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

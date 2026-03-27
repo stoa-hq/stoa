@@ -31,6 +31,10 @@ export const productsApi = {
 		api.put<ApiResponse<ProductVariant>>(`${BASE}/${productId}/variants/${variantId}`, data),
 	deleteVariant: (productId: string, variantId: string) =>
 		api.delete<void>(`${BASE}/${productId}/variants/${variantId}`),
+	setAttributes: (productId: string, data: { attributes: any[] }) =>
+		api.put<ApiResponse<Product>>(`${BASE}/${productId}/attributes`, data),
+	setVariantAttributes: (productId: string, variantId: string, data: { attributes: any[] }) =>
+		api.put<ApiResponse<any>>(`${BASE}/${productId}/variants/${variantId}/attributes`, data),
 	bulk: (data: BulkRequest) =>
 		api.post<ApiResponse<BulkResponse>>(`${BASE}/bulk`, data),
 	importCSV: (file: File) => {

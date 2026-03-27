@@ -171,6 +171,48 @@ func transformPropertyOptionArgs(args map[string]any) map[string]any {
 	return args
 }
 
+// transformAttributeArgs converts agent-friendly attribute arguments
+// into the REST API format (name/description → translations array).
+func transformAttributeArgs(args map[string]any) map[string]any {
+	name, _ := args["name"].(string)
+	desc, _ := args["description"].(string)
+	delete(args, "name")
+	delete(args, "description")
+
+	args = transformTranslations(args)
+
+	if _, ok := args["translations"]; !ok {
+		if name != "" {
+			t := map[string]any{"locale": "en-US", "name": name}
+			if desc != "" {
+				t["description"] = desc
+			}
+			args["translations"] = []any{t}
+		}
+	}
+
+	return args
+}
+
+// transformAttributeOptionArgs converts agent-friendly attribute option arguments
+// into the REST API format (name → translations array).
+func transformAttributeOptionArgs(args map[string]any) map[string]any {
+	name, _ := args["name"].(string)
+	delete(args, "name")
+
+	args = transformTranslations(args)
+
+	if _, ok := args["translations"]; !ok {
+		if name != "" {
+			args["translations"] = []any{
+				map[string]any{"locale": "en-US", "name": name},
+			}
+		}
+	}
+
+	return args
+}
+
 // toInt converts a value to int, handling float64 (JSON default) and int.
 func toInt(v any) int {
 	switch n := v.(type) {

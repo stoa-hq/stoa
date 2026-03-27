@@ -16,7 +16,8 @@
     "audit": "Audit-Log",
     "apiKeys": "API Keys",
     "settings": "Einstellungen",
-    "collapse": "Einklappen"
+    "collapse": "Einklappen",
+    "attributes": "Attribute"
   },
   "common": {
     "save": "Speichern",
@@ -169,7 +170,13 @@
     "jsonDescription": "Füge ein JSON-Array von Produkt-Objekten ein. Jedes Objekt folgt dem Schema von {schema} und kann optional ein {variants}-Array enthalten.",
     "jsonExpectsArray": "Erwartet ein JSON-Array von Produkten.",
     "jsonInvalid": "Ungültiges JSON.",
-    "noProductsFound": "Keine Produkte gefunden."
+    "noProductsFound": "Keine Produkte gefunden.",
+    "attributes": "Attribute",
+    "attributesSave": "Attribute speichern",
+    "attributesSaved": "Attribute gespeichert.",
+    "attributesSaveFailed": "Attribute konnten nicht gespeichert werden.",
+    "noAttributesDefined": "Keine Attribute definiert.",
+    "attributeNotSet": "Nicht gesetzt"
   },
   "categories": {
     "title": "Kategorien",
@@ -482,6 +489,48 @@
     "noKeys": "Noch keine API Keys erstellt.",
     "active": "Aktiv",
     "revokedStatus": "Widerrufen"
+  },
+  "attributes": {
+    "title": "Attribute",
+    "newAttribute": "Neues Attribut",
+    "editAttribute": "Attribut bearbeiten",
+    "newAttributeButton": "+ Neues Attribut",
+    "identifier": "Kennung",
+    "identifierHint": "Eindeutige Kennung (Kleinbuchstaben, Bindestriche, Unterstriche)",
+    "type": "Typ",
+    "unit": "Einheit",
+    "unitHint": "Physikalische Einheit (z.B. kg, cm, l)",
+    "filterable": "Filterbar",
+    "required": "Pflichtfeld",
+    "position": "Position",
+    "options": "Ausprägungen",
+    "optionCount": "Ausprägungen",
+    "addOption": "+ Ausprägung hinzufügen",
+    "addOptionTitle": "Ausprägung hinzufügen",
+    "editOption": "Ausprägung bearbeiten",
+    "deleteOptionTitle": "Ausprägung löschen",
+    "deleteOptionMessage": "Soll diese Ausprägung wirklich gelöscht werden?",
+    "noOptions": "Noch keine Ausprägungen vorhanden.",
+    "noAttributes": "Noch keine Attribute vorhanden.",
+    "loadFailed": "Attribute konnten nicht geladen werden.",
+    "loadOneFailed": "Attribut konnte nicht geladen werden.",
+    "saved": "Attribut gespeichert.",
+    "created": "Attribut erstellt.",
+    "deleted": "Attribut gelöscht.",
+    "deleteTitle": "Attribut löschen",
+    "deleteMessage": "Soll dieses Attribut wirklich gelöscht werden? Alle zugehörigen Ausprägungen werden ebenfalls gelöscht.",
+    "optionAdded": "Ausprägung hinzugefügt.",
+    "optionSaved": "Ausprägung gespeichert.",
+    "optionDeleted": "Ausprägung gelöscht.",
+    "optionCreateFailed": "Ausprägung konnte nicht erstellt werden.",
+    "duplicateIdentifier": "Diese Kennung wird bereits verwendet.",
+    "types": {
+      "text": "Text",
+      "number": "Zahl",
+      "select": "Auswahl",
+      "multi_select": "Mehrfachauswahl",
+      "boolean": "Ja / Nein"
+    }
   },
   "modal": {
     "closeLabel": "Modal schließen"

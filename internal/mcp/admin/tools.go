@@ -78,6 +78,18 @@ func RegisterTools(s *server.MCPServer, client *stoamcp.StoaClient) {
 	register(adminUpdatePropertyOption)
 	register(adminDeletePropertyOption)
 
+	// Attributes (10)
+	register(adminListAttributes)
+	register(adminGetAttribute)
+	register(adminCreateAttribute)
+	register(adminUpdateAttribute)
+	register(adminDeleteAttribute)
+	register(adminCreateAttributeOption)
+	register(adminUpdateAttributeOption)
+	register(adminDeleteAttributeOption)
+	register(adminSetProductAttributes)
+	register(adminSetVariantAttributes)
+
 	// Warehouses (8)
 	register(adminListWarehouses)
 	register(adminGetWarehouse)
